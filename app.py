@@ -17,10 +17,18 @@ app.secret_key = os.environ.get('SECRET_KEY', 'farmfresh-rescue-tamilnadu-secure
 
 # Upload configuration
 UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads')
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 MAX_FILE_SIZE = 3 * 1024 * 1024  # 3MB
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
+
+# Ensure database tables and initial seed data exist
+try:
+    init_db()
+    seed_db()
+except Exception as _e:
+    print(f"Database initialization notice: {_e}")
 
 # Tamil Nadu Districts List for unified filtering and dropdowns
 TN_DISTRICTS = [
@@ -1155,8 +1163,7 @@ def file_too_large(e):
 # ==========================================
 
 if __name__ == '__main__':
-    # Initialize database tables and seed sample data if not yet present
-    init_db()
-    seed_db()
-    print("FarmFresh Rescue Platform starting on http://127.0.0.1:5000 ...")
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    debug = os.environ.get('FLASK_DEBUG', 'False').lower() in ('true', '1')
+    print(f"FarmFresh Rescue Platform starting on http://0.0.0.0:{port} ...")
+    app.run(host='0.0.0.0', port=port, debug=debug)
