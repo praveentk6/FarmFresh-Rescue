@@ -82,26 +82,32 @@
 </section>
 
 <!-- Quick Search Banner -->
-<section style="background: white; border-bottom: 1px solid var(--border-subtle); padding: 1.5rem 0;">
+<section class="quick-search-section">
   <div class="container">
-    <form action="{{ url_for('browse_listings') }}" method="GET" style="display: flex; gap: 1rem; flex-wrap: wrap;">
-      <input type="text" name="q" class="filter-input" placeholder="Search produce (e.g. Tomatoes, Shallots, Carrots, Coconut)..." style="flex: 2; min-width: 250px;">
+    <form action="{{ url_for('browse_listings') }}" method="GET" class="quick-search-form">
+      <div class="quick-search-input-wrap">
+        <input type="text" name="q" class="filter-input" placeholder="Search produce (e.g. Tomatoes, Shallots, Carrots)...">
+      </div>
       
-      <select name="district" class="filter-select" style="flex: 1; min-width: 180px;">
-        <option value="">All Tamil Nadu Districts</option>
-        {% for d in tn_districts %}
-          <option value="{{ d }}">{{ d }}</option>
-        {% endfor %}
-      </select>
+      <div class="quick-search-select-wrap">
+        <select name="district" class="filter-select">
+          <option value="">All Districts</option>
+          {% for d in tn_districts %}
+            <option value="{{ d }}">{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
 
-      <select name="category" class="filter-select" style="flex: 1; min-width: 150px;">
-        <option value="">All Categories</option>
-        {% for c in crop_categories %}
-          <option value="{{ c }}">{{ c }}</option>
-        {% endfor %}
-      </select>
+      <div class="quick-search-select-wrap">
+        <select name="category" class="filter-select">
+          <option value="">All Categories</option>
+          {% for c in crop_categories %}
+            <option value="{{ c }}">{{ c }}</option>
+          {% endfor %}
+        </select>
+      </div>
 
-      <button type="submit" class="btn btn-primary" style="flex: 0 0 auto;">Search Produce</button>
+      <button type="submit" class="btn btn-primary quick-search-btn">🔍 Search Produce</button>
     </form>
   </div>
 </section>

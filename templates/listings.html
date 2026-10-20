@@ -65,14 +65,14 @@
         </div>
 
         <!-- Submit Button -->
-        <div style="display: flex; gap: 0.5rem;">
+        <div class="filter-btn-group">
           <button type="submit" class="btn btn-primary" style="height: 42px;">Filter</button>
           <a href="{{ url_for('browse_listings') }}" class="btn btn-secondary" style="height: 42px;" title="Reset filters">Reset</a>
         </div>
       </div>
 
       <!-- Secondary Filters: Price, Quantity, Status, Urgency Toggle -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-subtle);">
+      <div class="filter-secondary-grid">
         <div class="filter-group">
           <label class="filter-label">Min Price (₹)</label>
           <input type="number" name="min_price" value="{{ min_price }}" class="filter-input" placeholder="e.g. 10" min="0">

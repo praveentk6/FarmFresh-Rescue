@@ -6,7 +6,7 @@
 <div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
   
   <!-- Header with Add Listing CTA -->
-  <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+  <div class="dashboard-header">
     <div>
       <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">Farmer Management Portal</div>
       <h1 style="font-size: 2.25rem;">Vanakkam, {{ current_user['name'] }}!</h1>
@@ -75,6 +75,7 @@
 
     {% if listings %}
       <div class="table-responsive">
+        <div class="table-scroll-hint"><span>👉 Swipe horizontally to view full table details</span></div>
         <table class="custom-table">
           <thead>
             <tr>
@@ -181,6 +182,7 @@
 
     {% if enquiries %}
       <div class="table-responsive">
+        <div class="table-scroll-hint"><span>👉 Swipe horizontally to view full table details</span></div>
         <table class="custom-table">
           <thead>
             <tr>

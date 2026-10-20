@@ -16,8 +16,8 @@
       <!-- Role Selection -->
       <div class="form-group">
         <label class="form-label">I am registering as: <span class="required">*</span></label>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-          <label style="display: flex; align-items: center; gap: 0.5rem; background: #f8fafc; border: 1px solid #cbd5e1; padding: 0.85rem; border-radius: var(--radius-md); cursor: pointer;">
+        <div class="role-selection-grid">
+          <label class="role-card-label">
             <input type="radio" name="role" value="farmer" {% if initial_role == 'farmer' or role == 'farmer' %}checked{% endif %} id="roleFarmer">
             <div>
               <strong style="color: #166534; display: block;">👨‍🌾 Farmer / Producer</strong>
@@ -25,7 +25,7 @@
             </div>
           </label>
 
-          <label style="display: flex; align-items: center; gap: 0.5rem; background: #f8fafc; border: 1px solid #cbd5e1; padding: 0.85rem; border-radius: var(--radius-md); cursor: pointer;">
+          <label class="role-card-label">
             <input type="radio" name="role" value="buyer" {% if initial_role == 'buyer' or role == 'buyer' %}checked{% endif %} id="roleBuyer">
             <div>
               <strong style="color: #1e40af; display: block;">🏪 Commercial Buyer</strong>

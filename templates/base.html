@@ -25,42 +25,46 @@
         <span>FarmFresh <span class="brand-rescue">Rescue</span></span>
       </a>
 
-      <button class="menu-toggle" id="menuToggle" aria-label="Toggle Navigation">
-        ☰
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle Navigation" aria-expanded="false">
+        <span class="menu-icon-bar"></span>
+        <span class="menu-icon-bar"></span>
+        <span class="menu-icon-bar"></span>
       </button>
 
-      <ul class="nav-menu" id="navMenu">
-        <li><a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">Home</a></li>
-        <li><a href="{{ url_for('browse_listings') }}" class="nav-link {% if request.endpoint == 'browse_listings' and not request.args.get('urgency') %}active{% endif %}">Browse Produce</a></li>
-        <li>
-          <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="nav-link {% if request.args.get('urgency') == 'urgent_only' %}active{% endif %}" style="color: var(--urgent-red); font-weight: 700;">
-            ⚡ Urgent Rescue
-          </a>
-        </li>
-        <li><a href="{{ url_for('about') }}" class="nav-link {% if request.endpoint == 'about' %}active{% endif %}">About Mission</a></li>
-      </ul>
+      <div class="nav-menu-wrapper" id="navMenuWrapper">
+        <ul class="nav-menu" id="navMenu">
+          <li><a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">Home</a></li>
+          <li><a href="{{ url_for('browse_listings') }}" class="nav-link {% if request.endpoint == 'browse_listings' and not request.args.get('urgency') %}active{% endif %}">Browse Produce</a></li>
+          <li>
+            <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="nav-link nav-urgent-link {% if request.args.get('urgency') == 'urgent_only' %}active{% endif %}">
+              ⚡ Urgent Rescue
+            </a>
+          </li>
+          <li><a href="{{ url_for('about') }}" class="nav-link {% if request.endpoint == 'about' %}active{% endif %}">About Mission</a></li>
+        </ul>
 
-      <div class="nav-actions">
-        {% if current_user %}
-          <div class="user-badge role-{{ current_user['role'] }}">
-            <span>●</span>
-            <span>{{ current_user['name'].split()[0] }} ({{ current_user['role'].capitalize() }})</span>
-          </div>
+        <div class="nav-actions">
+          {% if current_user %}
+            <div class="user-badge role-{{ current_user['role'] }}">
+              <span>●</span>
+              <span>{{ current_user['name'].split()[0] }} ({{ current_user['role'].capitalize() }})</span>
+            </div>
 
-          {% if current_user['role'] == 'farmer' %}
-            <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="farmerDashBtn">My Dashboard</a>
-            <a href="{{ url_for('add_listing') }}" class="btn btn-primary btn-sm" id="addListingNavBtn">+ List Produce</a>
-          {% elif current_user['role'] == 'buyer' %}
-            <a href="{{ url_for('buyer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="buyerDashBtn">My Enquiries</a>
-          {% elif current_user['role'] == 'admin' %}
-            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-accent btn-sm" id="adminDashBtn">Admin Panel</a>
+            {% if current_user['role'] == 'farmer' %}
+              <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="farmerDashBtn">My Dashboard</a>
+              <a href="{{ url_for('add_listing') }}" class="btn btn-primary btn-sm" id="addListingNavBtn">+ List Produce</a>
+            {% elif current_user['role'] == 'buyer' %}
+              <a href="{{ url_for('buyer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="buyerDashBtn">My Enquiries</a>
+            {% elif current_user['role'] == 'admin' %}
+              <a href="{{ url_for('admin_dashboard') }}" class="btn btn-accent btn-sm" id="adminDashBtn">Admin Panel</a>
+            {% endif %}
+
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm" id="logoutBtn" title="Logout">Logout</a>
+          {% else %}
+            <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm" id="loginNavBtn">Log In</a>
+            <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm" id="registerNavBtn">Sign Up Free</a>
           {% endif %}
-
-          <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm" id="logoutBtn" title="Logout">Logout</a>
-        {% else %}
-          <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm" id="loginNavBtn">Log In</a>
-          <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm" id="registerNavBtn">Sign Up Free</a>
-        {% endif %}
+        </div>
       </div>
     </div>
   </header>
