@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Add Produce Listing - FarmFresh Rescue{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="form-card">
+    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+      <a href="{{ url_for('farmer_dashboard') }}">&larr; Back to Farmer Dashboard</a>
+    </div>
+
+    <h1 class="form-title">🌾 List Your Agricultural Produce</h1>
+    <p class="form-subtitle">
+      Post your harvested vegetables, fruits, or grains to connect with nearby wholesale buyers, hotels, and retailers.
+    </p>
+
+    <form action="{{ url_for('add_listing') }}" method="POST" enctype="multipart/form-data" id="addListingForm">
+      
+      <!-- Crop Name & Category -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Crop / Produce Name <span class="required">*</span></label>
+          <input type="text" name="crop_name" value="{{ form_data.get('crop_name', '') }}" class="form-control" placeholder="e.g. Krishnagiri Country Tomatoes, Dindigul Shallots" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Category <span class="required">*</span></label>
+          <select name="category" class="form-control" required>
+            {% for cat in crop_categories %}
+              <option value="{{ cat }}" {% if form_data.get('category') == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Quantity, Unit & Pricing -->
+      <div class="form-row-3">
+        <div class="form-group">
+          <label class="form-label">Available Quantity <span class="required">*</span></label>
+          <input type="number" step="any" min="0.1" name="quantity" value="{{ form_data.get('quantity', '') }}" class="form-control" placeholder="e.g. 500" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Unit of Measure <span class="required">*</span></label>
+          <select name="unit" class="form-control" required>
+            {% for u in crop_units %}
+              <option value="{{ u }}" {% if form_data.get('unit') == u %}selected{% endif %}>{{ u }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Asking Price (₹ / Unit) <span class="required">*</span></label>
+          <input type="number" step="any" min="0.1" name="price_per_unit" value="{{ form_data.get('price_per_unit', '') }}" class="form-control" placeholder="e.g. 22" required>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Standard Market Price (₹ / Unit) <small style="color: #64748b;">(Optional)</small></label>
+          <input type="number" step="any" name="original_price" value="{{ form_data.get('original_price', '') }}" class="form-control" placeholder="Original price to highlight clearance discount">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Harvest Date <span class="required">*</span></label>
+          <input type="date" name="harvest_date" value="{{ form_data.get('harvest_date', default_date) }}" class="form-control" required>
+        </div>
+      </div>
+
+      <!-- Location Details (Tamil Nadu) -->
+      <div class="form-row-3">
+        <div class="form-group">
+          <label class="form-label">Village / Town <span class="required">*</span></label>
+          <input type="text" name="village_town" value="{{ form_data.get('village_town', current_user['location'] if current_user else '') }}" class="form-control" placeholder="e.g. Ottanchathiram" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">District <span class="required">*</span></label>
+          <select name="district" class="form-control" required>
+            <option value="">Select District</option>
+            {% for d in tn_districts %}
+              <option value="{{ d }}" {% if form_data.get('district') == d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">PIN Code <span class="required">*</span></label>
+          <input type="text" name="pin_code" value="{{ form_data.get('pin_code', current_user['pin_code'] if current_user else '') }}" class="form-control" placeholder="6-digit PIN" maxlength="6" required>
+        </div>
+      </div>
+
+      <!-- Contact Details -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Farmer / Contact Person Name <span class="required">*</span></label>
+          <input type="text" name="farmer_name" value="{{ form_data.get('farmer_name', current_user['name'] if current_user else '') }}" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Contact Phone Number <span class="required">*</span></label>
+          <input type="tel" name="farmer_phone" value="{{ form_data.get('farmer_phone', current_user['phone'] if current_user else '') }}" class="form-control" placeholder="10-digit mobile number" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">WhatsApp Number <small style="color: #64748b;">(For direct instant buyer chat)</small></label>
+        <input type="tel" name="whatsapp_number" value="{{ form_data.get('whatsapp_number', current_user['phone'] if current_user else '') }}" class="form-control" placeholder="10-digit WhatsApp number">
+      </div>
+
+      <!-- Description / Produce Notes -->
+      <div class="form-group">
+        <label class="form-label">Produce Details & Condition</label>
+        <textarea name="description" class="form-control" rows="3" placeholder="Describe quality, grading, packaging (crates, gunny bags), and any urgency reasons (bumper harvest, urgent transport clearance needed).">{{ form_data.get('description', '') }}</textarea>
+      </div>
+
+      <!-- Photo Upload with Live Preview -->
+      <div class="form-group">
+        <label class="form-label">Upload Produce Photo <small style="color: #64748b;">(JPG, PNG, WEBP max 3MB - Optional)</small></label>
+        <input type="file" name="photo" id="cropPhotoInput" accept="image/png, image/jpeg, image/webp" class="form-control">
+        
+        <div class="image-preview-container" id="imagePreviewContainer">
+          <span id="previewPlaceholderText" style="color: #94a3b8; font-size: 0.85rem;">Selected image preview will appear here</span>
+          <img id="cropPhotoPreview" class="image-preview" alt="Crop Preview">
+        </div>
+      </div>
+
+      <div class="disclaimer-box" style="margin: 1.5rem 0;">
+        💡 <strong>Urgency Notification:</strong> Listings that remain unsold after 3 days will automatically display a <strong>Needs Attention</strong> badge to alert nearby buyers that urgent rescue is needed before food spoilage occurs.
+      </div>
+
+      <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
+        <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary btn-lg" id="submitProduceBtn">Publish Produce Listing</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

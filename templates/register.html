@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Sign Up - FarmFresh Rescue{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="form-card" style="max-width: 600px; margin: 3rem auto;">
+    
+    <div style="text-align: center; margin-bottom: 2rem;">
+      <h1 class="form-title">Create Free Account</h1>
+      <p class="form-subtitle">Join Tamil Nadu's real-time agricultural produce waste reduction network</p>
+    </div>
+
+    <form action="{{ url_for('register') }}" method="POST">
+      
+      <!-- Role Selection -->
+      <div class="form-group">
+        <label class="form-label">I am registering as: <span class="required">*</span></label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <label style="display: flex; align-items: center; gap: 0.5rem; background: #f8fafc; border: 1px solid #cbd5e1; padding: 0.85rem; border-radius: var(--radius-md); cursor: pointer;">
+            <input type="radio" name="role" value="farmer" {% if initial_role == 'farmer' or role == 'farmer' %}checked{% endif %} id="roleFarmer">
+            <div>
+              <strong style="color: #166534; display: block;">👨‍🌾 Farmer / Producer</strong>
+              <small style="color: #64748b; font-size: 0.775rem;">Sell unsold surplus harvests</small>
+            </div>
+          </label>
+
+          <label style="display: flex; align-items: center; gap: 0.5rem; background: #f8fafc; border: 1px solid #cbd5e1; padding: 0.85rem; border-radius: var(--radius-md); cursor: pointer;">
+            <input type="radio" name="role" value="buyer" {% if initial_role == 'buyer' or role == 'buyer' %}checked{% endif %} id="roleBuyer">
+            <div>
+              <strong style="color: #1e40af; display: block;">🏪 Commercial Buyer</strong>
+              <small style="color: #64748b; font-size: 0.775rem;">Hotels, shops, processors</small>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Full Name & Email -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Full Name <span class="required">*</span></label>
+          <input type="text" name="name" value="{{ name or '' }}" class="form-control" placeholder="e.g. Selvi Shanmugam" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Email Address <span class="required">*</span></label>
+          <input type="email" name="email" value="{{ email or '' }}" class="form-control" placeholder="name@example.com" required>
+        </div>
+      </div>
+
+      <!-- Password & Confirm -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Password <span class="required">*</span></label>
+          <input type="password" name="password" class="form-control" placeholder="Min 6 characters" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Confirm Password <span class="required">*</span></label>
+          <input type="password" name="confirm_password" class="form-control" placeholder="Repeat password" required>
+        </div>
+      </div>
+
+      <!-- Phone & Type -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Contact Phone Number <span class="required">*</span></label>
+          <input type="tel" name="phone" value="{{ phone or '' }}" class="form-control" placeholder="10-digit mobile" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Business / Producer Type</label>
+          <input type="text" name="user_type" value="{{ user_type or '' }}" class="form-control" placeholder="e.g. Smallholder, Restaurant, Supermarket">
+        </div>
+      </div>
+
+      <!-- Location & PIN -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Village / Town / City (Tamil Nadu)</label>
+          <input type="text" name="location" value="{{ location or '' }}" class="form-control" placeholder="e.g. Ottanchathiram, Dindigul">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Postal PIN Code</label>
+          <input type="text" name="pin_code" value="{{ pin_code or '' }}" class="form-control" placeholder="6-digit PIN" maxlength="6">
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top: 1rem;">
+        Complete Registration
+      </button>
+    </form>
+
+    <div style="text-align: center; margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle); font-size: 0.9rem; color: #64748b;">
+      Already have an account? 
+      <a href="{{ url_for('login') }}" style="font-weight: 700; color: var(--primary);">Log In Here</a>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

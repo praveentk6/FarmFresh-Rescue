@@ -1,0 +1,360 @@
+{% extends "base.html" %}
+
+{% block title %}FarmFresh Rescue - Real-Time Produce Waste Reduction Platform{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero">
+  <div class="container">
+    <div class="hero-grid">
+      <div>
+        <div class="hero-tag">
+          <span>🌱</span>
+          <span>Zero Farm Waste Initiative &bull; Tamil Nadu</span>
+        </div>
+        <h1 class="hero-title">
+          Stop Produce Spoilage.<br>
+          <span>Rescue Unsold Harvests</span> in Real Time.
+        </h1>
+        <p class="hero-subtitle">
+          Direct digital bridge connecting Tamil Nadu farmers holding unsold vegetables, fruits, and grains with nearby restaurants, hotels, retail shops, and bulk buyers before precious food goes to waste.
+        </p>
+
+        <div class="hero-actions">
+          <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="btn btn-accent btn-lg" id="heroUrgentBtn">
+            ⚡ Rescue Urgent Listings ({{ needs_attention_count }})
+          </a>
+          <a href="{{ url_for('browse_listings') }}" class="btn btn-primary btn-lg" id="heroBrowseBtn">
+            🔍 Browse All Produce
+          </a>
+          {% if not current_user or current_user['role'] == 'farmer' %}
+            <a href="{{ url_for('add_listing') }}" class="btn btn-secondary btn-lg" id="heroListBtn">
+              + Post Farm Listing
+            </a>
+          {% endif %}
+        </div>
+
+        <!-- Live Platform Metrics -->
+        <div class="hero-stats">
+          <div class="stat-item">
+            <div class="stat-value" id="statAvailable">{{ available_count }}</div>
+            <div class="stat-label">Available Batches</div>
+          </div>
+          <div class="stat-item urgent">
+            <div class="stat-value" id="statUrgent">{{ needs_attention_count }}</div>
+            <div class="stat-label">Needs Attention (3+ d)</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="statRescued">{{ rescued_sold_count }}</div>
+            <div class="stat-label">Batches Rescued</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-value" id="statUsers">{{ total_users_count }}</div>
+            <div class="stat-label">Registered Members</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hero Visual Card -->
+      <div class="hero-visual">
+        <div class="hero-card-preview">
+          <div class="card-floating-badge">
+            <span class="badge-urgent">
+              <span class="pulse-dot"></span> Needs Attention (4 Days Unsold)
+            </span>
+          </div>
+          <img src="{{ url_for('static', filename='uploads/tomatoes.jpg') }}" alt="Krishnagiri Fresh Tomatoes" class="hero-card-img">
+          
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.5rem;">
+            <h3 style="font-size: 1.25rem;">Krishnagiri Hybrid Tomatoes</h3>
+            <span class="price-main" style="color: var(--primary);">₹18 <span style="font-size: 0.85rem; color: #64748b;">/kg</span></span>
+          </div>
+          <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 1rem;">
+            📍 Rayakottai, Krishnagiri &bull; 850 kg available &bull; Harvested 5 days ago
+          </p>
+          <div style="display: flex; gap: 0.5rem;">
+            <a href="{{ url_for('listing_detail', listing_id=1) }}" class="btn btn-accent btn-sm btn-block">Rescue Batch Now</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Quick Search Banner -->
+<section style="background: white; border-bottom: 1px solid var(--border-subtle); padding: 1.5rem 0;">
+  <div class="container">
+    <form action="{{ url_for('browse_listings') }}" method="GET" style="display: flex; gap: 1rem; flex-wrap: wrap;">
+      <input type="text" name="q" class="filter-input" placeholder="Search produce (e.g. Tomatoes, Shallots, Carrots, Coconut)..." style="flex: 2; min-width: 250px;">
+      
+      <select name="district" class="filter-select" style="flex: 1; min-width: 180px;">
+        <option value="">All Tamil Nadu Districts</option>
+        {% for d in tn_districts %}
+          <option value="{{ d }}">{{ d }}</option>
+        {% endfor %}
+      </select>
+
+      <select name="category" class="filter-select" style="flex: 1; min-width: 150px;">
+        <option value="">All Categories</option>
+        {% for c in crop_categories %}
+          <option value="{{ c }}">{{ c }}</option>
+        {% endfor %}
+      </select>
+
+      <button type="submit" class="btn btn-primary" style="flex: 0 0 auto;">Search Produce</button>
+    </form>
+  </div>
+</section>
+
+<!-- Urgent Rescue Needed Section -->
+<section style="padding: 4rem 0;">
+  <div class="container">
+    <div class="section-header">
+      <div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+          <span class="badge-urgent"><span class="pulse-dot"></span> Priority Clearance</span>
+          <span style="font-size: 0.85rem; color: var(--text-muted);">Unsold for 3 or more days</span>
+        </div>
+        <h2 class="section-title">🚨 Urgent Harvest Rescue</h2>
+        <p class="section-subtitle">
+          These produce batches have been listed for 3+ days without a completed sale. Purchase immediately at attractive discounted rates to prevent post-harvest spoilage.
+        </p>
+      </div>
+      <div>
+        <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="btn btn-outline-primary btn-sm">
+          View All Urgent ({{ needs_attention_count }}) &rarr;
+        </a>
+      </div>
+    </div>
+
+    <!-- Urgent Produce Grid -->
+    {% if urgent_listings %}
+      <div class="produce-grid">
+        {% for item in urgent_listings %}
+          <div class="produce-card is-urgent">
+            <div class="card-image-wrap">
+              <div class="card-floating-badge">
+                <span class="badge-urgent">
+                  <span class="pulse-dot"></span> Needs Attention
+                </span>
+              </div>
+
+              {% set days_old, age_label = calculate_listing_age(item['created_at']) %}
+              <div class="card-age-tag">Listed {{ age_label }}</div>
+
+              {% if item['photo'] %}
+                <img src="{{ url_for('static', filename='uploads/' ~ item['photo']) }}" alt="{{ item['crop_name'] }}" class="card-img" loading="lazy">
+              {% else %}
+                <div class="card-img-placeholder">
+                  {% if item['category'] == 'Fruits' %}🥥{% elif item['category'] == 'Flowers' %}🌸{% elif item['category'] == 'Grains & Pulses' %}🌾{% else %}🥦{% endif %}
+                  <span class="placeholder-text">{{ item['category'] }}</span>
+                </div>
+              {% endif %}
+            </div>
+
+            <div class="card-body">
+              <div class="card-meta-top">
+                <span class="badge-category">{{ item['category'] }}</span>
+                <span style="font-size: 0.8rem; font-weight: 600; color: #166534;">
+                  {{ item['quantity'] }} {{ item['unit'] }} left
+                </span>
+              </div>
+
+              <h3 class="crop-title">
+                <a href="{{ url_for('listing_detail', listing_id=item['id']) }}">{{ item['crop_name'] }}</a>
+              </h3>
+
+              <div class="crop-location">
+                <span>📍</span>
+                <span>{{ item['village_town'] }}, {{ item['district'] }}</span>
+              </div>
+
+              <div class="crop-pricing-box">
+                <div>
+                  <span class="price-main">₹{{ "%.0f"|format(item['price_per_unit']) }}</span>
+                  <span class="price-unit">/ {{ item['unit'] }}</span>
+                  {% if item['original_price'] and item['original_price'] > item['price_per_unit'] %}
+                    <span class="price-original">₹{{ "%.0f"|format(item['original_price']) }}</span>
+                  {% endif %}
+                </div>
+                <span style="font-size: 0.75rem; color: #ea580c; font-weight: 700;">Clearance Rate</span>
+              </div>
+
+              <div class="harvest-info">
+                <span>Harvested: {{ item['harvest_date'] }}</span>
+                <span>PIN: {{ item['pin_code'] }}</span>
+              </div>
+
+              <div class="card-farmer-info">
+                <div class="farmer-avatar-name">
+                  <div class="farmer-avatar">{{ item['farmer_name'][0] }}</div>
+                  <div class="farmer-name">{{ item['farmer_name'] }}</div>
+                </div>
+                <a href="{{ url_for('listing_detail', listing_id=item['id']) }}" class="btn btn-accent btn-sm">
+                  Contact Farmer
+                </a>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="empty-state">
+        <span class="empty-icon">🎉</span>
+        <h3 class="empty-title">All Older Harvests Cleared!</h3>
+        <p class="empty-text">No listings are currently older than 3 days. All local produce is moving briskly!</p>
+        <a href="{{ url_for('browse_listings') }}" class="btn btn-primary">Browse All Active Produce</a>
+      </div>
+    {% endif %}
+
+    <!-- Urgency Notice Disclaimer -->
+    <div class="disclaimer-box" style="margin-top: 2rem;">
+      <strong>⚠️ Transparency Disclaimer:</strong> The "Needs Attention" badge indicates listing age (unsold for 3 or more days on this platform) to help prioritize surplus batches before deterioration. It does not certify laboratory food quality or guarantee commercial terms. Buyers should inspect produce upon pickup or delivery.
+    </div>
+  </div>
+</section>
+
+<!-- Fresh Recent Harvests -->
+<section style="background: white; padding: 4rem 0; border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle);">
+  <div class="container">
+    <div class="section-header">
+      <div>
+        <h2 class="section-title">Freshly Listed Farm Harvests</h2>
+        <p class="section-subtitle">Newly added produce from farmers across Tamil Nadu agricultural belts.</p>
+      </div>
+      <div>
+        <a href="{{ url_for('browse_listings') }}" class="btn btn-secondary btn-sm">Explore All Marketplace &rarr;</a>
+      </div>
+    </div>
+
+    <div class="produce-grid">
+      {% for item in recent_listings %}
+        <div class="produce-card {% if is_needs_attention(item) %}is-urgent{% endif %}">
+          <div class="card-image-wrap">
+            <div class="card-floating-badge">
+              {% if is_needs_attention(item) %}
+                <span class="badge-urgent"><span class="pulse-dot"></span> Needs Attention</span>
+              {% else %}
+                <span class="badge-available">● Fresh Listing</span>
+              {% endif %}
+            </div>
+
+            {% set days_old, age_label = calculate_listing_age(item['created_at']) %}
+            <div class="card-age-tag">{{ age_label }}</div>
+
+            {% if item['photo'] %}
+              <img src="{{ url_for('static', filename='uploads/' ~ item['photo']) }}" alt="{{ item['crop_name'] }}" class="card-img" loading="lazy">
+            {% else %}
+              <div class="card-img-placeholder">
+                {% if item['category'] == 'Fruits' %}🥥{% elif item['category'] == 'Flowers' %}🌸{% elif item['category'] == 'Grains & Pulses' %}🌾{% else %}🥦{% endif %}
+                <span class="placeholder-text">{{ item['category'] }}</span>
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="card-body">
+            <div class="card-meta-top">
+              <span class="badge-category">{{ item['category'] }}</span>
+              <span style="font-size: 0.8rem; font-weight: 600; color: #166534;">
+                {{ item['quantity'] }} {{ item['unit'] }}
+              </span>
+            </div>
+
+            <h3 class="crop-title">
+              <a href="{{ url_for('listing_detail', listing_id=item['id']) }}">{{ item['crop_name'] }}</a>
+            </h3>
+
+            <div class="crop-location">
+              <span>📍</span>
+              <span>{{ item['village_town'] }}, {{ item['district'] }}</span>
+            </div>
+
+            <div class="crop-pricing-box">
+              <div>
+                <span class="price-main">₹{{ "%.0f"|format(item['price_per_unit']) }}</span>
+                <span class="price-unit">/ {{ item['unit'] }}</span>
+                {% if item['original_price'] and item['original_price'] > item['price_per_unit'] %}
+                  <span class="price-original">₹{{ "%.0f"|format(item['original_price']) }}</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="harvest-info">
+              <span>Harvested: {{ item['harvest_date'] }}</span>
+              <span>PIN: {{ item['pin_code'] }}</span>
+            </div>
+
+            <div class="card-farmer-info">
+              <div class="farmer-avatar-name">
+                <div class="farmer-avatar">{{ item['farmer_name'][0] }}</div>
+                <div class="farmer-name">{{ item['farmer_name'] }}</div>
+              </div>
+              <a href="{{ url_for('listing_detail', listing_id=item['id']) }}" class="btn btn-outline-primary btn-sm">
+                View Details
+              </a>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- How It Works Section -->
+<section style="padding: 4.5rem 0;">
+  <div class="container">
+    <div style="text-align: center; max-width: 650px; margin: 0 auto 3rem;">
+      <h2 style="font-size: 2.25rem; margin-bottom: 0.75rem;">How FarmFresh Rescue Solves Spoilage</h2>
+      <p style="color: var(--text-muted); font-size: 1.05rem;">
+        Bridging the critical gap between farmers suffering post-harvest bottlenecks and commercial buyers looking for quality produce at direct farm-gate rates.
+      </p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem;">
+      <div style="background: white; padding: 2rem; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm);">
+        <div style="width: 52px; height: 52px; background: #dcfce7; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; margin-bottom: 1.25rem;">
+          👨‍🌾
+        </div>
+        <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">1. Farmers Post Harvest</h3>
+        <p style="color: var(--text-muted); font-size: 0.925rem; line-height: 1.6;">
+          Farmers enter produce quantity, asking price, harvest date, village, and photos. If a batch remains unsold after 3 days, the system automatically marks it with a high-priority <strong>Needs Attention</strong> badge.
+        </p>
+      </div>
+
+      <div style="background: white; padding: 2rem; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm);">
+        <div style="width: 52px; height: 52px; background: #fef3c7; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; margin-bottom: 1.25rem;">
+          🏪
+        </div>
+        <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">2. Nearby Buyers Discover</h3>
+        <p style="color: var(--text-muted); font-size: 0.925rem; line-height: 1.6;">
+          Hotels, restaurants, juice stalls, and retail stores search by crop, district, or PIN code. They can prioritize older batches to secure huge wholesale savings while saving food from rotting.
+        </p>
+      </div>
+
+      <div style="background: white; padding: 2rem; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm);">
+        <div style="width: 52px; height: 52px; background: #dbeafe; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.75rem; margin-bottom: 1.25rem;">
+          🤝
+        </div>
+        <h3 style="font-size: 1.25rem; margin-bottom: 0.5rem;">3. Direct Connect & Rescue</h3>
+        <p style="color: var(--text-muted); font-size: 0.925rem; line-height: 1.6;">
+          Buyers send direct enquiries, call the farmer immediately, or message on WhatsApp. Produce is collected or delivered rapidly, and the farmer marks the listing as <strong>Sold</strong>.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Call to Action Banner -->
+<section style="background: linear-gradient(135deg, #15803d, #14532d); color: white; padding: 4rem 0; text-align: center;">
+  <div class="container">
+    <h2 style="font-size: 2.5rem; color: white; margin-bottom: 1rem;">Are You a Farmer with Unsold Produce?</h2>
+    <p style="font-size: 1.15rem; color: #bbf7d0; max-width: 600px; margin: 0 auto 2rem;">
+      Don't dump your hard work or let it spoil in farm yards. List your vegetables and fruits on FarmFresh Rescue and connect with buyers today.
+    </p>
+    <div style="display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
+      <a href="{{ url_for('register', role='farmer') }}" class="btn btn-accent btn-lg">Join as a Farmer</a>
+      <a href="{{ url_for('register', role='buyer') }}" class="btn btn-secondary btn-lg">Register as a Buyer</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

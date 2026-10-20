@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Browse Agricultural Produce - FarmFresh Rescue{% endblock %}
+{% block meta_desc %}Search and filter fresh farm vegetables, fruits, and grains available across Tamil Nadu. Filter by district, price, quantity, and rescue urgent unsold batches.{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+  
+  <!-- Breadcrumb & Title -->
+  <div style="margin-bottom: 1.5rem;">
+    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">
+      <a href="{{ url_for('index') }}">Home</a> &bull; Produce Marketplace
+    </div>
+    <div style="display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+      <h1 style="font-size: 2.25rem; font-weight: 800;">Agricultural Produce Marketplace</h1>
+      <div style="font-size: 0.95rem; color: var(--text-muted);">
+        Showing <strong>{{ listings|length }}</strong> results 
+        (Total Available: <strong>{{ total_available }}</strong> | Urgent Rescue Needed: <strong style="color: var(--urgent-red);">{{ total_urgent }}</strong>)
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Filter Card -->
+  <div class="filter-card">
+    <form action="{{ url_for('browse_listings') }}" method="GET" id="searchFilterForm">
+      <div class="filter-grid">
+        <!-- Search Keyword -->
+        <div class="filter-group">
+          <label class="filter-label">Search Produce or Farmer</label>
+          <input type="text" name="q" value="{{ search_q }}" class="filter-input" placeholder="Crop name, village, PIN, farmer...">
+        </div>
+
+        <!-- District Filter -->
+        <div class="filter-group">
+          <label class="filter-label">District (Tamil Nadu)</label>
+          <select name="district" class="filter-select">
+            <option value="">All Districts</option>
+            {% for d in tn_districts %}
+              <option value="{{ d }}" {% if district == d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Category -->
+        <div class="filter-group">
+          <label class="filter-label">Category</label>
+          <select name="category" class="filter-select">
+            <option value="">All Categories</option>
+            {% for c in crop_categories %}
+              <option value="{{ c }}" {% if category == c %}selected{% endif %}>{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Sort By -->
+        <div class="filter-group">
+          <label class="filter-label">Sort By</label>
+          <select name="sort" class="filter-select">
+            <option value="urgent" {% if sort_by == 'urgent' %}selected{% endif %}>⚡ Urgent Unsold First</option>
+            <option value="newest" {% if sort_by == 'newest' %}selected{% endif %}>Newest Listed</option>
+            <option value="price_low" {% if sort_by == 'price_low' %}selected{% endif %}>Price: Low to High</option>
+            <option value="price_high" {% if sort_by == 'price_high' %}selected{% endif %}>Price: High to Low</option>
+            <option value="harvest_recent" {% if sort_by == 'harvest_recent' %}selected{% endif %}>Recent Harvest Date</option>
+          </select>
+        </div>
+
+        <!-- Submit Button -->
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="submit" class="btn btn-primary" style="height: 42px;">Filter</button>
+          <a href="{{ url_for('browse_listings') }}" class="btn btn-secondary" style="height: 42px;" title="Reset filters">Reset</a>
+        </div>
+      </div>
+
+      <!-- Secondary Filters: Price, Quantity, Status, Urgency Toggle -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-subtle);">
+        <div class="filter-group">
+          <label class="filter-label">Min Price (₹)</label>
+          <input type="number" name="min_price" value="{{ min_price }}" class="filter-input" placeholder="e.g. 10" min="0">
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Max Price (₹)</label>
+          <input type="number" name="max_price" value="{{ max_price }}" class="filter-input" placeholder="e.g. 100" min="0">
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Min Quantity</label>
+          <input type="number" name="min_qty" value="{{ min_qty }}" class="filter-input" placeholder="e.g. 50" min="0">
+        </div>
+        <div class="filter-group">
+          <label class="filter-label">Listing Status</label>
+          <select name="status" class="filter-select">
+            <option value="Available" {% if status_filter == 'Available' %}selected{% endif %}>Available Only</option>
+            <option value="Sold" {% if status_filter == 'Sold' %}selected{% endif %}>Rescued / Sold</option>
+            <option value="All" {% if status_filter == 'All' %}selected{% endif %}>All Statuses</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Fast Quick-Filter Pills -->
+      <div class="quick-filter-pills">
+        <span style="font-size: 0.825rem; font-weight: 700; color: #475569; align-self: center;">Quick Focus:</span>
+        
+        <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="pill-btn urgent {% if urgency == 'urgent_only' %}active{% endif %}">
+          ⚡ 3+ Days Unsold (Needs Attention)
+        </a>
+        <a href="{{ url_for('browse_listings', category='Vegetables') }}" class="pill-btn {% if category == 'Vegetables' %}active{% endif %}">
+          🥦 Vegetables
+        </a>
+        <a href="{{ url_for('browse_listings', category='Fruits') }}" class="pill-btn {% if category == 'Fruits' %}active{% endif %}">
+          🍌 Fruits
+        </a>
+        <a href="{{ url_for('browse_listings', district='Dindigul') }}" class="pill-btn {% if district == 'Dindigul' %}active{% endif %}">
+          📍 Dindigul
+        </a>
+        <a href="{{ url_for('browse_listings', district='Krishnagiri') }}" class="pill-btn {% if district == 'Krishnagiri' %}active{% endif %}">
+          📍 Krishnagiri
+        </a>
+        <a href="{{ url_for('browse_listings', district='Nilgiris') }}" class="pill-btn {% if district == 'Nilgiris' %}active{% endif %}">
+          📍 Nilgiris (Ooty)
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Urgency Banner Notification if urgency filter active -->
+  {% if urgency == 'urgent_only' %}
+    <div class="disclaimer-box" style="margin-bottom: 2rem;">
+      <strong>⚡ Displaying Urgent Unsold Listings:</strong> These batches have been active on FarmFresh Rescue for 3 or more days without a buyer match. We urge nearby bulk buyers, restaurants, and juice centres to contact farmers quickly to clear this inventory.
+      <br><span style="font-size: 0.8rem; color: #78350f;">* Note: The Needs Attention tag indicates listing age only and does not claim to replace physical produce inspection.</span>
+    </div>
+  {% endif %}
+
+  <!-- Produce Cards Grid -->
+  {% if listings %}
+    <div class="produce-grid">
+      {% for item in listings %}
+        <div class="produce-card {% if is_needs_attention(item) %}is-urgent{% endif %} {% if item['status'] == 'Sold' %}is-sold{% endif %}">
+          <div class="card-image-wrap">
+            <div class="card-floating-badge">
+              {% if item['status'] == 'Sold' %}
+                <span class="badge-sold">✓ Sold / Rescued</span>
+              {% elif is_needs_attention(item) %}
+                <span class="badge-urgent"><span class="pulse-dot"></span> Needs Attention</span>
+              {% else %}
+                <span class="badge-available">● Available</span>
+              {% endif %}
+            </div>
+
+            {% set days_old, age_label = calculate_listing_age(item['created_at']) %}
+            <div class="card-age-tag">Listed {{ age_label }}</div>
+
+            {% if item['photo'] %}
+              <img src="{{ url_for('static', filename='uploads/' ~ item['photo']) }}" alt="{{ item['crop_name'] }}" class="card-img" loading="lazy">
+            {% else %}
+              <div class="card-img-placeholder">
+                {% if item['category'] == 'Fruits' %}🥥{% elif item['category'] == 'Flowers' %}🌸{% elif item['category'] == 'Grains & Pulses' %}🌾{% else %}🥦{% endif %}
+                <span class="placeholder-text">{{ item['category'] }}</span>
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="card-body">
+            <div class="card-meta-top">
+              <span class="badge-category">{{ item['category'] }}</span>
+              <span style="font-size: 0.85rem; font-weight: 700; color: #166534;">
+                {{ item['quantity'] }} {{ item['unit'] }}
+              </span>
+            </div>
+
+            <h3 class="crop-title">
+              <a href="{{ url_for('listing_detail', listing_id=item['id']) }}">{{ item['crop_name'] }}</a>
+            </h3>
+
+            <div class="crop-location">
+              <span>📍</span>
+              <span>{{ item['village_town'] }}, {{ item['district'] }} ({{ item['pin_code'] }})</span>
+            </div>
+
+            <div class="crop-pricing-box">
+              <div>
+                <span class="price-main">₹{{ "%.0f"|format(item['price_per_unit']) }}</span>
+                <span class="price-unit">/ {{ item['unit'] }}</span>
+                {% if item['original_price'] and item['original_price'] > item['price_per_unit'] %}
+                  <span class="price-original">₹{{ "%.0f"|format(item['original_price']) }}</span>
+                {% endif %}
+              </div>
+              {% if is_needs_attention(item) and item['status'] == 'Available' %}
+                <span style="font-size: 0.75rem; color: #ea580c; font-weight: 700;">3+ Days Old</span>
+              {% endif %}
+            </div>
+
+            <div class="harvest-info">
+              <span>Harvested: {{ item['harvest_date'] }}</span>
+              <span>Status: <strong>{{ item['status'] }}</strong></span>
+            </div>
+
+            <div class="card-farmer-info">
+              <div class="farmer-avatar-name">
+                <div class="farmer-avatar">{{ item['farmer_name'][0] }}</div>
+                <div class="farmer-name">{{ item['farmer_name'] }}</div>
+              </div>
+
+              {% if item['status'] == 'Available' %}
+                <a href="{{ url_for('listing_detail', listing_id=item['id']) }}" class="btn btn-sm {% if is_needs_attention(item) %}btn-accent{% else %}btn-outline-primary{% endif %}">
+                  Contact Farmer
+                </a>
+              {% else %}
+                <span class="badge-sold">Sold Out</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <!-- Empty Search Results State -->
+    <div class="empty-state">
+      <span class="empty-icon">🔍</span>
+      <h3 class="empty-title">No Matching Produce Found</h3>
+      <p class="empty-text">
+        We couldn't find any produce listings matching your filter criteria. Try clearing your search keyword or selecting a wider district.
+      </p>
+      <a href="{{ url_for('browse_listings') }}" class="btn btn-primary">Clear All Filters</a>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}FarmFresh Rescue - Connect Farmers & Nearby Buyers to Reduce Agricultural Waste{% endblock %}</title>
+  <meta name="description" content="{% block meta_desc %}Real-time marketplace connecting Tamil Nadu farmers with nearby hotels, shops, and bulk buyers to prevent crop loss and rescue unsold harvests.{% endblock %}">
+  
+  <!-- Favicon & Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- CSS Stylesheet -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+  <!-- Navigation Bar -->
+  <header class="navbar">
+    <div class="container nav-container">
+      <a href="{{ url_for('index') }}" class="nav-brand" id="brandLogo">
+        <span class="brand-leaf">🌾</span>
+        <span>FarmFresh <span class="brand-rescue">Rescue</span></span>
+      </a>
+
+      <button class="menu-toggle" id="menuToggle" aria-label="Toggle Navigation">
+        ☰
+      </button>
+
+      <ul class="nav-menu" id="navMenu">
+        <li><a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">Home</a></li>
+        <li><a href="{{ url_for('browse_listings') }}" class="nav-link {% if request.endpoint == 'browse_listings' and not request.args.get('urgency') %}active{% endif %}">Browse Produce</a></li>
+        <li>
+          <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="nav-link {% if request.args.get('urgency') == 'urgent_only' %}active{% endif %}" style="color: var(--urgent-red); font-weight: 700;">
+            ⚡ Urgent Rescue
+          </a>
+        </li>
+        <li><a href="{{ url_for('about') }}" class="nav-link {% if request.endpoint == 'about' %}active{% endif %}">About Mission</a></li>
+      </ul>
+
+      <div class="nav-actions">
+        {% if current_user %}
+          <div class="user-badge role-{{ current_user['role'] }}">
+            <span>●</span>
+            <span>{{ current_user['name'].split()[0] }} ({{ current_user['role'].capitalize() }})</span>
+          </div>
+
+          {% if current_user['role'] == 'farmer' %}
+            <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="farmerDashBtn">My Dashboard</a>
+            <a href="{{ url_for('add_listing') }}" class="btn btn-primary btn-sm" id="addListingNavBtn">+ List Produce</a>
+          {% elif current_user['role'] == 'buyer' %}
+            <a href="{{ url_for('buyer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="buyerDashBtn">My Enquiries</a>
+          {% elif current_user['role'] == 'admin' %}
+            <a href="{{ url_for('admin_dashboard') }}" class="btn btn-accent btn-sm" id="adminDashBtn">Admin Panel</a>
+          {% endif %}
+
+          <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm" id="logoutBtn" title="Logout">Logout</a>
+        {% else %}
+          <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm" id="loginNavBtn">Log In</a>
+          <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm" id="registerNavBtn">Sign Up Free</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <!-- Flash Messages Section -->
+  <div class="container flash-container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }}">
+            <span>{{ message }}</span>
+            <button type="button" class="alert-close" aria-label="Close alert">&times;</button>
+          </div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+  </div>
+
+  <!-- Main Body Content -->
+  <main id="mainContent">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div>
+          <div class="footer-brand-title">🌾 FarmFresh Rescue</div>
+          <p class="footer-text">
+            A dedicated agricultural waste prevention initiative in Tamil Nadu. We connect hardworking farmers holding unsold bumper harvests with nearby restaurants, hotels, food processors, and bulk retailers before spoilage occurs.
+          </p>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">Produce Marketplace</h4>
+          <ul class="footer-links">
+            <li><a href="{{ url_for('browse_listings', category='Vegetables') }}">Fresh Vegetables</a></li>
+            <li><a href="{{ url_for('browse_listings', category='Fruits') }}">Orchard Fruits</a></li>
+            <li><a href="{{ url_for('browse_listings', urgency='urgent_only') }}">Needs Attention Listings</a></li>
+            <li><a href="{{ url_for('browse_listings', district='Dindigul') }}">Dindigul Market Hub</a></li>
+            <li><a href="{{ url_for('browse_listings', district='Krishnagiri') }}">Krishnagiri Harvests</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">Quick Portals</h4>
+          <ul class="footer-links">
+            {% if current_user %}
+              {% if current_user['role'] == 'farmer' %}
+                <li><a href="{{ url_for('farmer_dashboard') }}">Farmer Dashboard</a></li>
+                <li><a href="{{ url_for('add_listing') }}">Add Produce Listing</a></li>
+              {% elif current_user['role'] == 'buyer' %}
+                <li><a href="{{ url_for('buyer_dashboard') }}">Buyer Enquiries</a></li>
+              {% elif current_user['role'] == 'admin' %}
+                <li><a href="{{ url_for('admin_dashboard') }}">Admin Control Center</a></li>
+              {% endif %}
+            {% else %}
+              <li><a href="{{ url_for('login') }}">Farmer / Buyer Login</a></li>
+              <li><a href="{{ url_for('register', role='farmer') }}">Register as Farmer</a></li>
+              <li><a href="{{ url_for('register', role='buyer') }}">Register as Buyer</a></li>
+            {% endif %}
+            <li><a href="{{ url_for('about') }}">About Agricultural Waste</a></li>
+          </ul>
+        </div>
+
+        <div>
+          <h4 class="footer-col-title">Tamil Nadu Farmer Support</h4>
+          <p class="footer-text" style="font-size: 0.85rem; margin-bottom: 0.75rem;">
+            Ottanchathiram, Rayakottai, Pollachi, Ooty & Kaveri Delta regions.
+          </p>
+          <div style="font-size: 0.85rem; color: #94a3b8; line-height: 1.5;">
+            📞 Support: 1800-425-FARM<br>
+            📍 Regional Hub: Chennai & Madurai, TN<br>
+            ✉️ Email: rescue@farmfresh.org
+          </div>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <div>
+          &copy; {{ now_year }} FarmFresh Rescue. Designed for Agricultural Produce Waste Reduction.
+        </div>
+        <div style="color: #64748b; font-size: 0.8rem;">
+          * "Needs Attention" badge reflects listing duration (3+ days unsold) to prioritize clearance and does not certify lab freshness.
+        </div>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Main JavaScript File -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  {% block extra_scripts %}{% endblock %}
+</body>
+</html>

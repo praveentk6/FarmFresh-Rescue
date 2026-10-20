@@ -1,0 +1,234 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Control Center - FarmFresh Rescue{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+  
+  <div style="margin-bottom: 2rem;">
+    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">Platform Administration</div>
+    <h1 style="font-size: 2.25rem;">Agricultural Waste Prevention Control Center</h1>
+    <p style="color: var(--text-muted); font-size: 0.95rem;">
+      Monitor registered users, active produce listings, waste rescue KPIs, and platform transactions across Tamil Nadu.
+    </p>
+  </div>
+
+  <!-- Admin KPI Counters -->
+  <div class="dashboard-grid-kpis">
+    <div class="kpi-card highlight">
+      <div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">TOTAL USERS</div>
+        <div class="kpi-num" style="color: var(--primary);">{{ total_users }}</div>
+        <div style="font-size: 0.75rem; color: #64748b;">{{ total_farmers }} Farmers &bull; {{ total_buyers }} Buyers</div>
+      </div>
+      <div class="kpi-icon">👥</div>
+    </div>
+
+    <div class="kpi-card">
+      <div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">AVAILABLE PRODUCE</div>
+        <div class="kpi-num" style="color: #059669;">{{ available_listings }}</div>
+        <div style="font-size: 0.75rem; color: #64748b;">Out of {{ total_listings }} Total Listings</div>
+      </div>
+      <div class="kpi-icon">🥦</div>
+    </div>
+
+    <div class="kpi-card urgent">
+      <div>
+        <div style="font-size: 0.8rem; color: #ea580c; font-weight: 700;">NEEDS ATTENTION (3+ d)</div>
+        <div class="kpi-num" style="color: var(--urgent-red);">{{ urgent_count }}</div>
+        <div style="font-size: 0.75rem; color: #ea580c;">High Risk of Spoilage</div>
+      </div>
+      <div class="kpi-icon">⚠️</div>
+    </div>
+
+    <div class="kpi-card">
+      <div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">RESCUED & SOLD</div>
+        <div class="kpi-num" style="color: #0284c7;">{{ sold_listings }}</div>
+        <div style="font-size: 0.75rem; color: #64748b;">{{ total_enquiries }} Total Buyer Enquiries</div>
+      </div>
+      <div class="kpi-icon">🎉</div>
+    </div>
+  </div>
+
+  <!-- Section 1: Listings Moderation -->
+  <div class="data-table-card">
+    <div class="data-table-header">
+      <div>
+        <h2 style="font-size: 1.35rem;">Manage & Moderate Produce Listings</h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Review listings, detect duplicates, or remove inappropriate posts</span>
+      </div>
+      <a href="{{ url_for('add_listing') }}" class="btn btn-outline-primary btn-sm">+ Add Listing</a>
+    </div>
+
+    <div class="table-responsive">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Crop Name</th>
+            <th>Farmer</th>
+            <th>Location</th>
+            <th>Stock & Rate</th>
+            <th>Age / Status</th>
+            <th style="text-align: right;">Moderation Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for l in listings %}
+            <tr>
+              <td>#{{ l['id'] }}</td>
+              <td>
+                <a href="{{ url_for('listing_detail', listing_id=l['id']) }}" style="font-weight: 700;">{{ l['crop_name'] }}</a>
+                <div style="font-size: 0.75rem; color: #64748b;">{{ l['category'] }}</div>
+              </td>
+              <td>
+                <div style="font-weight: 600;">{{ l['farmer_name'] }}</div>
+                <div style="font-size: 0.75rem; color: #64748b;">{{ l['farmer_phone'] }}</div>
+              </td>
+              <td>{{ l['village_town'] }}, {{ l['district'] }}</td>
+              <td>
+                <strong>{{ l['quantity'] }} {{ l['unit'] }}</strong><br>
+                ₹{{ "%.0f"|format(l['price_per_unit']) }} / {{ l['unit'] }}
+              </td>
+              <td>
+                {% set days_old, age_label = calculate_listing_age(l['created_at']) %}
+                {% if is_needs_attention(l) %}
+                  <span class="badge-urgent" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">{{ age_label }}</span>
+                {% else %}
+                  <span style="font-size: 0.8rem; color: #475569;">{{ age_label }}</span>
+                {% endif %}
+                <div style="font-size: 0.75rem; font-weight: 700; margin-top: 0.2rem; color: {% if l['status'] == 'Available' %}#15803d{% else %}#64748b{% endif %};">
+                  {{ l['status'] }}
+                </div>
+              </td>
+              <td>
+                <div class="action-btns" style="justify-content: flex-end;">
+                  <!-- Toggle Status -->
+                  <form action="{{ url_for('toggle_listing_status', listing_id=l['id']) }}" method="POST">
+                    <button type="submit" class="btn btn-sm btn-secondary" title="Toggle status">
+                      {% if l['status'] == 'Available' %}Mark Sold{% else %}Make Available{% endif %}
+                    </button>
+                  </form>
+
+                  <!-- Edit -->
+                  <a href="{{ url_for('edit_listing', listing_id=l['id']) }}" class="btn btn-sm btn-secondary">
+                    ✏️
+                  </a>
+
+                  <!-- Delete -->
+                  <form action="{{ url_for('delete_listing', listing_id=l['id']) }}" method="POST" class="confirm-delete">
+                    <button type="submit" class="btn btn-sm btn-danger" title="Remove Listing">
+                      🗑️
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Section 2: User Accounts Management -->
+  <div class="data-table-card">
+    <div class="data-table-header">
+      <div>
+        <h2 style="font-size: 1.35rem;">Registered User Directory</h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Manage farmers, buyers, and administrators</span>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Role</th>
+            <th>Contact Details</th>
+            <th>Location</th>
+            <th>Type</th>
+            <th>Registered Date</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+            <tr>
+              <td>
+                <div style="font-weight: 700; color: #0f172a;">{{ u['name'] }}</div>
+                <div style="font-size: 0.75rem; color: #64748b;">ID #{{ u['id'] }}</div>
+              </td>
+              <td>
+                <span class="user-badge role-{{ u['role'] }}">
+                  {{ u['role'].capitalize() }}
+                </span>
+              </td>
+              <td>
+                <div>📞 {{ u['phone'] }}</div>
+                <div style="font-size: 0.775rem; color: #64748b;">✉️ {{ u['email'] }}</div>
+              </td>
+              <td>{{ u['location'] or '-' }}</td>
+              <td>{{ u['user_type'] or '-' }}</td>
+              <td>{{ u['created_at'].split()[0] if ' ' in u['created_at'] else u['created_at'] }}</td>
+              <td style="text-align: right;">
+                {% if u['id'] != current_user['id'] %}
+                  <form action="{{ url_for('admin_delete_user', user_id=u['id']) }}" method="POST" class="confirm-delete" style="display: inline;">
+                    <button type="submit" class="btn btn-danger btn-sm" title="Delete User">
+                      Delete
+                    </button>
+                  </form>
+                {% else %}
+                  <span style="font-size: 0.8rem; color: #166534; font-weight: 600;">(Current Admin)</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Section 3: Platform Audit & Activity Logs -->
+  <div class="data-table-card">
+    <div class="data-table-header">
+      <div>
+        <h2 style="font-size: 1.35rem;">Platform Audit & Activity Log</h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Real-time tracking of platform transactions, listings, and updates</span>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Timestamp</th>
+            <th>Action</th>
+            <th>Details</th>
+            <th>User</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for log in logs %}
+            <tr>
+              <td style="font-size: 0.8rem; color: #64748b; white-space: nowrap;">
+                {{ log['created_at'] }}
+              </td>
+              <td>
+                <span style="font-weight: 700; font-size: 0.85rem; color: var(--primary-dark);">
+                  {{ log['action'] }}
+                </span>
+              </td>
+              <td style="font-size: 0.85rem;">{{ log['details'] }}</td>
+              <td style="font-size: 0.8rem; color: #64748b;">{{ log['user_email'] }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

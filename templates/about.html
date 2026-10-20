@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}About FarmFresh Rescue - Agricultural Waste Reduction Mission{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 3rem; padding-bottom: 5rem;">
+  
+  <div style="max-width: 820px; margin: 0 auto;">
+    
+    <div style="text-align: center; margin-bottom: 3rem;">
+      <span class="hero-tag">Mission & Architecture</span>
+      <h1 style="font-size: 2.75rem; margin-top: 0.5rem; margin-bottom: 1rem;">
+        Rescuing Agricultural Produce.<br>
+        <span style="color: var(--primary);">Empowering Tamil Nadu Farmers.</span>
+      </h1>
+      <p style="font-size: 1.15rem; color: #475569; line-height: 1.7;">
+        FarmFresh Rescue is a real-time digital agricultural waste prevention platform engineered to connect farmers holding unsold surplus fruits, vegetables, and grains directly with local commercial buyers before spoilage occurs.
+      </p>
+    </div>
+
+    <!-- The Problem & Solution -->
+    <div style="background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); padding: 2.25rem; box-shadow: var(--shadow-sm); margin-bottom: 2rem;">
+      <h2 style="font-size: 1.5rem; margin-bottom: 1rem; color: var(--primary-dark);">The Agricultural Waste Challenge</h2>
+      <p style="color: #334155; line-height: 1.8; margin-bottom: 1rem;">
+        In India, an estimated <strong>16% to 30% of perishable agricultural produce</strong> (notably tomatoes, leafy vegetables, onions, and seasonal fruits) is lost post-harvest due to market access bottlenecks, temporary wholesale gluts, and lack of immediate cold storage facilities.
+      </p>
+      <p style="color: #334155; line-height: 1.8;">
+        During peak seasons in Tamil Nadu regions like Ottanchathiram, Rayakottai, and Pollachi, farmers are often compelled to distress-sell or abandon healthy harvests on roadside verges when central mandis face oversupply. FarmFresh Rescue converts this unsold inventory into discovery opportunities for nearby hotels, restaurants, caterers, and food processing units.
+      </p>
+    </div>
+
+    <!-- The Urgency Indicator Explained -->
+    <div style="background: #fff7ed; border-radius: var(--radius-lg); border: 1px solid #fdba74; padding: 2.25rem; margin-bottom: 2rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+        <span class="badge-urgent"><span class="pulse-dot"></span> Needs Attention Badge</span>
+        <h2 style="font-size: 1.35rem; color: #9a3412; margin: 0;">How Urgency is Tracked & Flagged</h2>
+      </div>
+      <p style="color: #9a3412; line-height: 1.8; margin-bottom: 1rem;">
+        When a farmer posts a produce listing, our system monitors its duration on the platform. If a listing remains unsold and available for <strong>3 or more days</strong>, the application automatically flags it with the high-visibility <strong>Needs Attention</strong> badge.
+      </p>
+      
+      <div class="disclaimer-box" style="background: white; border-left-color: #ea580c; margin-top: 1.25rem;">
+        <strong>⚠️ Transparency Notice & Disclaimer:</strong><br>
+        The "Needs Attention" badge indicates <em>listing age only</em> (that 3+ days have elapsed since listing without a recorded sale). It serves to prioritize clearance and alerts conscious buyers to intervene before crops rot. The badge <strong>does not claim to perform laboratory freshness verification, microbiological testing, or guarantee commercial performance</strong>. Buyers and farmers are encouraged to inspect produce upon collection.
+      </div>
+    </div>
+
+    <!-- Core Pillars -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; margin-bottom: 3rem;">
+      <div style="background: white; border: 1px solid var(--border-subtle); padding: 1.5rem; border-radius: var(--radius-md);">
+        <div style="font-size: 1.75rem; margin-bottom: 0.5rem;">👨‍🌾</div>
+        <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">For Farmers</h3>
+        <p style="font-size: 0.9rem; color: #64748b; line-height: 1.6;">
+          Post bumper stock, set minimum reserve prices in Indian Rupees (₹), track listing age, connect directly via WhatsApp/Calls, and mark batches as sold.
+        </p>
+      </div>
+
+      <div style="background: white; border: 1px solid var(--border-subtle); padding: 1.5rem; border-radius: var(--radius-md);">
+        <div style="font-size: 1.75rem; margin-bottom: 0.5rem;">🏪</div>
+        <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">For Buyers</h3>
+        <p style="font-size: 0.9rem; color: #64748b; line-height: 1.6;">
+          Filter by district, PIN, price, and urgency. Rescue high-quality farm produce at discounted clearance rates while trimming commercial procurement costs.
+        </p>
+      </div>
+
+      <div style="background: white; border: 1px solid var(--border-subtle); padding: 1.5rem; border-radius: var(--radius-md);">
+        <div style="font-size: 1.75rem; margin-bottom: 0.5rem;">🛡️</div>
+        <h3 style="font-size: 1.15rem; margin-bottom: 0.5rem;">For Platform Admins</h3>
+        <p style="font-size: 0.9rem; color: #64748b; line-height: 1.6;">
+          Monitor real-time platform transactions, moderate duplicate or spam listings, manage registered users, and track total agricultural waste prevented.
+        </p>
+      </div>
+    </div>
+
+    <!-- Suitable Tamil Nadu Produce Showcase -->
+    <div style="background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); padding: 2.25rem;">
+      <h2 style="font-size: 1.5rem; margin-bottom: 1rem;">Key Agricultural Hubs in Tamil Nadu</h2>
+      <ul style="color: #334155; line-height: 1.8; margin-left: 1.25rem; font-size: 0.95rem;">
+        <li><strong>Krishnagiri & Dharmapuri:</strong> Country hybrid tomatoes, mangoes, and capsicum.</li>
+        <li><strong>Dindigul (Ottanchathiram):</strong> Famous Bellary small onions (shallots), drumsticks, and green chilies.</li>
+        <li><strong>The Nilgiris (Ooty & Ketti):</strong> High-altitude crunchy mountain carrots, cabbage, and potatoes.</li>
+        <li><strong>Pollachi & Anamalai:</strong> Premium tender coconuts (elaneer) and organic bananas.</li>
+        <li><strong>Madurai:</strong> Fragrant Madurai Malli (jasmine buds) requiring immediate daily clearance.</li>
+        <li><strong>Thanjavur & Kaveri Delta:</strong> Ponni paddy, black gram, and green gram harvests.</li>
+      </ul>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}

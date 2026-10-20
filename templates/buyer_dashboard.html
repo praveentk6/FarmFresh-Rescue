@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+
+{% block title %}Buyer Dashboard - FarmFresh Rescue{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+  
+  <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">Buyer Procurement Center</div>
+      <h1 style="font-size: 2.25rem;">Vanakkam, {{ current_user['name'] }}!</h1>
+      <p style="color: var(--text-muted); font-size: 0.95rem;">
+        Track your purchase requests, connect directly with farmers, and source fresh farm harvests at fair rates.
+      </p>
+    </div>
+    <div>
+      <a href="{{ url_for('browse_listings') }}" class="btn btn-primary btn-lg">
+        🔍 Explore Produce Marketplace
+      </a>
+    </div>
+  </div>
+
+  <!-- Buyer Sent Enquiries Table -->
+  <div class="data-table-card">
+    <div class="data-table-header">
+      <div>
+        <h2 style="font-size: 1.35rem;">My Purchase Enquiries</h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Requests sent to local farmers</span>
+      </div>
+    </div>
+
+    {% if enquiries %}
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Produce Item</th>
+              <th>Farmer Contact</th>
+              <th>Your Offer / Qty</th>
+              <th>Enquiry Note</th>
+              <th>Status</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in enquiries %}
+              <tr>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    {% if e['photo'] %}
+                      <img src="{{ url_for('static', filename='uploads/' ~ e['photo']) }}" alt="{{ e['crop_name'] }}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px;">
+                    {% else %}
+                      <div style="width: 44px; height: 44px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        🥦
+                      </div>
+                    {% endif %}
+                    <div>
+                      <a href="{{ url_for('listing_detail', listing_id=e['listing_id']) }}" style="font-weight: 700; color: #0f172a;">
+                        {{ e['crop_name'] }}
+                      </a>
+                      <div style="font-size: 0.75rem; color: #64748b;">
+                        Listing Rate: ₹{{ "%.0f"|format(e['price_per_unit']) }} / {{ e['unit'] }}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div style="font-weight: 700;">{{ e['farmer_name'] }}</div>
+                  <div style="font-size: 0.775rem; color: #64748b;">
+                    📍 {{ e['village_town'] }}, {{ e['district'] }}<br>
+                    📞 {{ e['farmer_phone'] }}
+                  </div>
+                </td>
+                <td>
+                  {% if e['requested_quantity'] %}
+                    <div>Requested: <strong>{{ e['requested_quantity'] }}</strong> {{ e['unit'] }}</div>
+                  {% endif %}
+                  {% if e['offered_price'] %}
+                    <div style="color: #166534; font-weight: 700;">Offered: ₹{{ "%.0f"|format(e['offered_price']) }} / {{ e['unit'] }}</div>
+                  {% endif %}
+                </td>
+                <td style="max-width: 250px;">
+                  <div style="font-size: 0.85rem; color: #334155;">{{ e['message'] }}</div>
+                  <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">Sent: {{ e['created_at'].split()[0] if ' ' in e['created_at'] else e['created_at'] }}</div>
+                </td>
+                <td>
+                  {% if e['status'] == 'Pending' %}
+                    <span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Pending</span>
+                  {% elif e['status'] == 'Accepted' %}
+                    <span style="background: #dcfce7; color: #166534; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Accepted</span>
+                  {% elif e['status'] == 'Completed' %}
+                    <span style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Completed</span>
+                  {% else %}
+                    <span style="background: #f1f5f9; color: #64748b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ e['status'] }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <div style="display: flex; gap: 0.35rem; justify-content: flex-end;">
+                    <a href="tel:{{ e['farmer_phone'] }}" class="btn btn-secondary btn-sm" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">
+                      📞 Call
+                    </a>
+                    {% set wa_num = e['whatsapp_number'] or e['farmer_phone'] %}
+                    {% set clean_wa = wa_num.replace(' ', '').replace('-', '').replace('+91', '') %}
+                    <a href="https://wa.me/91{{ clean_wa }}?text=Hello%20{{ e['farmer_name'] }}%2C%20following%20up%20on%20my%20enquiry%20for%20{{ e['crop_name'] }}." 
+                       target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">
+                      💬 Chat
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state" style="padding: 2.5rem 1.5rem;">
+        <span class="empty-icon">🛒</span>
+        <h3 class="empty-title">You Haven't Sent Any Enquiries Yet</h3>
+        <p class="empty-text">Browse our real-time farm marketplace to discover fresh produce from local farmers.</p>
+        <a href="{{ url_for('browse_listings') }}" class="btn btn-primary">Browse Produce Listings</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Urgent Rescue Spotlight for Buyer -->
+  {% if urgent_recommendations %}
+    <div style="margin-top: 3rem;">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">⚡ High-Priority Produce Needing Rescue</h2>
+          <p class="section-subtitle">These batches are 3+ days old and available at attractive clearance prices.</p>
+        </div>
+        <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="btn btn-outline-primary btn-sm">
+          View All Urgent &rarr;
+        </a>
+      </div>
+
+      <div class="produce-grid">
+        {% for item in urgent_recommendations %}
+          <div class="produce-card is-urgent">
+            <div class="card-image-wrap">
+              <div class="card-floating-badge">
+                <span class="badge-urgent"><span class="pulse-dot"></span> Needs Attention</span>
+              </div>
+              {% set days_old, age_label = calculate_listing_age(item['created_at']) %}
+              <div class="card-age-tag">Listed {{ age_label }}</div>
+              {% if item['photo'] %}
+                <img src="{{ url_for('static', filename='uploads/' ~ item['photo']) }}" alt="{{ item['crop_name'] }}" class="card-img" loading="lazy">
+              {% else %}
+                <div class="card-img-placeholder">🥦</div>
+              {% endif %}
+            </div>
+            <div class="card-body">
+              <h3 class="crop-title">
+                <a href="{{ url_for('listing_detail', listing_id=item['id']) }}">{{ item['crop_name'] }}</a>
+              </h3>
+              <div class="crop-location">📍 {{ item['village_town'] }}, {{ item['district'] }}</div>
+              <div class="crop-pricing-box">
+                <span class="price-main">₹{{ "%.0f"|format(item['price_per_unit']) }}</span>
+                <span class="price-unit">/ {{ item['unit'] }}</span>
+              </div>
+              <a href="{{ url_for('listing_detail', listing_id=item['id']) }}" class="btn btn-accent btn-sm btn-block">Enquire Now</a>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

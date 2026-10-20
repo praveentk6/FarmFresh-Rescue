@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Edit {{ listing['crop_name'] }} - FarmFresh Rescue{% endblock %}
+
+{% block content %}
+<div class="container">
+  <div class="form-card">
+    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
+      <a href="{{ url_for('farmer_dashboard') }}">&larr; Back to Farmer Dashboard</a>
+    </div>
+
+    <h1 class="form-title">✏️ Update Produce Listing</h1>
+    <p class="form-subtitle">
+      Modify quantity, price, location, harvest date, or status for <strong>{{ listing['crop_name'] }}</strong> (Listing #{{ listing['id'] }}).
+    </p>
+
+    <form action="{{ url_for('edit_listing', listing_id=listing['id']) }}" method="POST" enctype="multipart/form-data">
+      
+      <!-- Produce Name & Category -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Crop / Produce Name <span class="required">*</span></label>
+          <input type="text" name="crop_name" value="{{ listing['crop_name'] }}" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Category <span class="required">*</span></label>
+          <select name="category" class="form-control" required>
+            {% for cat in crop_categories %}
+              <option value="{{ cat }}" {% if listing['category'] == cat %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Quantity, Unit & Price -->
+      <div class="form-row-3">
+        <div class="form-group">
+          <label class="form-label">Available Quantity <span class="required">*</span></label>
+          <input type="number" step="any" min="0.1" name="quantity" value="{{ listing['quantity'] }}" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Unit of Measure <span class="required">*</span></label>
+          <select name="unit" class="form-control" required>
+            {% for u in crop_units %}
+              <option value="{{ u }}" {% if listing['unit'] == u %}selected{% endif %}>{{ u }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Asking Price (₹ / Unit) <span class="required">*</span></label>
+          <input type="number" step="any" min="0.1" name="price_per_unit" value="{{ listing['price_per_unit'] }}" class="form-control" required>
+        </div>
+      </div>
+
+      <!-- Original price & Harvest date -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Standard Market Price (₹ / Unit)</label>
+          <input type="number" step="any" name="original_price" value="{{ listing['original_price'] or '' }}" class="form-control">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Harvest Date <span class="required">*</span></label>
+          <input type="date" name="harvest_date" value="{{ listing['harvest_date'] }}" class="form-control" required>
+        </div>
+      </div>
+
+      <!-- Status dropdown -->
+      <div class="form-group">
+        <label class="form-label">Produce Status <span class="required">*</span></label>
+        <select name="status" class="form-control" style="font-weight: 700;">
+          <option value="Available" {% if listing['status'] == 'Available' %}selected{% endif %}>Available (Open to Enquiries)</option>
+          <option value="Sold" {% if listing['status'] == 'Sold' %}selected{% endif %}>Sold / Rescued (Produce Cleared)</option>
+          <option value="Inactive" {% if listing['status'] == 'Inactive' %}selected{% endif %}>Inactive (Temporarily Hidden)</option>
+        </select>
+      </div>
+
+      <!-- Location Details (Tamil Nadu) -->
+      <div class="form-row-3">
+        <div class="form-group">
+          <label class="form-label">Village / Town <span class="required">*</span></label>
+          <input type="text" name="village_town" value="{{ listing['village_town'] }}" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">District <span class="required">*</span></label>
+          <select name="district" class="form-control" required>
+            {% for d in tn_districts %}
+              <option value="{{ d }}" {% if listing['district'] == d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">PIN Code <span class="required">*</span></label>
+          <input type="text" name="pin_code" value="{{ listing['pin_code'] }}" class="form-control" maxlength="6" required>
+        </div>
+      </div>
+
+      <!-- Farmer Contact Details -->
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Farmer Contact Name <span class="required">*</span></label>
+          <input type="text" name="farmer_name" value="{{ listing['farmer_name'] }}" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Phone Number <span class="required">*</span></label>
+          <input type="tel" name="farmer_phone" value="{{ listing['farmer_phone'] }}" class="form-control" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">WhatsApp Number</label>
+        <input type="tel" name="whatsapp_number" value="{{ listing['whatsapp_number'] or '' }}" class="form-control">
+      </div>
+
+      <!-- Description -->
+      <div class="form-group">
+        <label class="form-label">Produce Notes</label>
+        <textarea name="description" class="form-control" rows="3">{{ listing['description'] or '' }}</textarea>
+      </div>
+
+      <!-- Photo -->
+      <div class="form-group">
+        <label class="form-label">Update Photo <small style="color: #64748b;">(Leave empty to keep existing image)</small></label>
+        {% if listing['photo'] %}
+          <div style="margin-bottom: 0.5rem; font-size: 0.85rem; color: #166534;">
+            Current file: <strong>{{ listing['photo'] }}</strong>
+          </div>
+        {% endif %}
+        <input type="file" name="photo" id="cropPhotoInput" accept="image/png, image/jpeg, image/webp" class="form-control">
+        
+        <div class="image-preview-container" id="imagePreviewContainer">
+          {% if listing['photo'] %}
+            <img id="cropPhotoPreview" class="image-preview" src="{{ url_for('static', filename='uploads/' ~ listing['photo']) }}" style="display: block;" alt="Current photo">
+          {% else %}
+            <span id="previewPlaceholderText" style="color: #94a3b8; font-size: 0.85rem;">No current image. Upload a new photo to preview.</span>
+            <img id="cropPhotoPreview" class="image-preview" alt="Preview">
+          {% endif %}
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 1rem; justify-content: space-between; align-items: center; margin-top: 2rem;">
+        <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-secondary">Cancel</a>
+        <button type="submit" class="btn btn-primary btn-lg">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
