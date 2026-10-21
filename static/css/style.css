@@ -896,6 +896,21 @@ a:hover {
   color: #334155;
 }
 
+/* Dual-button action row at bottom of produce cards */
+.card-action-row {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: auto;
+}
+
+.card-action-row .btn {
+  flex: 1;
+  text-align: center;
+  white-space: nowrap;
+  font-size: 0.82rem;
+  padding: 0.45rem 0.6rem;
+}
+
 /* ===================================================================
    Search & Filter Bar
    =================================================================== */

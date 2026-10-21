@@ -136,6 +136,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // Auto-open enquiry modal if URL hash is #enquiry-section
+  // (Triggered by "Contact Farmer" button on the browse listings page)
+  if (enquiryModal && window.location.hash === '#enquiry-section') {
+    setTimeout(() => {
+      enquiryModal.classList.add('active');
+      recalcModalTotal();
+      // Scroll to farmer contact section
+      const contactCard = document.querySelector('.farmer-contact-card');
+      if (contactCard) {
+        contactCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 300);
+  }
+
   // Live order total price recalculator
   const orderModalQty = document.getElementById('orderModalQty');
   const orderModalPrice = document.getElementById('orderModalPrice');
