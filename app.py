@@ -1869,6 +1869,10 @@ def admin_dashboard():
     cursor.execute("SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 30")
     recent_logs = cursor.fetchall()
 
+    # Demonstration Listings Count
+    cursor.execute("SELECT COUNT(*) FROM listings WHERE farmer_name LIKE '[DEMO]%'")
+    demo_listings_count = cursor.fetchone()[0]
+
     conn.close()
 
     return render_template(
@@ -1882,6 +1886,7 @@ def admin_dashboard():
         urgent_count=urgent_count,
         total_enquiries=total_enquiries,
         platform_revenue=platform_revenue,
+        demo_listings_count=demo_listings_count,
         users=all_users,
         listings=all_listings,
         enquiries=all_enquiries,
@@ -1936,6 +1941,32 @@ def admin_delete_user(user_id):
         flash("User not found.", "warning")
 
     conn.close()
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/sample-data/remove', methods=['POST'])
+@login_required
+@role_required('admin')
+def admin_remove_sample_data():
+    try:
+        from seed_vegetables import remove_sample_data
+        count = remove_sample_data()
+        log_activity("Sample Data Removed", f"Admin removed {count} demonstration vegetable listings and sample accounts.")
+        flash(f"Successfully removed {count} demonstration vegetable listings from the platform.", "info")
+    except Exception as e:
+        flash(f"Error removing sample data: {e}", "danger")
+    return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/sample-data/reset', methods=['POST'])
+@login_required
+@role_required('admin')
+def admin_reset_sample_data():
+    try:
+        from seed_vegetables import reset_sample_data
+        removed, inserted = reset_sample_data()
+        log_activity("Sample Data Reset", f"Admin reset demonstration vegetable listings (removed {removed}, seeded {inserted}).")
+        flash(f"Successfully refreshed {inserted} demonstration vegetable listings with current dates and market rates.", "success")
+    except Exception as e:
+        flash(f"Error refreshing sample data: {e}", "danger")
     return redirect(url_for('admin_dashboard'))
 
 # ==========================================

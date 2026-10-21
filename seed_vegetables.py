@@ -28,19 +28,64 @@ def get_db():
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
-def seed_vegetables():
+def remove_sample_data():
+    """Remove all demonstration listings and demo farmer accounts from database."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT COUNT(*) FROM listings WHERE farmer_name LIKE '[DEMO]%' OR farmer_id IN (SELECT id FROM users WHERE email IN (?, ?, ?))",
+        (DEMO_FARMER_EMAIL, DEMO_FARMER_EMAIL2, DEMO_FARMER_EMAIL3)
+    )
+    count = cursor.fetchone()[0]
+    cursor.execute(
+        "DELETE FROM listings WHERE farmer_name LIKE '[DEMO]%' OR farmer_id IN (SELECT id FROM users WHERE email IN (?, ?, ?))",
+        (DEMO_FARMER_EMAIL, DEMO_FARMER_EMAIL2, DEMO_FARMER_EMAIL3)
+    )
+    cursor.execute(
+        "DELETE FROM users WHERE email IN (?, ?, ?)",
+        (DEMO_FARMER_EMAIL, DEMO_FARMER_EMAIL2, DEMO_FARMER_EMAIL3)
+    )
+    conn.commit()
+    conn.close()
+    print(f"[OK] Removed {count} demonstration vegetable listings and demo farmer accounts.")
+    return count
+
+def reset_sample_data():
+    """Remove existing demo data and re-seed 10 fresh demonstration vegetable listings."""
+    removed = remove_sample_data()
+    inserted = seed_vegetables(force=True)
+    print(f"[OK] Reset complete: removed {removed} old records, seeded {inserted} fresh records.")
+    return removed, inserted
+
+def get_sample_data_status():
+    """Return list of active demonstration listings."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, crop_name, price_per_unit, quantity, district FROM listings WHERE farmer_name LIKE '[DEMO]%' ORDER BY id")
+    rows = cursor.fetchall()
+    conn.close()
+    return rows
+
+def seed_vegetables(force=False):
     conn = get_db()
     cursor = conn.cursor()
 
     # ── 1. Check if demo vegetables already exist ──────────────────────────
-    cursor.execute(
-        "SELECT COUNT(*) FROM listings WHERE farmer_name LIKE '[DEMO]%'"
-    )
-    already = cursor.fetchone()[0]
-    if already >= 10:
-        print(f"Demo vegetables already seeded ({already} records). Nothing to do.")
-        conn.close()
-        return
+    if force:
+        cursor.execute(
+            "DELETE FROM listings WHERE farmer_name LIKE '[DEMO]%' OR farmer_id IN (SELECT id FROM users WHERE email IN (?, ?, ?))",
+            (DEMO_FARMER_EMAIL, DEMO_FARMER_EMAIL2, DEMO_FARMER_EMAIL3)
+        )
+        conn.commit()
+    else:
+        cursor.execute(
+            "SELECT COUNT(*) FROM listings WHERE farmer_name LIKE '[DEMO]%'"
+        )
+        already = cursor.fetchone()[0]
+        if already >= 10:
+            print(f"Demo vegetables already seeded ({already} records). Nothing to do.")
+            conn.close()
+            return already
 
     # ── 2. Get or create demo farmer accounts ─────────────────────────────
     def get_or_create_farmer(email, name, phone, location, pin_code, user_type):
@@ -293,7 +338,59 @@ def seed_vegetables():
     print(f"[OK] Successfully inserted {inserted} demonstration vegetable listings.")
     print("     Open http://127.0.0.1:5000/listings to see them in Browse Produce.")
     conn.close()
+    return inserted
 
 
 if __name__ == '__main__':
-    seed_vegetables()
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="FarmFresh Rescue - Demonstration Vegetable Data Manager",
+        epilog="Examples:\n"
+               "  python seed_vegetables.py           # Seed 10 demo vegetables if missing\n"
+               "  python seed_vegetables.py --remove  # Remove all demo listings and accounts\n"
+               "  python seed_vegetables.py --reset   # Refresh demo listings with current dates and prices\n"
+               "  python seed_vegetables.py --status  # Check demo listings count in database\n",
+        formatter_class=argparse.RawDescriptionHelpFormatter
+    )
+    parser.add_argument(
+        'action',
+        nargs='?',
+        choices=['seed', 'remove', 'reset', 'update', 'status'],
+        default=None,
+        help="Action to perform (optional positional command)"
+    )
+    parser.add_argument(
+        '--remove', '-r',
+        action='store_true',
+        help="Remove all demo vegetable listings and accounts"
+    )
+    parser.add_argument(
+        '--reset', '--update', '-R',
+        action='store_true',
+        help="Remove and re-populate the 10 demo vegetable listings with fresh dates"
+    )
+    parser.add_argument(
+        '--status', '-s',
+        action='store_true',
+        help="Check count and names of demo listings in database"
+    )
+    parser.add_argument(
+        '--force', '-f',
+        action='store_true',
+        help="Force re-seeding even if demo listings already exist"
+    )
+
+    args = parser.parse_args()
+
+    if args.remove or args.action == 'remove':
+        remove_sample_data()
+    elif args.reset or args.action in ('reset', 'update'):
+        reset_sample_data()
+    elif args.status or args.action == 'status':
+        items = get_sample_data_status()
+        print(f"\nActive Demonstration Listings: {len(items)}")
+        for item in items:
+            print(f"  #{item['id']} {item['crop_name']} - Rs {item['price_per_unit']}/kg ({item['quantity']} kg, {item['district']})")
+        print()
+    else:
+        seed_vegetables(force=args.force)

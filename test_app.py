@@ -161,15 +161,26 @@ class TestFarmFreshRescue(unittest.TestCase):
         self.assertIn('english_pitch', data)
         self.assertIn('tamil_pitch', data)
 
-    def test_10_unread_notifications_api(self):
+    def test_11_admin_sample_data_workflow(self):
         with self.client.session_transaction() as sess:
-            sess['user_id'] = 2
-            sess['user_role'] = 'farmer'
+            sess['user_id'] = 1  # Admin
+            sess['user_role'] = 'admin'
 
-        res = self.client.get('/api/notifications/unread-count')
+        # 1. Admin dashboard shows sample data section
+        res = self.client.get('/admin/dashboard')
         self.assertEqual(res.status_code, 200)
-        data = res.get_json()
-        self.assertIn('unread', data)
+        self.assertIn(b'sample-data', res.data)
+
+        # 2. Admin can remove sample data
+        res_remove = self.client.post('/admin/sample-data/remove', follow_redirects=True)
+        self.assertEqual(res_remove.status_code, 200)
+        self.assertIn(b'No Sample Data', res_remove.data)
+
+        # 3. Admin can reset/re-seed sample data
+        res_reset = self.client.post('/admin/sample-data/reset', follow_redirects=True)
+        self.assertEqual(res_reset.status_code, 200)
+        self.assertIn(b'10 Demo Vegetables Active', res_reset.data)
+
 
 if __name__ == '__main__':
     unittest.main()

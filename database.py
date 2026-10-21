@@ -307,11 +307,6 @@ def seed_db():
         # Still check and seed buyer_requirements and notifications if needed
         seed_buyer_requirements(conn)
         conn.close()
-        try:
-            from seed_vegetables import seed_vegetables
-            seed_vegetables()
-        except Exception as _e:
-            print(f"Demo vegetable seed note: {_e}")
         return
 
     # Seed Users

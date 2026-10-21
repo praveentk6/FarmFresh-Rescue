@@ -147,15 +147,30 @@
     gap: 0.85rem;
   ">
     <span style="font-size: 1.5rem; flex-shrink: 0;">🧪</span>
-    <div>
-      <div style="font-size: 0.95rem; font-weight: 700; color: #92400e; margin-bottom: 0.2rem;">
-        Sample Demonstration Data Included
+    <div style="flex: 1;">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.35rem;">
+        <div style="font-size: 0.95rem; font-weight: 700; color: #92400e;">
+          Sample Demonstration Data Included
+        </div>
+        {% if current_user and current_user['role'] == 'admin' %}
+          <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <a href="{{ url_for('admin_dashboard') }}#sample-data" class="btn btn-sm btn-outline-primary" style="font-size: 0.75rem; padding: 0.2rem 0.55rem;">
+              ⚙️ Admin Sample Control
+            </a>
+            <form action="{{ url_for('admin_remove_sample_data') }}" method="POST" style="margin: 0;" onsubmit="return confirm('Remove all sample vegetable listings?');">
+              <button type="submit" class="btn btn-sm btn-danger" style="font-size: 0.75rem; padding: 0.2rem 0.55rem;">
+                🗑️ Remove Sample Data
+              </button>
+            </form>
+          </div>
+        {% endif %}
       </div>
       <div style="font-size: 0.85rem; color: #78350f; line-height: 1.55;">
         Some listings on this page are clearly labelled <strong>[SAMPLE]</strong> and were added to demonstrate
         how the marketplace works. They use realistic Tamil Nadu prices and quantities for illustration only.
         Real farmer listings are unlabelled and posted by registered FarmFresh Rescue farmers.
-        <strong>To update or remove sample data, run <code style="background:#fde68a; padding:1px 4px; border-radius:3px;">python seed_vegetables.py</code> or log in as admin.</strong>
+        <br>
+        <strong>To update or remove sample data, run <code style="background:#fde68a; padding:1px 5px; border-radius:3px;">python seed_vegetables.py --remove</code> or <a href="{{ url_for('admin_dashboard') if current_user and current_user['role'] == 'admin' else url_for('login') }}" style="color:#b45309; text-decoration:underline; font-weight:700;">log in as admin</a>.</strong>
       </div>
     </div>
   </div>
