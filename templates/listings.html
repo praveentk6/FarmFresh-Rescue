@@ -129,52 +129,6 @@
     </div>
   {% endif %}
 
-  <!-- Demo Data Notice Banner -->
-  {% set ns = namespace(has_demo=false) %}
-  {% for item in listings %}
-    {% if '[DEMO]' in item['farmer_name'] %}{% set ns.has_demo = true %}{% endif %}
-  {% endfor %}
-  {% if ns.has_demo %}
-  <div class="demo-notice-banner" style="
-    background: linear-gradient(135deg, #fefce8, #fef9c3);
-    border: 1.5px solid #fde68a;
-    border-left: 5px solid #f59e0b;
-    border-radius: 10px;
-    padding: 1rem 1.25rem;
-    margin-bottom: 1.75rem;
-    display: flex;
-    align-items: flex-start;
-    gap: 0.85rem;
-  ">
-    <span style="font-size: 1.5rem; flex-shrink: 0;">🧪</span>
-    <div style="flex: 1;">
-      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.35rem;">
-        <div style="font-size: 0.95rem; font-weight: 700; color: #92400e;">
-          Sample Demonstration Data Included
-        </div>
-        {% if current_user and current_user['role'] == 'admin' %}
-          <div style="display: flex; gap: 0.5rem; align-items: center;">
-            <a href="{{ url_for('admin_dashboard') }}#sample-data" class="btn btn-sm btn-outline-primary" style="font-size: 0.75rem; padding: 0.2rem 0.55rem;">
-              ⚙️ Admin Sample Control
-            </a>
-            <form action="{{ url_for('admin_remove_sample_data') }}" method="POST" style="margin: 0;" onsubmit="return confirm('Remove all sample vegetable listings?');">
-              <button type="submit" class="btn btn-sm btn-danger" style="font-size: 0.75rem; padding: 0.2rem 0.55rem;">
-                🗑️ Remove Sample Data
-              </button>
-            </form>
-          </div>
-        {% endif %}
-      </div>
-      <div style="font-size: 0.85rem; color: #78350f; line-height: 1.55;">
-        Some listings on this page are clearly labelled <strong>[SAMPLE]</strong> and were added to demonstrate
-        how the marketplace works. They use realistic Tamil Nadu prices and quantities for illustration only.
-        Real farmer listings are unlabelled and posted by registered FarmFresh Rescue farmers.
-        <br>
-        <strong>To update or remove sample data, run <code style="background:#fde68a; padding:1px 5px; border-radius:3px;">python seed_vegetables.py --remove</code> or <a href="{{ url_for('admin_dashboard') if current_user and current_user['role'] == 'admin' else url_for('login') }}" style="color:#b45309; text-decoration:underline; font-weight:700;">log in as admin</a>.</strong>
-      </div>
-    </div>
-  </div>
-  {% endif %}
 
   <!-- Produce Cards Grid -->
   {% if listings %}
@@ -195,25 +149,9 @@
               {% endif %}
             </div>
 
-            <!-- SAMPLE badge on demo listings (top-right of image) -->
-            {% if is_demo %}
-            <div style="position:absolute; top:0.85rem; right:0.85rem; z-index:3;">
-              <span style="
-                background: #f59e0b;
-                color: #1c1917;
-                font-size: 0.65rem;
-                font-weight: 800;
-                letter-spacing: 0.05em;
-                padding: 0.2rem 0.55rem;
-                border-radius: 999px;
-                text-transform: uppercase;
-              ">SAMPLE</span>
-            </div>
-            {% else %}
-            <!-- Listing age tag (non-demo cards) -->
+            <!-- Listing age tag -->
             {% set days_old, age_label = calculate_listing_age(item['created_at']) %}
             <div class="card-age-tag">Listed {{ age_label }}</div>
-            {% endif %}
 
             <!-- Produce image -->
             {% if item['photo'] %}
@@ -273,16 +211,9 @@
             <!-- Farmer info row -->
             <div class="card-farmer-info" style="margin-bottom: 0.85rem;">
               <div class="farmer-avatar-name">
-                <div class="farmer-avatar">
-                  {% if is_demo %}🧪{% else %}{{ item['farmer_name'][0] }}{% endif %}
-                </div>
-                <div class="farmer-name">
-                  {% if is_demo %}
-                    <span style="font-size: 0.8rem; color: #92400e;">Sample Listing</span>
-                  {% else %}
-                    {{ item['farmer_name'] }}
-                  {% endif %}
-                </div>
+                {% set clean_farmer_name = item['farmer_name'].replace('[DEMO] ', '') %}
+                <div class="farmer-avatar">{{ clean_farmer_name[0] }}</div>
+                <div class="farmer-name">{{ clean_farmer_name }}</div>
               </div>
             </div>
 
