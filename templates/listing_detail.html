@@ -127,6 +127,20 @@
         </div>
 
         <div class="spec-box">
+          <div class="spec-label">Estimated Freshness</div>
+          <div class="spec-val">
+            {% if listing['estimated_freshness_date'] %}
+              {{ listing['estimated_freshness_date'] }}
+            {% else %}
+              <span style="font-size: 0.9rem; color: #64748b;">Standard Fresh</span>
+            {% endif %}
+          </div>
+          <div style="font-size: 0.775rem; color: #64748b; margin-top: 0.15rem;">
+            Farmer Freshness Window
+          </div>
+        </div>
+
+        <div class="spec-box">
           <div class="spec-label">Listing Age</div>
           <div class="spec-val">{{ age_text }}</div>
           <div style="font-size: 0.775rem; color: #64748b; margin-top: 0.15rem;">
@@ -139,11 +153,6 @@
           <div class="spec-val" style="color: {% if listing['status'] == 'Available' %}#15803d{% else %}#64748b{% endif %};">
             {{ listing['status'] }}
           </div>
-        </div>
-
-        <div class="spec-box">
-          <div class="spec-label">Postal PIN Code</div>
-          <div class="spec-val">{{ listing['pin_code'] }}</div>
         </div>
       </div>
 
@@ -244,11 +253,11 @@
 <div class="modal-overlay" id="enquiryModal">
   <div class="modal-dialog">
     <div class="modal-header">
-      <h3 class="modal-title">Enquire About {{ listing['crop_name'] }}</h3>
+      <h3 class="modal-title">Send Purchase Request &bull; {{ listing['crop_name'] }}</h3>
       <button type="button" class="modal-close" id="closeEnquiryModalBtn">&times;</button>
     </div>
 
-    <form action="{{ url_for('submit_enquiry') }}" method="POST">
+    <form action="{{ url_for('submit_order') }}" method="POST" id="purchaseOrderForm">
       <input type="hidden" name="listing_id" value="{{ listing['id'] }}">
 
       <div class="form-group">
@@ -269,24 +278,39 @@
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Quantity Needed ({{ listing['unit'] }})</label>
-          <input type="number" step="any" name="requested_quantity" class="form-control" placeholder="e.g. {{ listing['quantity'] }}" max="{{ listing['quantity'] }}">
-          <small style="color: #64748b; font-size: 0.775rem;">Max available: {{ listing['quantity'] }} {{ listing['unit'] }}</small>
+          <label class="form-label">Quantity Needed ({{ listing['unit'] }}) <span class="required">*</span></label>
+          <input type="number" step="any" min="0.1" name="requested_quantity" id="orderModalQty" class="form-control" placeholder="e.g. {{ listing['quantity'] }}" max="{{ listing['quantity'] }}" value="{{ listing['quantity'] }}" required>
+          <small style="color: #64748b; font-size: 0.775rem;">Max available stock: <strong>{{ listing['quantity'] }} {{ listing['unit'] }}</strong></small>
         </div>
         <div class="form-group">
-          <label class="form-label">Offered Price (₹ / {{ listing['unit'] }})</label>
-          <input type="number" step="any" name="offered_price" class="form-control" placeholder="Asking: ₹{{ '%.0f'|format(listing['price_per_unit']) }}">
+          <label class="form-label">Offered Price (₹ / {{ listing['unit'] }}) <span class="required">*</span></label>
+          <input type="number" step="any" min="0.1" name="offered_price" id="orderModalPrice" class="form-control" value="{{ '%.0f'|format(listing['price_per_unit']) }}" placeholder="Asking: ₹{{ '%.0f'|format(listing['price_per_unit']) }}" required>
         </div>
       </div>
 
       <div class="form-group">
-        <label class="form-label">Message / Delivery Terms <span class="required">*</span></label>
-        <textarea name="message" class="form-control" rows="3" required placeholder="Specify your delivery or farm pickup preference, transport availability, or counter-offer details."></textarea>
+        <label class="form-label">Delivery or Collection Preference <span class="required">*</span></label>
+        <select name="delivery_preference" class="form-control" required>
+          <option value="Direct Pickup / Collection at Farm" selected>Direct Farmgate Pickup / Collection (Buyer organizes transport)</option>
+          <option value="Farmer Delivery to Local Transport Hub / Bypass">Farmer Delivery to Nearby Transport Hub / Bypass</option>
+          <option value="Shared Transport / Tempo Delivery">Shared Transport / Tempo Delivery</option>
+        </select>
+      </div>
+
+      <!-- Live Order Total Preview Box -->
+      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-weight: 600; color: #166534; font-size: 0.9rem;">Calculated Order Total:</span>
+        <span style="font-size: 1.25rem; font-weight: 800; color: #15803d;" id="orderModalTotal">₹{{ "{:,.0f}".format(listing['quantity'] * listing['price_per_unit']) }}</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Message / Delivery Notes <span class="required">*</span></label>
+        <textarea name="message" class="form-control" rows="2" required placeholder="Specify your collection timing, vehicle arrangements, or special packaging notes for the farmer.">Hello {{ listing['farmer_name'] }}, we are interested in purchasing this batch. Please confirm pickup arrangements.</textarea>
       </div>
 
       <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1.5rem;">
         <button type="button" class="btn btn-secondary" onclick="document.getElementById('enquiryModal').classList.remove('active')">Cancel</button>
-        <button type="submit" class="btn btn-accent">Submit Enquiry to Farmer</button>
+        <button type="submit" class="btn btn-accent btn-lg" id="submitOrderBtn">Submit Purchase Request</button>
       </div>
     </form>
   </div>

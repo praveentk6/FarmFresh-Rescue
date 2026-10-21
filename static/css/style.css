@@ -1958,3 +1958,50 @@ textarea.form-control {
     transform: translateY(0);
   }
 }
+
+/* Voice Assistant & Modern Micro-animations */
+@keyframes micPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 0 14px rgba(220, 38, 38, 0);
+    transform: scale(1.04);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
+    transform: scale(1);
+  }
+}
+
+.recording-pulse {
+  background-color: #dc2626 !important;
+  color: white !important;
+  animation: micPulse 1.4s infinite ease-in-out !important;
+  border-color: #b91c1c !important;
+}
+
+/* AI Assistant, Analytics, and Buyer Responsive Grids */
+@media (max-width: 900px) {
+  .ai-assistant-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1.5rem !important;
+  }
+  
+  .analytics-detail-grid {
+    grid-template-columns: 1fr !important;
+    gap: 1.5rem !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .buyer-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .voice-assistant-card {
+    padding: 1rem !important;
+  }
+}
+

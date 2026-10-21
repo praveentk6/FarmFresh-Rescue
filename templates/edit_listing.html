@@ -55,7 +55,7 @@
         </div>
       </div>
 
-      <!-- Original price & Harvest date -->
+      <!-- Original price, Harvest date & Estimated Freshness -->
       <div class="form-row">
         <div class="form-group">
           <label class="form-label">Standard Market Price (₹ / Unit)</label>
@@ -65,6 +65,22 @@
         <div class="form-group">
           <label class="form-label">Harvest Date <span class="required">*</span></label>
           <input type="date" name="harvest_date" value="{{ listing['harvest_date'] }}" class="form-control" required>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Estimated Freshness Date <small style="color: #64748b;">(Optional)</small></label>
+          <input type="date" name="estimated_freshness_date" value="{{ listing['estimated_freshness_date'] or '' }}" class="form-control">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Urgency Level <span class="required">*</span></label>
+          <select name="urgency_level" class="form-control">
+            <option value="Normal" {% if listing['urgency_level'] == 'Normal' %}selected{% endif %}>Normal (Fresh Harvest)</option>
+            <option value="Needs Attention" {% if listing['urgency_level'] == 'Needs Attention' %}selected{% endif %}>Needs Attention (3+ days unsold / swift clearance)</option>
+            <option value="Urgent Sale" {% if listing['urgency_level'] == 'Urgent Sale' %}selected{% endif %}>⚡ Urgent Sale (Immediate clearance needed)</option>
+          </select>
         </div>
       </div>
 

@@ -1,21 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ lang }}">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}FarmFresh Rescue - Connect Farmers & Nearby Buyers to Reduce Agricultural Waste{% endblock %}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>{% block title %}{{ _t('brand_name') }} - Connect Farmers & Nearby Buyers to Reduce Agricultural Waste{% endblock %}</title>
   <meta name="description" content="{% block meta_desc %}Real-time marketplace connecting Tamil Nadu farmers with nearby hotels, shops, and bulk buyers to prevent crop loss and rescue unsold harvests.{% endblock %}">
   
   <!-- Favicon & Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&family=Mukta+Malar:wght@400;500;600;700&display=swap" rel="stylesheet">
   
   <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+  <script>
+    window.APP_LANG = "{{ lang }}";
+    window.APP_TRANSLATIONS = {{ translations_json|safe }};
+  </script>
+
   {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body class="lang-{{ lang }}">
 
   <!-- Navigation Bar -->
   <header class="navbar">
@@ -25,6 +31,13 @@
         <span>FarmFresh <span class="brand-rescue">Rescue</span></span>
       </a>
 
+      <!-- Language Selector -->
+      <div class="lang-switch-wrap" aria-label="Language Selector">
+        <a href="{{ url_for('set_language', lang_code='en') }}" class="lang-btn {% if lang == 'en' %}active{% endif %}" id="langEnBtn" title="English">EN</a>
+        <span class="lang-sep">|</span>
+        <a href="{{ url_for('set_language', lang_code='ta') }}" class="lang-btn {% if lang == 'ta' %}active{% endif %}" id="langTaBtn" title="தமிழ்">தமிழ்</a>
+      </div>
+
       <button class="menu-toggle" id="menuToggle" aria-label="Toggle Navigation" aria-expanded="false">
         <span class="menu-icon-bar"></span>
         <span class="menu-icon-bar"></span>
@@ -33,36 +46,47 @@
 
       <div class="nav-menu-wrapper" id="navMenuWrapper">
         <ul class="nav-menu" id="navMenu">
-          <li><a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">Home</a></li>
-          <li><a href="{{ url_for('browse_listings') }}" class="nav-link {% if request.endpoint == 'browse_listings' and not request.args.get('urgency') %}active{% endif %}">Browse Produce</a></li>
+          <li><a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">{{ _t('home') }}</a></li>
+          <li><a href="{{ url_for('browse_listings') }}" class="nav-link {% if request.endpoint == 'browse_listings' and not request.args.get('urgency') %}active{% endif %}">{{ _t('browse_produce') }}</a></li>
           <li>
             <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="nav-link nav-urgent-link {% if request.args.get('urgency') == 'urgent_only' %}active{% endif %}">
-              ⚡ Urgent Rescue
+              ⚡ {{ _t('urgent_rescue') }}
             </a>
           </li>
-          <li><a href="{{ url_for('about') }}" class="nav-link {% if request.endpoint == 'about' %}active{% endif %}">About Mission</a></li>
+          <li><a href="{{ url_for('nearby_buyers') }}" class="nav-link {% if request.endpoint == 'nearby_buyers' %}active{% endif %}">{{ _t('nearby_buyers') }}</a></li>
+          <li><a href="{{ url_for('ai_assistant') }}" class="nav-link {% if request.endpoint == 'ai_assistant' %}active{% endif %}">🤖 {{ _t('ai_assistant') }}</a></li>
+          <li><a href="{{ url_for('analytics_view') }}" class="nav-link {% if request.endpoint == 'analytics_view' %}active{% endif %}">📊 {{ _t('analytics') }}</a></li>
+          <li><a href="{{ url_for('about') }}" class="nav-link {% if request.endpoint == 'about' %}active{% endif %}">{{ _t('about_mission') }}</a></li>
         </ul>
 
         <div class="nav-actions">
           {% if current_user %}
+            <!-- Notifications Bell -->
+            <a href="{{ url_for('notifications_view') }}" class="nav-notif-btn" title="{{ _t('notifications') }}" id="navNotifBtn" aria-label="Notifications">
+              🔔
+              {% if unread_count > 0 %}
+                <span class="notif-badge" id="notifBadge">{{ unread_count }}</span>
+              {% endif %}
+            </a>
+
             <div class="user-badge role-{{ current_user['role'] }}">
               <span>●</span>
-              <span>{{ current_user['name'].split()[0] }} ({{ current_user['role'].capitalize() }})</span>
+              <span>{{ current_user['name'].split()[0] }} ({{ _t('role_' ~ current_user['role']) }})</span>
             </div>
 
             {% if current_user['role'] == 'farmer' %}
-              <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="farmerDashBtn">My Dashboard</a>
-              <a href="{{ url_for('add_listing') }}" class="btn btn-primary btn-sm" id="addListingNavBtn">+ List Produce</a>
+              <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="farmerDashBtn">{{ _t('my_dashboard') }}</a>
+              <a href="{{ url_for('add_listing') }}" class="btn btn-primary btn-sm" id="addListingNavBtn">{{ _t('list_produce') }}</a>
             {% elif current_user['role'] == 'buyer' %}
-              <a href="{{ url_for('buyer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="buyerDashBtn">My Enquiries</a>
+              <a href="{{ url_for('buyer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="buyerDashBtn">{{ _t('my_orders') }}</a>
             {% elif current_user['role'] == 'admin' %}
-              <a href="{{ url_for('admin_dashboard') }}" class="btn btn-accent btn-sm" id="adminDashBtn">Admin Panel</a>
+              <a href="{{ url_for('admin_dashboard') }}" class="btn btn-accent btn-sm" id="adminDashBtn">{{ _t('admin_panel') }}</a>
             {% endif %}
 
-            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm" id="logoutBtn" title="Logout">Logout</a>
+            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm" id="logoutBtn" title="{{ _t('logout') }}">{{ _t('logout') }}</a>
           {% else %}
-            <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm" id="loginNavBtn">Log In</a>
-            <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm" id="registerNavBtn">Sign Up Free</a>
+            <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm" id="loginNavBtn">{{ _t('log_in') }}</a>
+            <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm" id="registerNavBtn">{{ _t('sign_up') }}</a>
           {% endif %}
         </div>
       </div>
@@ -93,52 +117,61 @@
     <div class="container">
       <div class="footer-grid">
         <div>
-          <div class="footer-brand-title">🌾 FarmFresh Rescue</div>
+          <div class="footer-brand-title">🌾 {{ _t('brand_name') }}</div>
           <p class="footer-text">
-            A dedicated agricultural waste prevention initiative in Tamil Nadu. We connect hardworking farmers holding unsold bumper harvests with nearby restaurants, hotels, food processors, and bulk retailers before spoilage occurs.
+            {{ _t('hero_subtitle') }}
           </p>
+          <div style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center;">
+            <span style="font-size: 0.85rem; color: #94a3b8;">{{ _t('select_language') }}:</span>
+            <a href="{{ url_for('set_language', lang_code='en') }}" class="lang-btn {% if lang == 'en' %}active{% endif %}">English</a>
+            <span class="lang-sep">|</span>
+            <a href="{{ url_for('set_language', lang_code='ta') }}" class="lang-btn {% if lang == 'ta' %}active{% endif %}">தமிழ்</a>
+          </div>
         </div>
 
         <div>
-          <h4 class="footer-col-title">Produce Marketplace</h4>
+          <h4 class="footer-col-title">{{ _t('browse_produce') }}</h4>
           <ul class="footer-links">
             <li><a href="{{ url_for('browse_listings', category='Vegetables') }}">Fresh Vegetables</a></li>
             <li><a href="{{ url_for('browse_listings', category='Fruits') }}">Orchard Fruits</a></li>
-            <li><a href="{{ url_for('browse_listings', urgency='urgent_only') }}">Needs Attention Listings</a></li>
-            <li><a href="{{ url_for('browse_listings', district='Dindigul') }}">Dindigul Market Hub</a></li>
-            <li><a href="{{ url_for('browse_listings', district='Krishnagiri') }}">Krishnagiri Harvests</a></li>
+            <li><a href="{{ url_for('browse_listings', urgency='urgent_only') }}">⚡ {{ _t('urgent_rescue') }}</a></li>
+            <li><a href="{{ url_for('nearby_buyers') }}">🔍 {{ _t('nearby_buyers') }}</a></li>
+            <li><a href="{{ url_for('ai_assistant') }}">🤖 {{ _t('ai_assistant') }}</a></li>
           </ul>
         </div>
 
         <div>
-          <h4 class="footer-col-title">Quick Portals</h4>
+          <h4 class="footer-col-title">{{ _t('my_dashboard') }}</h4>
           <ul class="footer-links">
             {% if current_user %}
               {% if current_user['role'] == 'farmer' %}
-                <li><a href="{{ url_for('farmer_dashboard') }}">Farmer Dashboard</a></li>
-                <li><a href="{{ url_for('add_listing') }}">Add Produce Listing</a></li>
+                <li><a href="{{ url_for('farmer_dashboard') }}">{{ _t('my_dashboard') }}</a></li>
+                <li><a href="{{ url_for('add_listing') }}">{{ _t('list_produce') }}</a></li>
+                <li><a href="{{ url_for('nearby_buyers') }}">{{ _t('nearby_buyers') }}</a></li>
+                <li><a href="{{ url_for('analytics_view') }}">{{ _t('analytics') }}</a></li>
               {% elif current_user['role'] == 'buyer' %}
-                <li><a href="{{ url_for('buyer_dashboard') }}">Buyer Enquiries</a></li>
+                <li><a href="{{ url_for('buyer_dashboard') }}">{{ _t('my_orders') }}</a></li>
+                <li><a href="{{ url_for('browse_listings') }}">{{ _t('browse_produce') }}</a></li>
               {% elif current_user['role'] == 'admin' %}
-                <li><a href="{{ url_for('admin_dashboard') }}">Admin Control Center</a></li>
+                <li><a href="{{ url_for('admin_dashboard') }}">{{ _t('admin_panel') }}</a></li>
               {% endif %}
             {% else %}
-              <li><a href="{{ url_for('login') }}">Farmer / Buyer Login</a></li>
+              <li><a href="{{ url_for('login') }}">{{ _t('log_in') }}</a></li>
               <li><a href="{{ url_for('register', role='farmer') }}">Register as Farmer</a></li>
               <li><a href="{{ url_for('register', role='buyer') }}">Register as Buyer</a></li>
             {% endif %}
-            <li><a href="{{ url_for('about') }}">About Agricultural Waste</a></li>
+            <li><a href="{{ url_for('about') }}">{{ _t('about_mission') }}</a></li>
           </ul>
         </div>
 
         <div>
           <h4 class="footer-col-title">Tamil Nadu Farmer Support</h4>
           <p class="footer-text" style="font-size: 0.85rem; margin-bottom: 0.75rem;">
-            Ottanchathiram, Rayakottai, Pollachi, Ooty & Kaveri Delta regions.
+            Ottanchathiram, Rayakottai, Pollachi, Ooty, Erode & Kaveri Delta regions.
           </p>
           <div style="font-size: 0.85rem; color: #94a3b8; line-height: 1.5;">
             📞 Support: 1800-425-FARM<br>
-            📍 Regional Hub: Chennai & Madurai, TN<br>
+            📍 Regional Hub: Chennai, Madurai & Coimbatore, TN<br>
             ✉️ Email: rescue@farmfresh.org
           </div>
         </div>
@@ -146,10 +179,10 @@
 
       <div class="footer-bottom">
         <div>
-          &copy; {{ now_year }} FarmFresh Rescue. Designed for Agricultural Produce Waste Reduction.
+          &copy; {{ now_year }} FarmFresh Rescue. Direct Agricultural Marketplace for Waste Prevention.
         </div>
         <div style="color: #64748b; font-size: 0.8rem;">
-          * "Needs Attention" badge reflects listing duration (3+ days unsold) to prioritize clearance and does not certify lab freshness.
+          * Urgency badges are calculated from harvest dates, farmer freshness notices, and listing duration to prioritize clearance.
         </div>
       </div>
     </div>

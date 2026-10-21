@@ -1,31 +1,115 @@
 {% extends "base.html" %}
 
-{% block title %}Add Produce Listing - FarmFresh Rescue{% endblock %}
+{% block title %}{{ _t('add_produce_title') }} - {{ _t('brand_name') }}{% endblock %}
+{% block meta_desc %}Post harvested vegetables, fruits, and grains from your farm in Tamil Nadu to connect with nearby wholesale buyers, hotels, and retailers.{% endblock %}
 
 {% block content %}
-<div class="container">
-  <div class="form-card">
-    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">
-      <a href="{{ url_for('farmer_dashboard') }}">&larr; Back to Farmer Dashboard</a>
+<div class="container" style="padding-top: 1.5rem; padding-bottom: 4rem; max-width: 860px;">
+  
+  <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+    <a href="{{ url_for('farmer_dashboard') }}">&larr; {{ _t('my_dashboard') }}</a>
+  </div>
+
+  <!-- Header -->
+  <div style="margin-bottom: 1.5rem;">
+    <h1 class="form-title" style="font-size: 2.25rem; font-weight: 800; color: #0f172a;">🌾 {{ _t('add_produce_title') }}</h1>
+    <p class="form-subtitle" style="color: var(--text-muted); font-size: 0.95rem;">
+      {{ _t('add_produce_sub') }}
+    </p>
+  </div>
+
+  <!-- Section 9: Voice-Based Listing Assistant Card -->
+  <div class="voice-assistant-card" id="voiceAssistantCard" style="background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%); border: 2px dashed #86efac; border-radius: var(--radius-lg); padding: 1.5rem; margin-bottom: 2rem; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.08);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem;">
+        <span style="font-size: 1.8rem; background: #dcfce7; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%;">🎙️</span>
+        <div>
+          <h2 style="font-size: 1.15rem; font-weight: 700; color: #166534; margin: 0;">
+            குரல் வழி பதிவு / Voice-Based Produce Entry
+          </h2>
+          <div style="font-size: 0.8rem; color: #15803d;">
+            Speak in Tamil or English to auto-fill crop name, quantity, and price
+          </div>
+        </div>
+      </div>
+
+      <!-- Voice Language Selector -->
+      <div style="display: flex; align-items: center; gap: 0.5rem; background: white; padding: 0.25rem 0.5rem; border-radius: var(--radius-sm); border: 1px solid #bbf7d0;">
+        <span style="font-size: 0.75rem; color: #475569; font-weight: 600;">Voice Language:</span>
+        <label style="font-size: 0.8rem; font-weight: 600; cursor: pointer; color: #166534;">
+          <input type="radio" name="voiceLang" value="ta-IN" id="voiceLangTa" checked> தமிழ்
+        </label>
+        <span style="color: #cbd5e1;">|</span>
+        <label style="font-size: 0.8rem; font-weight: 600; cursor: pointer; color: #0f172a;">
+          <input type="radio" name="voiceLang" value="en-IN" id="voiceLangEn"> English
+        </label>
+      </div>
     </div>
 
-    <h1 class="form-title">🌾 List Your Agricultural Produce</h1>
-    <p class="form-subtitle">
-      Post your harvested vegetables, fruits, or grains to connect with nearby wholesale buyers, hotels, and retailers.
-    </p>
+    <!-- Speech instructions & Example -->
+    <div style="font-size: 0.85rem; color: #1e293b; background: white; padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid #dcfce7; margin-bottom: 1rem;">
+      <strong>உதாரணம் (Example):</strong> 
+      <span style="color: #15803d; font-family: 'Mukta Malar', sans-serif;">
+        "என்னிடம் 100 கிலோ தக்காளி உள்ளது. ஒரு கிலோ 15 ரூபாய்."
+      </span> 
+      <span style="color: #64748b; font-size: 0.8rem;">(or in English: "I have 100 kg Tomatoes, price 15 rupees per kg")</span>
+    </div>
 
+    <!-- Microphone Action & Status -->
+    <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+      <button type="button" class="btn btn-accent" id="startVoiceBtn" style="display: inline-flex; align-items: center; gap: 0.5rem; font-size: 0.95rem; padding: 0.6rem 1.25rem;">
+        <span class="mic-icon" id="micIcon">🎙️</span>
+        <span id="voiceBtnText">பேசத் தொடங்குங்கள் (Start Speaking)</span>
+      </button>
+
+      <span id="voiceStatusText" style="font-size: 0.85rem; color: #475569; font-weight: 500;">
+        Click microphone to speak
+      </span>
+    </div>
+
+    <!-- Live Transcript Box -->
+    <div id="voiceTranscriptBox" style="display: none; margin-top: 1rem; background: #ffffff; border: 1px solid #86efac; border-radius: var(--radius-sm); padding: 0.85rem;">
+      <div style="font-size: 0.75rem; font-weight: 700; color: #166534; text-transform: uppercase; margin-bottom: 0.25rem;">
+        Recognized Speech / கேட்ட உரை:
+      </div>
+      <div id="voiceTranscriptText" style="font-size: 0.95rem; color: #0f172a; font-style: italic; margin-bottom: 0.5rem;"></div>
+
+      <!-- Extracted Details Chips -->
+      <div id="extractedDetailsWrap" style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #dcfce7;">
+        <span id="extractedCropChip" style="display: none; background: #ecfdf5; color: #166534; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 700;"></span>
+        <span id="extractedQtyChip" style="display: none; background: #e0f2fe; color: #0369a1; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 700;"></span>
+        <span id="extractedPriceChip" style="display: none; background: #fef3c7; color: #92400e; padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 700;"></span>
+      </div>
+      <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.35rem;">
+        * Form fields below have been populated. You can edit and correct any field before final submission.
+      </div>
+    </div>
+
+    <!-- Speech recognition error notice if unsupported -->
+    <div id="voiceErrorNotice" style="display: none; margin-top: 0.75rem; padding: 0.65rem 0.85rem; background: #fee2e2; border-left: 4px solid #ef4444; border-radius: var(--radius-sm); font-size: 0.85rem; color: #991b1b;">
+      <span id="voiceErrorMsg">Speech recognition is not supported in this browser. Please fill in the details manually below.</span>
+    </div>
+  </div>
+
+  <!-- Main Listing Form -->
+  <div class="form-card" style="box-shadow: var(--shadow-sm); border: 1px solid var(--border-subtle); padding: 2rem;">
     <form action="{{ url_for('add_listing') }}" method="POST" enctype="multipart/form-data" id="addListingForm">
       
+      <!-- Section A: Produce Core Specs -->
+      <h3 style="font-size: 1.2rem; font-weight: 700; color: #0f172a; margin-bottom: 1.25rem; padding-bottom: 0.5rem; border-bottom: 1px solid #f1f5f9;">
+        1. Produce Information / விளைபொருள் தகவல்
+      </h3>
+
       <!-- Crop Name & Category -->
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Crop / Produce Name <span class="required">*</span></label>
-          <input type="text" name="crop_name" value="{{ form_data.get('crop_name', '') }}" class="form-control" placeholder="e.g. Krishnagiri Country Tomatoes, Dindigul Shallots" required>
+          <label class="form-label">{{ _t('crop_name_label') }} <span class="required">*</span></label>
+          <input type="text" name="crop_name" id="fieldCropName" value="{{ form_data.get('crop_name', '') }}" class="form-control" placeholder="{{ _t('crop_name_placeholder') }}" required>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Category <span class="required">*</span></label>
-          <select name="category" class="form-control" required>
+          <label class="form-label">{{ _t('category_label') }} <span class="required">*</span></label>
+          <select name="category" id="fieldCategory" class="form-control" required>
             {% for cat in crop_categories %}
               <option value="{{ cat }}" {% if form_data.get('category') == cat %}selected{% endif %}>{{ cat }}</option>
             {% endfor %}
@@ -36,13 +120,13 @@
       <!-- Quantity, Unit & Pricing -->
       <div class="form-row-3">
         <div class="form-group">
-          <label class="form-label">Available Quantity <span class="required">*</span></label>
-          <input type="number" step="any" min="0.1" name="quantity" value="{{ form_data.get('quantity', '') }}" class="form-control" placeholder="e.g. 500" required>
+          <label class="form-label">{{ _t('quantity_label') }} <span class="required">*</span></label>
+          <input type="number" step="any" min="0.1" name="quantity" id="fieldQuantity" value="{{ form_data.get('quantity', '') }}" class="form-control" placeholder="e.g. 500" required>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Unit of Measure <span class="required">*</span></label>
-          <select name="unit" class="form-control" required>
+          <label class="form-label">{{ _t('unit_label') }} <span class="required">*</span></label>
+          <select name="unit" id="fieldUnit" class="form-control" required>
             {% for u in crop_units %}
               <option value="{{ u }}" {% if form_data.get('unit') == u %}selected{% endif %}>{{ u }}</option>
             {% endfor %}
@@ -50,34 +134,55 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">Asking Price (₹ / Unit) <span class="required">*</span></label>
-          <input type="number" step="any" min="0.1" name="price_per_unit" value="{{ form_data.get('price_per_unit', '') }}" class="form-control" placeholder="e.g. 22" required>
+          <label class="form-label">{{ _t('asking_price_label') }} (₹ / {{ _t('unit_label') }}) <span class="required">*</span></label>
+          <input type="number" step="any" min="0.1" name="price_per_unit" id="fieldPrice" value="{{ form_data.get('price_per_unit', '') }}" class="form-control" placeholder="e.g. 22" required>
         </div>
       </div>
 
       <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Standard Market Price (₹ / Unit) <small style="color: #64748b;">(Optional)</small></label>
-          <input type="number" step="any" name="original_price" value="{{ form_data.get('original_price', '') }}" class="form-control" placeholder="Original price to highlight clearance discount">
+          <label class="form-label">{{ _t('standard_price_label') }} <small style="color: #64748b;">(Optional)</small></label>
+          <input type="number" step="any" min="0.1" name="original_price" id="fieldOriginalPrice" value="{{ form_data.get('original_price', '') }}" class="form-control" placeholder="Market reference price (to highlight clearance discount)">
         </div>
 
         <div class="form-group">
-          <label class="form-label">Harvest Date <span class="required">*</span></label>
-          <input type="date" name="harvest_date" value="{{ form_data.get('harvest_date', default_date) }}" class="form-control" required>
+          <label class="form-label">Urgency Level / விற்பனை அவசரம்</label>
+          <select name="urgency_level" id="fieldUrgencyLevel" class="form-control">
+            <option value="Normal" {% if form_data.get('urgency_level') == 'Normal' %}selected{% endif %}>Normal (Fresh Harvest)</option>
+            <option value="Needs Attention" {% if form_data.get('urgency_level') == 'Needs Attention' %}selected{% endif %}>Needs Attention (3+ days unsold / swift clearance)</option>
+            <option value="Urgent Sale" {% if form_data.get('urgency_level') == 'Urgent Sale' %}selected{% endif %}>⚡ Urgent Sale (Immediate clearance needed)</option>
+          </select>
         </div>
       </div>
 
-      <!-- Location Details (Tamil Nadu) -->
-      <div class="form-row-3">
+      <!-- Harvest Date & Estimated Freshness Date -->
+      <div class="form-row">
         <div class="form-group">
-          <label class="form-label">Village / Town <span class="required">*</span></label>
-          <input type="text" name="village_town" value="{{ form_data.get('village_town', current_user['location'] if current_user else '') }}" class="form-control" placeholder="e.g. Ottanchathiram" required>
+          <label class="form-label">{{ _t('harvest_date_label') }} <span class="required">*</span></label>
+          <input type="date" name="harvest_date" id="fieldHarvestDate" value="{{ form_data.get('harvest_date', default_date) }}" class="form-control" required>
         </div>
 
         <div class="form-group">
-          <label class="form-label">District <span class="required">*</span></label>
-          <select name="district" class="form-control" required>
-            <option value="">Select District</option>
+          <label class="form-label">Estimated Freshness Date / எதிர்பார்க்கும் புத்துணர்ச்சி தேதி <small style="color: #64748b;">(Optional)</small></label>
+          <input type="date" name="estimated_freshness_date" id="fieldFreshnessDate" value="{{ form_data.get('estimated_freshness_date', '') }}" class="form-control">
+        </div>
+      </div>
+
+      <!-- Section B: Farm Location Details -->
+      <h3 style="font-size: 1.2rem; font-weight: 700; color: #0f172a; margin-top: 1.75rem; margin-bottom: 1.25rem; padding-bottom: 0.5rem; border-bottom: 1px solid #f1f5f9;">
+        2. Farm Location / பண்ணை இருப்பிடம்
+      </h3>
+
+      <div class="form-row-3">
+        <div class="form-group">
+          <label class="form-label">{{ _t('village_label') }} <span class="required">*</span></label>
+          <input type="text" name="village_town" id="fieldVillage" value="{{ form_data.get('village_town', current_user['location'] if current_user else '') }}" class="form-control" placeholder="e.g. Ottanchathiram" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">{{ _t('district_label') }} <span class="required">*</span></label>
+          <select name="district" id="fieldDistrict" class="form-control" required>
+            <option value="">{{ _t('select_district') }}</option>
             {% for d in tn_districts %}
               <option value="{{ d }}" {% if form_data.get('district') == d %}selected{% endif %}>{{ d }}</option>
             {% endfor %}
@@ -85,53 +190,64 @@
         </div>
 
         <div class="form-group">
-          <label class="form-label">PIN Code <span class="required">*</span></label>
-          <input type="text" name="pin_code" value="{{ form_data.get('pin_code', current_user['pin_code'] if current_user else '') }}" class="form-control" placeholder="6-digit PIN" maxlength="6" required>
-        </div>
-      </div>
-
-      <!-- Contact Details -->
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Farmer / Contact Person Name <span class="required">*</span></label>
-          <input type="text" name="farmer_name" value="{{ form_data.get('farmer_name', current_user['name'] if current_user else '') }}" class="form-control" required>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Contact Phone Number <span class="required">*</span></label>
-          <input type="tel" name="farmer_phone" value="{{ form_data.get('farmer_phone', current_user['phone'] if current_user else '') }}" class="form-control" placeholder="10-digit mobile number" required>
+          <label class="form-label">State / மாநிலம் <span class="required">*</span></label>
+          <input type="text" name="state" value="Tamil Nadu" class="form-control" readonly style="background: #f1f5f9; cursor: not-allowed;">
         </div>
       </div>
 
       <div class="form-group">
-        <label class="form-label">WhatsApp Number <small style="color: #64748b;">(For direct instant buyer chat)</small></label>
-        <input type="tel" name="whatsapp_number" value="{{ form_data.get('whatsapp_number', current_user['phone'] if current_user else '') }}" class="form-control" placeholder="10-digit WhatsApp number">
+        <label class="form-label">{{ _t('pincode_label') }} <span class="required">*</span></label>
+        <input type="text" name="pin_code" id="fieldPinCode" value="{{ form_data.get('pin_code', current_user['pin_code'] if current_user else '') }}" class="form-control" placeholder="6-digit postal PIN" maxlength="6" required style="max-width: 250px;">
+      </div>
+
+      <!-- Section C: Contact & Delivery Specs -->
+      <h3 style="font-size: 1.2rem; font-weight: 700; color: #0f172a; margin-top: 1.75rem; margin-bottom: 1.25rem; padding-bottom: 0.5rem; border-bottom: 1px solid #f1f5f9;">
+        3. Contact & Description / தொடர்பு மற்றும் விவரம்
+      </h3>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">{{ _t('farmer_name_label') }} <span class="required">*</span></label>
+          <input type="text" name="farmer_name" id="fieldFarmerName" value="{{ form_data.get('farmer_name', current_user['name'] if current_user else '') }}" class="form-control" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">{{ _t('farmer_phone_label') }} <span class="required">*</span></label>
+          <input type="tel" name="farmer_phone" id="fieldFarmerPhone" value="{{ form_data.get('farmer_phone', current_user['phone'] if current_user else '') }}" class="form-control" placeholder="10-digit mobile number" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">WhatsApp Number <small style="color: #64748b;">(For instant buyer negotiations)</small></label>
+        <input type="tel" name="whatsapp_number" id="fieldWhatsapp" value="{{ form_data.get('whatsapp_number', current_user['phone'] if current_user else '') }}" class="form-control" placeholder="10-digit WhatsApp number">
       </div>
 
       <!-- Description / Produce Notes -->
       <div class="form-group">
-        <label class="form-label">Produce Details & Condition</label>
-        <textarea name="description" class="form-control" rows="3" placeholder="Describe quality, grading, packaging (crates, gunny bags), and any urgency reasons (bumper harvest, urgent transport clearance needed).">{{ form_data.get('description', '') }}</textarea>
+        <label class="form-label">{{ _t('description_label') }}</label>
+        <textarea name="description" id="fieldDescription" class="form-control" rows="3" placeholder="Describe quality, grading, packing (wooden crates, gunny bags), and any urgency reasons (bumper harvest, immediate clearance).">{{ form_data.get('description', '') }}</textarea>
       </div>
 
       <!-- Photo Upload with Live Preview -->
       <div class="form-group">
-        <label class="form-label">Upload Produce Photo <small style="color: #64748b;">(JPG, PNG, WEBP max 3MB - Optional)</small></label>
+        <label class="form-label">{{ _t('upload_photo_label') }} <small style="color: #64748b;">(JPG, PNG, WEBP max 3MB - Optional)</small></label>
         <input type="file" name="photo" id="cropPhotoInput" accept="image/png, image/jpeg, image/webp" class="form-control">
         
-        <div class="image-preview-container" id="imagePreviewContainer">
+        <div class="image-preview-container" id="imagePreviewContainer" style="margin-top: 0.75rem; min-height: 120px; border: 2px dashed #cbd5e1; border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; background: #f8fafc; overflow: hidden;">
           <span id="previewPlaceholderText" style="color: #94a3b8; font-size: 0.85rem;">Selected image preview will appear here</span>
-          <img id="cropPhotoPreview" class="image-preview" alt="Crop Preview">
+          <img id="cropPhotoPreview" class="image-preview" alt="Crop Preview" style="display: none; max-height: 220px; width: auto; object-fit: cover; border-radius: 8px;">
         </div>
       </div>
 
       <div class="disclaimer-box" style="margin: 1.5rem 0;">
-        💡 <strong>Urgency Notification:</strong> Listings that remain unsold after 3 days will automatically display a <strong>Needs Attention</strong> badge to alert nearby buyers that urgent rescue is needed before food spoilage occurs.
+        💡 <strong>Waste Prevention Notice:</strong> Listings that remain unsold after 3 days will automatically display a <strong>Needs Attention</strong> badge to alert nearby buyers that urgent rescue is needed before food spoilage occurs.
       </div>
 
-      <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem;">
+      <div style="display: flex; gap: 1rem; justify-content: flex-end; margin-top: 2rem;">
         <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-secondary">Cancel</a>
-        <button type="submit" class="btn btn-primary btn-lg" id="submitProduceBtn">Publish Produce Listing</button>
+        <button type="submit" class="btn btn-primary btn-lg" id="submitProduceBtn">
+          {{ _t('btn_publish_produce') }}
+        </button>
       </div>
     </form>
   </div>

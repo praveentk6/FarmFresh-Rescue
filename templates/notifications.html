@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}{{ _t('notifications') }} - {{ _t('brand_name') }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem; max-width: 800px;">
+  
+  <!-- Breadcrumb -->
+  <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+    <a href="{{ url_for('index') }}">{{ _t('home') }}</a> &bull; 
+    <span>{{ _t('notifications') }}</span>
+  </div>
+
+  <!-- Header Banner -->
+  <div class="dashboard-header" style="margin-bottom: 1.5rem;">
+    <div>
+      <h1 style="font-size: 2rem; font-weight: 800;">🔔 {{ _t('notifications') }}</h1>
+      <p style="color: var(--text-muted); font-size: 0.95rem;">
+        Real-time alerts for purchase requests, order status changes, and harvest clearance risks.
+      </p>
+    </div>
+
+    {% if notifications %}
+      <div>
+        <form action="{{ url_for('read_all_notifications') }}" method="POST">
+          <button type="submit" class="btn btn-secondary btn-sm" id="markAllReadBtn">
+            ✓ {{ _t('mark_all_read') }}
+          </button>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Notifications List -->
+  {% if notifications %}
+    <div class="notifications-list" style="display: flex; flex-direction: column; gap: 0.75rem;">
+      {% for n in notifications %}
+        <div class="notif-card {% if n['is_read'] == 0 %}unread{% endif %}" 
+             style="background: white; border-radius: var(--radius-md); padding: 1.25rem; border: 1px solid {% if n['is_read'] == 0 %}#bbf7d0{% else %}var(--border-subtle){% endif %}; {% if n['is_read'] == 0 %}box-shadow: 0 2px 8px rgba(22, 163, 74, 0.08); background: #fcfdfc; border-left: 4px solid #16a34a;{% endif %} display: flex; gap: 1rem; align-items: flex-start; justify-content: space-between;">
+          
+          <div style="display: flex; gap: 0.85rem; align-items: flex-start;">
+            <!-- Icon by Type -->
+            <div style="font-size: 1.4rem; line-height: 1; padding: 0.35rem; border-radius: 8px; background: {% if n['type'] == 'order' %}#ecfdf5{% elif n['type'] == 'urgent_risk' %}#fff7ed{% elif n['type'] == 'alert' %}#e0f2fe{% else %}#f1f5f9{% endif %};">
+              {% if n['type'] == 'order' %}
+                📦
+              {% elif n['type'] == 'urgent_risk' %}
+                ⚠️
+              {% elif n['type'] == 'alert' %}
+                ⚡
+              {% elif n['type'] == 'status_change' %}
+                🔄
+              {% else %}
+                🔔
+              {% endif %}
+            </div>
+
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                <h3 style="font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0;">
+                  {{ n['title'] }}
+                </h3>
+                {% if n['is_read'] == 0 %}
+                  <span style="background: #16a34a; color: white; font-size: 0.65rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 9999px;">NEW</span>
+                {% endif %}
+              </div>
+
+              <p style="font-size: 0.9rem; color: #334155; margin: 0 0 0.5rem 0; line-height: 1.5;">
+                {{ n['message'] }}
+              </p>
+
+              <div style="display: flex; gap: 1rem; align-items: center; font-size: 0.775rem; color: #94a3b8;">
+                <span>🕒 {{ n['created_at'] }}</span>
+                {% if n['link'] %}
+                  <a href="{{ url_for('read_notification', notif_id=n['id'], next=n['link']) }}" style="font-weight: 700; color: var(--primary);">
+                    View Details &rarr;
+                  </a>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+
+          <!-- Mark single as read link -->
+          {% if n['is_read'] == 0 %}
+            <div>
+              <a href="{{ url_for('read_notification', notif_id=n['id']) }}" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;" title="Mark as Read">
+                ✓
+              </a>
+            </div>
+          {% endif %}
+
+        </div>
+      {% endfor %}
+    </div>
+
+  {% else %}
+    <!-- Empty State -->
+    <div class="empty-state" style="background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); padding: 4rem 1.5rem; text-align: center;">
+      <span class="empty-icon" style="font-size: 3.5rem; display: block; margin-bottom: 1rem;">🔔</span>
+      <h3 class="empty-title" style="font-size: 1.35rem; font-weight: 700; margin-bottom: 0.5rem;">
+        {{ _t('no_notifications') }}
+      </h3>
+      <p class="empty-text" style="color: var(--text-muted); max-width: 440px; margin: 0 auto 1.5rem;">
+        You're completely caught up! We'll alert you as soon as buyers send purchase requests, order statuses change, or produce requires urgent clearance.
+      </p>
+      {% if current_user and current_user['role'] == 'farmer' %}
+        <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-primary">{{ _t('my_dashboard') }}</a>
+      {% else %}
+        <a href="{{ url_for('buyer_dashboard') }}" class="btn btn-primary">{{ _t('my_orders') }}</a>
+      {% endif %}
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

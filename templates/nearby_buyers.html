@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+
+{% block title %}{{ _t('nearby_buyers_title') }} - {{ _t('brand_name') }}{% endblock %}
+{% block meta_desc %}Connect directly with verified wholesale buyers, hotels, supermarkets, and food processors in Tamil Nadu to sell your agricultural produce quickly and avoid crop loss.{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+  
+  <!-- Breadcrumb -->
+  <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+    <a href="{{ url_for('index') }}">{{ _t('home') }}</a> &bull; 
+    <span>{{ _t('nearby_buyers') }}</span>
+  </div>
+
+  <!-- Header Banner -->
+  <div class="dashboard-header" style="margin-bottom: 2rem;">
+    <div>
+      <div style="font-size: 0.85rem; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+        🤝 {{ _t('nearby_buyers') }} &bull; {{ _t('tamil_nadu') }}
+      </div>
+      <h1 style="font-size: 2.25rem; font-weight: 800; margin-top: 0.25rem;">{{ _t('nearby_buyers_title') }}</h1>
+      <p style="color: var(--text-muted); font-size: 0.95rem; max-width: 750px;">
+        {{ _t('nearby_buyers_sub') }}
+      </p>
+    </div>
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+      {% if current_user and current_user['role'] == 'buyer' %}
+        <a href="{{ url_for('buyer_dashboard') }}#postRequirementSection" class="btn btn-primary btn-lg">
+          + {{ _t('btn_post_req') }}
+        </a>
+      {% elif not current_user %}
+        <a href="{{ url_for('register', role='buyer') }}" class="btn btn-primary btn-lg">
+          {{ _t('sign_up') }} as Buyer
+        </a>
+      {% endif %}
+      <a href="{{ url_for('browse_listings') }}" class="btn btn-secondary btn-lg">
+        {{ _t('browse_produce') }}
+      </a>
+    </div>
+  </div>
+
+  <!-- Filter Card -->
+  <div class="filter-card" style="margin-bottom: 2rem;">
+    <form action="{{ url_for('nearby_buyers') }}" method="GET" id="buyerFilterForm">
+      <div class="filter-grid" style="grid-template-columns: 2fr 1.5fr 1.5fr auto;">
+        <!-- Search Keyword -->
+        <div class="filter-group">
+          <label class="filter-label">{{ _t('search_produce') }} / {{ _t('nearby_buyers') }}</label>
+          <input type="text" name="q" value="{{ search_q }}" class="filter-input" placeholder="Crop (e.g. Tomato, Shallots), Buyer, Town...">
+        </div>
+
+        <!-- District Filter -->
+        <div class="filter-group">
+          <label class="filter-label">{{ _t('filter_district') }} (Tamil Nadu)</label>
+          <select name="district" class="filter-select">
+            <option value="">{{ _t('all_districts') }}</option>
+            {% for d in tn_districts %}
+              <option value="{{ d }}" {% if district_filter == d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Buyer Business Type -->
+        <div class="filter-group">
+          <label class="filter-label">{{ _t('filter_buyer_type') }}</label>
+          <select name="buyer_type" class="filter-select">
+            <option value="">{{ _t('buyer_all_types') }}</option>
+            {% for btype in buyer_types %}
+              <option value="{{ btype }}" {% if buyer_type_filter == btype %}selected{% endif %}>{{ btype }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Filter Submit & Reset -->
+        <div class="filter-btn-group" style="align-self: flex-end;">
+          <button type="submit" class="btn btn-primary" style="height: 44px;">{{ _t('btn_apply_filters') }}</button>
+          <a href="{{ url_for('nearby_buyers') }}" class="btn btn-secondary" style="height: 44px;" title="Reset filters">{{ _t('btn_reset_filters') }}</a>
+        </div>
+      </div>
+
+      <!-- Quick Category Filter Pills -->
+      <div class="quick-filter-pills" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-subtle); display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+        <span style="font-size: 0.8rem; font-weight: 700; color: #64748b;">Buyer Types:</span>
+        <a href="{{ url_for('nearby_buyers') }}" class="pill-btn {% if not buyer_type_filter %}active{% endif %}">
+          All ({{ requirements|length }})
+        </a>
+        {% for btype in buyer_types %}
+          {% set count = type_counts.get(btype, 0) %}
+          <a href="{{ url_for('nearby_buyers', buyer_type=btype, district=district_filter) }}" 
+             class="pill-btn {% if buyer_type_filter == btype %}active{% endif %}">
+            {{ btype }} {% if count > 0 %}<span style="opacity: 0.8; font-size: 0.75rem;">({{ count }})</span>{% endif %}
+          </a>
+        {% endfor %}
+      </div>
+    </form>
+  </div>
+
+  <!-- Buyer Requirements Grid -->
+  {% if requirements %}
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem;">
+      <h2 style="font-size: 1.35rem; font-weight: 700;">
+        Active Procurement Requests ({{ requirements|length }})
+      </h2>
+      <span style="font-size: 0.85rem; color: var(--text-muted);">
+        Verified buyers looking for farm harvests in Tamil Nadu
+      </span>
+    </div>
+
+    <div class="buyer-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 1.5rem;">
+      {% for req in requirements %}
+        <div class="buyer-card" style="background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); padding: 1.5rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between; transition: transform var(--transition-fast), box-shadow var(--transition-fast);">
+          <div>
+            <!-- Card Header: Business Type & District Badge -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.75rem;">
+              <span class="badge-category" style="background: #ecfdf5; color: #166534; font-weight: 700;">
+                🏢 {{ req['business_type'] }}
+              </span>
+              <span style="font-size: 0.8rem; font-weight: 600; color: #0284c7; background: #e0f2fe; padding: 0.2rem 0.55rem; border-radius: 9999px;">
+                📍 {{ req['district'] }}
+              </span>
+            </div>
+
+            <!-- Buyer Name & Crop Requested -->
+            <h3 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 0.25rem; color: #0f172a;">
+              {{ req['crop_name'] }}
+            </h3>
+            
+            <div style="font-size: 0.875rem; color: #475569; font-weight: 600; margin-bottom: 0.75rem;">
+              Buyer: <span style="color: #0f172a;">{{ req['buyer_name'] }}</span>
+            </div>
+
+            <!-- Requirement Details Table / Metrics -->
+            <div style="background: #f8fafc; border-radius: var(--radius-md); padding: 0.85rem; margin-bottom: 1rem; border: 1px solid #f1f5f9;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                <div>
+                  <div style="font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Required Qty</div>
+                  <div style="font-size: 1.15rem; font-weight: 800; color: #15803d;">
+                    {{ req['required_quantity'] }} {{ req['unit'] }}
+                  </div>
+                </div>
+                <div>
+                  <div style="font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Target Rate</div>
+                  <div style="font-size: 1.15rem; font-weight: 800; color: #0f172a;">
+                    {% if req['target_price'] %}
+                      ₹{{ "%.0f"|format(req['target_price']) }} / {{ req['unit'] }}
+                    {% else %}
+                      <span style="font-size: 0.9rem; color: #64748b;">Market Rate</span>
+                    {% endif %}
+                  </div>
+                </div>
+              </div>
+
+              {% if req['village_town'] %}
+                <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #e2e8f0;">
+                  📍 Preferred Pickup / Hub: <strong>{{ req['village_town'] }}, {{ req['district'] }}</strong>
+                </div>
+              {% endif %}
+            </div>
+
+            <!-- Notes from Buyer -->
+            {% if req['notes'] %}
+              <div style="font-size: 0.85rem; color: #334155; line-height: 1.5; margin-bottom: 1.25rem; background: #fffbeb; padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border-left: 3px solid #f59e0b;">
+                <strong>Procurement Specs:</strong> {{ req['notes'] }}
+              </div>
+            {% endif %}
+          </div>
+
+          <!-- Contact Actions -->
+          <div style="display: flex; gap: 0.5rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle);">
+            {% set clean_phone = req['contact_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
+            <a href="tel:{{ req['contact_phone'] }}" class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center; font-size: 0.85rem;">
+              📞 {{ _t('buyer_contact_btn') }}
+            </a>
+            <a href="https://wa.me/91{{ clean_phone }}?text=Vanakkam%20{{ req['buyer_name'] }}%2C%20I%20saw%20your%20requirement%20for%20{{ req['crop_name'] }}%20on%20FarmFresh%20Rescue.%20I%20have%20harvested%20produce%20available." 
+               target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="flex: 1; justify-content: center; font-size: 0.85rem;">
+              💬 {{ _t('buyer_chat_btn') }}
+            </a>
+            {% if current_user and current_user['role'] == 'farmer' %}
+              <a href="{{ url_for('ai_assistant') }}?crop={{ req['crop_name'] }}&qty={{ req['required_quantity'] }}" class="btn btn-outline-primary btn-sm" title="Get AI Rescue Advice" style="padding: 0.35rem 0.6rem;">
+                🤖 AI
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+
+  {% else %}
+    <!-- Empty State -->
+    <div class="empty-state" style="background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); padding: 4rem 1.5rem; text-align: center; margin-top: 1rem;">
+      <span class="empty-icon" style="font-size: 3.5rem; display: block; margin-bottom: 1rem;">🔍</span>
+      <h3 class="empty-title" style="font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem;">
+        {{ _t('no_buyers_found') }}
+      </h3>
+      <p class="empty-text" style="color: var(--text-muted); max-width: 500px; margin: 0 auto 1.5rem;">
+        No active procurement requirements match your current filter settings. Try selecting a different district or clearing keyword filters.
+      </p>
+      <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
+        <a href="{{ url_for('nearby_buyers') }}" class="btn btn-primary">{{ _t('btn_reset_filters') }}</a>
+        {% if current_user and current_user['role'] == 'farmer' %}
+          <a href="{{ url_for('add_listing') }}" class="btn btn-secondary">+ {{ _t('list_produce') }}</a>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Information Notice -->
+  <div class="disclaimer-box" style="margin-top: 2.5rem;">
+    💡 <strong>Direct Farm-to-Buyer Matching:</strong> All registered buyer requirements are verified for commercial purchase in Tamil Nadu. Farmers can directly communicate via telephone or WhatsApp without brokerage commissions or intermediary markups.
+  </div>
+
+</div>
+{% endblock %}

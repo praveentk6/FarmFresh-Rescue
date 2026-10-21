@@ -1,76 +1,172 @@
 {% extends "base.html" %}
 
-{% block title %}Farmer Dashboard - FarmFresh Rescue{% endblock %}
+{% block title %}{{ _t('my_dashboard') }} - {{ _t('brand_name') }}{% endblock %}
 
 {% block content %}
 <div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
   
-  <!-- Header with Add Listing CTA -->
-  <div class="dashboard-header">
+  <!-- Header with Add Listing & Action Shortcuts -->
+  <div class="dashboard-header" style="margin-bottom: 2rem;">
     <div>
-      <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">Farmer Management Portal</div>
-      <h1 style="font-size: 2.25rem;">Vanakkam, {{ current_user['name'] }}!</h1>
+      <div style="font-size: 0.85rem; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+        {{ _t('farmer_portal_title') }} &bull; {{ _t('tamil_nadu') }}
+      </div>
+      <h1 style="font-size: 2.25rem; font-weight: 800; margin-top: 0.25rem;">{{ _t('welcome_vanakkam') }}, {{ current_user['name'] }}!</h1>
       <p style="color: var(--text-muted); font-size: 0.95rem;">
-        Manage your harvested produce listings, monitor unsold inventory age, and respond to buyer enquiries.
+        {{ _t('farmer_intro') }}
       </p>
     </div>
-    <div>
+    
+    <!-- Action Shortcuts -->
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
       <a href="{{ url_for('add_listing') }}" class="btn btn-primary btn-lg" id="dashboardAddListingBtn">
-        + Post New Produce Listing
+        + {{ _t('btn_post_listing') }}
+      </a>
+      <a href="{{ url_for('nearby_buyers') }}" class="btn btn-outline-primary btn-lg">
+        {{ _t('btn_find_buyers') }}
+      </a>
+      <a href="{{ url_for('ai_assistant') }}" class="btn btn-secondary btn-lg">
+        {{ _t('btn_ai_rescue') }}
+      </a>
+      <a href="{{ url_for('analytics_view') }}" class="btn btn-secondary btn-lg">
+        {{ _t('btn_view_analytics') }}
       </a>
     </div>
   </div>
 
-  <!-- KPI Stat Cards -->
-  <div class="dashboard-grid-kpis">
-    <div class="kpi-card highlight">
+  <!-- Section 3: Exact 6 Calculated KPI Summary Cards -->
+  <div class="dashboard-grid-kpis" style="grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin-bottom: 2rem;">
+    
+    <!-- 1. Total Products Listed -->
+    <div class="kpi-card" style="border-top: 4px solid #64748b;">
       <div>
-        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">ACTIVE LISTINGS</div>
-        <div class="kpi-num" style="color: var(--primary);">{{ active_count }}</div>
+        <div style="font-size: 0.775rem; font-weight: 700; color: #64748b; text-transform: uppercase;">
+          {{ _t('kpi_total_products') }}
+        </div>
+        <div class="kpi-num" style="color: #0f172a;" id="kpiTotalProducts">
+          {{ total_products_listed }}
+        </div>
+        <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.2rem;">
+          Total produce items
+        </div>
+      </div>
+      <div class="kpi-icon">📋</div>
+    </div>
+
+    <!-- 2. Available Produce Quantity -->
+    <div class="kpi-card highlight" style="border-top: 4px solid var(--primary);">
+      <div>
+        <div style="font-size: 0.775rem; font-weight: 700; color: var(--primary); text-transform: uppercase;">
+          {{ _t('kpi_available_produce') }}
+        </div>
+        <div class="kpi-num" style="color: var(--primary);" id="kpiAvailableQty">
+          {{ "%.0f"|format(available_produce_qty) }} <span style="font-size: 1rem; font-weight: 600;">kg</span>
+        </div>
+        <div style="font-size: 0.75rem; color: #166534; margin-top: 0.2rem;">
+          In active inventory
+        </div>
       </div>
       <div class="kpi-icon">🥦</div>
     </div>
 
-    <div class="kpi-card urgent">
+    <!-- 3. Pending Orders -->
+    <div class="kpi-card" style="border-top: 4px solid #d97706;">
       <div>
-        <div style="font-size: 0.85rem; color: #ea580c; font-weight: 700;">NEEDS ATTENTION (3+ d)</div>
-        <div class="kpi-num" style="color: var(--urgent-red);">{{ attention_count }}</div>
+        <div style="font-size: 0.775rem; font-weight: 700; color: #d97706; text-transform: uppercase;">
+          {{ _t('kpi_pending_orders') }}
+        </div>
+        <div class="kpi-num" style="color: #d97706;" id="kpiPendingOrders">
+          {{ pending_orders_count }}
+        </div>
+        <div style="font-size: 0.75rem; color: #b45309; margin-top: 0.2rem;">
+          Awaiting confirmation
+        </div>
       </div>
-      <div class="kpi-icon">⚠️</div>
+      <div class="kpi-icon">⏳</div>
     </div>
 
-    <div class="kpi-card">
+    <!-- 4. Completed Sales -->
+    <div class="kpi-card" style="border-top: 4px solid #0284c7;">
       <div>
-        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">SOLD & RESCUED</div>
-        <div class="kpi-num" style="color: #0284c7;">{{ sold_count }}</div>
+        <div style="font-size: 0.775rem; font-weight: 700; color: #0284c7; text-transform: uppercase;">
+          {{ _t('kpi_completed_sales') }}
+        </div>
+        <div class="kpi-num" style="color: #0284c7;" id="kpiCompletedSales">
+          {{ completed_sales_count }}
+        </div>
+        <div style="font-size: 0.75rem; color: #0369a1; margin-top: 0.2rem;">
+          Successfully delivered
+        </div>
       </div>
       <div class="kpi-icon">🤝</div>
     </div>
 
-    <div class="kpi-card">
+    <!-- 5. Produce at Risk (kg) -->
+    <div class="kpi-card urgent" style="border-top: 4px solid var(--urgent-red);">
       <div>
-        <div style="font-size: 0.85rem; color: var(--text-muted); font-weight: 600;">NEW ENQUIRIES</div>
-        <div class="kpi-num" style="color: #d97706;">{{ pending_enquiries_count }}</div>
+        <div style="font-size: 0.775rem; font-weight: 700; color: #ea580c; text-transform: uppercase;">
+          {{ _t('kpi_produce_at_risk') }}
+        </div>
+        <div class="kpi-num" style="color: var(--urgent-red);" id="kpiProduceAtRisk">
+          {{ "%.0f"|format(produce_at_risk_qty) }} <span style="font-size: 1rem; font-weight: 600;">kg</span>
+        </div>
+        <div style="font-size: 0.75rem; color: #ea580c; margin-top: 0.2rem;">
+          Unsold 3+ d or urgent
+        </div>
       </div>
-      <div class="kpi-icon">✉️</div>
+      <div class="kpi-icon">⚠️</div>
     </div>
+
+    <!-- 6. Total Sales Revenue (₹) -->
+    <div class="kpi-card" style="border-top: 4px solid #15803d; background: #f0fdf4;">
+      <div>
+        <div style="font-size: 0.775rem; font-weight: 700; color: #166534; text-transform: uppercase;">
+          {{ _t('kpi_total_revenue') }}
+        </div>
+        <div class="kpi-num" style="color: #15803d;" id="kpiTotalRevenue">
+          ₹{{ "{:,.0f}".format(total_sales_revenue) }}
+        </div>
+        <div style="font-size: 0.75rem; color: #166534; margin-top: 0.2rem;">
+          From completed orders
+        </div>
+      </div>
+      <div class="kpi-icon">💰</div>
+    </div>
+
   </div>
 
-  <!-- Attention Warning Alert if older listings exist -->
-  {% if attention_count > 0 %}
-    <div class="disclaimer-box" style="margin-bottom: 2rem;">
-      <strong>⚠️ Attention Needed:</strong> You have <strong>{{ attention_count }}</strong> produce listing(s) that have remained unsold for 3 or more days. Consider offering a discounted clearance price or contacting registered buyers directly to prevent post-harvest spoilage.
+  <!-- Produce at Risk Warning Banner -->
+  {% if attention_count > 0 or produce_at_risk_qty > 0 %}
+    <div class="disclaimer-box" style="margin-bottom: 2rem; background: #fff7ed; border-color: #fdba74;">
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+          <strong style="color: #c2410c;">⚠️ {{ _t('attention_warning') }}</strong>
+          <div style="font-size: 0.85rem; color: #7c2d12; margin-top: 0.25rem;">
+            You have <strong>{{ attention_count }}</strong> produce listing(s) totaling <strong>{{ "%.0f"|format(produce_at_risk_qty) }} kg</strong> that have remained unsold for 3+ days or are marked for urgent clearance.
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <a href="{{ url_for('nearby_buyers') }}" class="btn btn-accent btn-sm">
+            🔍 Match Local Buyers
+          </a>
+          <a href="{{ url_for('ai_assistant') }}" class="btn btn-secondary btn-sm">
+            🤖 AI Selling Advice
+          </a>
+        </div>
+      </div>
     </div>
   {% endif %}
 
   <!-- Section 1: My Produce Listings Table -->
-  <div class="data-table-card">
+  <div class="data-table-card" style="margin-bottom: 2.5rem;">
     <div class="data-table-header">
       <div>
-        <h2 style="font-size: 1.35rem;">My Farm Produce Listings</h2>
-        <span style="font-size: 0.85rem; color: var(--text-muted);">Total {{ listings|length }} items listed</span>
+        <h2 style="font-size: 1.35rem; font-weight: 700;">{{ _t('my_farm_listings') }}</h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">{{ listings|length }} {{ _t('table_produce') }} items in database</span>
       </div>
-      <a href="{{ url_for('add_listing') }}" class="btn btn-outline-primary btn-sm">+ Add Item</a>
+      <div style="display: flex; gap: 0.5rem;">
+        <a href="{{ url_for('add_listing') }}" class="btn btn-primary btn-sm">+ {{ _t('list_produce') }}</a>
+      </div>
     </div>
 
     {% if listings %}
@@ -79,14 +175,14 @@
         <table class="custom-table">
           <thead>
             <tr>
-              <th>Produce / Crop</th>
-              <th>Category</th>
-              <th>Stock</th>
-              <th>Asking Price</th>
-              <th>Harvest Date</th>
-              <th>Listing Age</th>
-              <th>Status</th>
-              <th style="text-align: right;">Actions</th>
+              <th>{{ _t('table_produce') }}</th>
+              <th>{{ _t('table_category') }}</th>
+              <th>{{ _t('table_stock') }}</th>
+              <th>{{ _t('table_price') }}</th>
+              <th>{{ _t('table_harvest_date') }}</th>
+              <th>{{ _t('table_age') }}</th>
+              <th>{{ _t('table_status') }}</th>
+              <th style="text-align: right;">{{ _t('table_actions') }}</th>
             </tr>
           </thead>
           <tbody>
@@ -127,9 +223,9 @@
                 </td>
                 <td>
                   {% if item['status'] == 'Available' %}
-                    <span class="badge-available">Available</span>
+                    <span class="badge-available">{{ _t('status_available') }}</span>
                   {% elif item['status'] == 'Sold' %}
-                    <span class="badge-sold">Sold Out</span>
+                    <span class="badge-sold">{{ _t('status_sold') }}</span>
                   {% else %}
                     <span class="badge-sold">{{ item['status'] }}</span>
                   {% endif %}
@@ -139,19 +235,24 @@
                     <!-- Toggle Status (Mark as Sold / Available) -->
                     <form action="{{ url_for('toggle_listing_status', listing_id=item['id']) }}" method="POST" class="{% if item['status'] == 'Available' %}confirm-status-sold{% endif %}">
                       <button type="submit" class="btn btn-sm {% if item['status'] == 'Available' %}btn-success{% else %}btn-secondary{% endif %}" title="Toggle sold status">
-                        {% if item['status'] == 'Available' %}✓ Mark Sold{% else %}Make Available{% endif %}
+                        {% if item['status'] == 'Available' %}{{ _t('btn_mark_sold') }}{% else %}{{ _t('btn_make_available') }}{% endif %}
                       </button>
                     </form>
 
                     <!-- Edit -->
                     <a href="{{ url_for('edit_listing', listing_id=item['id']) }}" class="btn btn-secondary btn-sm" title="Edit listing">
-                      ✏️ Edit
+                      {{ _t('btn_edit') }}
+                    </a>
+
+                    <!-- AI Advice Shortcut -->
+                    <a href="{{ url_for('ai_assistant') }}?crop={{ item['crop_name'] }}&qty={{ item['quantity'] }}" class="btn btn-outline-primary btn-sm" title="AI Rescue Advice">
+                      🤖
                     </a>
 
                     <!-- Delete -->
                     <form action="{{ url_for('delete_listing', listing_id=item['id']) }}" method="POST" class="confirm-delete">
                       <button type="submit" class="btn btn-danger btn-sm" title="Delete listing">
-                        🗑️
+                        {{ _t('btn_delete') }}
                       </button>
                     </form>
                   </div>
@@ -162,96 +263,120 @@
         </table>
       </div>
     {% else %}
-      <div class="empty-state" style="padding: 2.5rem 1.5rem;">
-        <span class="empty-icon">🌾</span>
-        <h3 class="empty-title">You Have No Active Listings</h3>
-        <p class="empty-text">List your freshly harvested or unsold produce now to start receiving orders.</p>
-        <a href="{{ url_for('add_listing') }}" class="btn btn-primary">+ Post Your First Listing</a>
+      <div class="empty-state" style="padding: 3rem 1.5rem; text-align: center;">
+        <span class="empty-icon" style="font-size: 3rem; display: block; margin-bottom: 0.5rem;">🌾</span>
+        <h3 class="empty-title" style="font-size: 1.25rem; font-weight: 700;">{{ _t('no_listings_farmer') }}</h3>
+        <p class="empty-text" style="color: var(--text-muted); margin-bottom: 1rem;">
+          Post your bumper harvests or vegetables holding unsold stock to connect with nearby wholesale buyers.
+        </p>
+        <a href="{{ url_for('add_listing') }}" class="btn btn-primary">+ {{ _t('btn_post_listing') }}</a>
       </div>
     {% endif %}
   </div>
 
-  <!-- Section 2: Buyer Enquiries Received -->
-  <div class="data-table-card">
+  <!-- Section 2: Recent Purchase Orders & Enquiries Received -->
+  <div class="data-table-card" id="ordersSection">
     <div class="data-table-header">
       <div>
-        <h2 style="font-size: 1.35rem;">Buyer Enquiries & Purchase Requests</h2>
-        <span style="font-size: 0.85rem; color: var(--text-muted);">Incoming requests from restaurants, supermarkets, and bulk buyers</span>
+        <h2 style="font-size: 1.35rem; font-weight: 700;">{{ _t('recent_orders') }}</h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Purchase requests from registered buyers</span>
       </div>
     </div>
 
-    {% if enquiries %}
+    {% if orders %}
       <div class="table-responsive">
         <div class="table-scroll-hint"><span>👉 Swipe horizontally to view full table details</span></div>
         <table class="custom-table">
           <thead>
             <tr>
+              <th>Order #</th>
+              <th>Produce</th>
               <th>Buyer Information</th>
-              <th>Produce Item</th>
-              <th>Offer Details</th>
-              <th>Message</th>
-              <th>Status</th>
-              <th style="text-align: right;">Update / Connect</th>
+              <th>Requested Qty & Price</th>
+              <th>Delivery / Message</th>
+              <th>Order Status</th>
+              <th style="text-align: right;">Update Workflow</th>
             </tr>
           </thead>
           <tbody>
-            {% for e in enquiries %}
+            {% for o in orders %}
               <tr>
+                <td><strong>#{{ o['id'] }}</strong></td>
                 <td>
-                  <div style="font-weight: 700; color: #0f172a;">{{ e['buyer_name'] }}</div>
-                  <div style="font-size: 0.775rem; color: #64748b;">
-                    📞 {{ e['buyer_phone'] }}<br>
-                    ✉️ {{ e['buyer_email'] }}
+                  <a href="{{ url_for('listing_detail', listing_id=o['listing_id']) }}" style="font-weight: 700; color: #0f172a;">
+                    {{ o['crop_name'] }}
+                  </a>
+                  <div style="font-size: 0.75rem; color: #64748b;">
+                    Asking: ₹{{ "%.0f"|format(o['price_per_unit']) }} / {{ o['unit'] }}
                   </div>
                 </td>
                 <td>
-                  <strong>{{ e['crop_name'] }}</strong>
+                  <div style="font-weight: 700;">{{ o['buyer_name'] }}</div>
                   <div style="font-size: 0.775rem; color: #64748b;">
-                    Listed Rate: ₹{{ "%.0f"|format(e['price_per_unit']) }} / {{ e['unit'] }}
+                    📞 {{ o['buyer_phone'] }}<br>
+                    ✉️ {{ o['buyer_email'] }}
                   </div>
                 </td>
                 <td>
-                  {% if e['requested_quantity'] %}
-                    <div>Qty: <strong>{{ e['requested_quantity'] }}</strong> {{ e['unit'] }}</div>
+                  {% if o['requested_quantity'] %}
+                    <div>Qty: <strong>{{ o['requested_quantity'] }}</strong> {{ o['unit'] }}</div>
                   {% endif %}
-                  {% if e['offered_price'] %}
-                    <div style="color: #166534; font-weight: 700;">Offer: ₹{{ "%.0f"|format(e['offered_price']) }} / {{ e['unit'] }}</div>
+                  {% if o['offered_price'] %}
+                    <div style="color: #166534; font-weight: 700;">Offered: ₹{{ "%.0f"|format(o['offered_price']) }} / {{ o['unit'] }}</div>
+                  {% endif %}
+                  {% if o['total_price'] %}
+                    <div style="font-size: 0.8rem; color: #0f172a; font-weight: 600;">Total: ₹{{ "{:,.0f}".format(o['total_price']) }}</div>
                   {% endif %}
                 </td>
                 <td style="max-width: 250px;">
-                  <div style="font-size: 0.85rem; color: #334155; line-height: 1.4;">{{ e['message'] }}</div>
-                  <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">{{ e['created_at'].split()[0] if ' ' in e['created_at'] else e['created_at'] }}</div>
+                  {% if o['delivery_preference'] %}
+                    <span style="font-size: 0.75rem; background: #f1f5f9; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600;">
+                      🚚 {{ o['delivery_preference'] }}
+                    </span>
+                  {% endif %}
+                  <div style="font-size: 0.85rem; color: #334155; margin-top: 0.35rem; line-height: 1.4;">
+                    {{ o['message'] }}
+                  </div>
+                  <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">
+                    {{ o['created_at'].split()[0] if ' ' in o['created_at'] else o['created_at'] }}
+                  </div>
                 </td>
                 <td>
-                  {% if e['status'] == 'Pending' %}
+                  {% if o['status'] == 'Pending' %}
                     <span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Pending</span>
-                  {% elif e['status'] == 'Accepted' %}
+                  {% elif o['status'] == 'Accepted' %}
                     <span style="background: #dcfce7; color: #166534; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Accepted</span>
-                  {% elif e['status'] == 'Completed' %}
+                  {% elif o['status'] == 'Ready for Collection' %}
+                    <span style="background: #fef08a; color: #854d0e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Ready for Pickup</span>
+                  {% elif o['status'] == 'Completed' %}
                     <span style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Completed</span>
+                  {% elif o['status'] == 'Cancelled' %}
+                    <span style="background: #fee2e2; color: #991b1b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Cancelled</span>
                   {% else %}
-                    <span style="background: #f1f5f9; color: #64748b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ e['status'] }}</span>
+                    <span style="background: #f1f5f9; color: #64748b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ o['status'] }}</span>
                   {% endif %}
                 </td>
                 <td>
                   <div style="display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end;">
                     <!-- Status Form -->
-                    <form action="{{ url_for('update_enquiry_status', enquiry_id=e['id']) }}" method="POST" style="display: flex; gap: 0.35rem;">
-                      <select name="status" class="filter-select" style="font-size: 0.8rem; padding: 0.3rem 0.5rem; width: 110px;">
-                        <option value="Pending" {% if e['status'] == 'Pending' %}selected{% endif %}>Pending</option>
-                        <option value="Accepted" {% if e['status'] == 'Accepted' %}selected{% endif %}>Accept</option>
-                        <option value="Declined" {% if e['status'] == 'Declined' %}selected{% endif %}>Decline</option>
-                        <option value="Completed" {% if e['status'] == 'Completed' %}selected{% endif %}>Completed</option>
+                    <form action="{{ url_for('update_order_status', order_id=o['id']) }}" method="POST" style="display: flex; gap: 0.35rem;">
+                      <select name="status" class="filter-select" style="font-size: 0.8rem; padding: 0.3rem 0.5rem; width: 140px;">
+                        <option value="Pending" {% if o['status'] == 'Pending' %}selected{% endif %}>Pending</option>
+                        <option value="Accepted" {% if o['status'] == 'Accepted' %}selected{% endif %}>Accept Request</option>
+                        <option value="Rejected" {% if o['status'] == 'Rejected' %}selected{% endif %}>Reject</option>
+                        <option value="Ready for Collection" {% if o['status'] == 'Ready for Collection' %}selected{% endif %}>Ready for Pickup</option>
+                        <option value="Completed" {% if o['status'] == 'Completed' %}selected{% endif %}>Complete Sale</option>
                       </select>
                       <button type="submit" class="btn btn-secondary btn-sm" style="padding: 0.3rem 0.6rem;">Update</button>
                     </form>
 
                     <!-- Quick Call / WhatsApp -->
                     <div style="display: flex; gap: 0.35rem;">
-                      <a href="tel:{{ e['buyer_phone'] }}" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                      <a href="tel:{{ o['buyer_phone'] }}" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
                         📞 Call
                       </a>
-                      <a href="https://wa.me/91{{ e['buyer_phone'] }}?text=Hello%20{{ e['buyer_name'] }}%2C%20regarding%20your%20enquiry%20for%20{{ e['crop_name'] }}%20on%20FarmFresh%20Rescue." 
+                      {% set clean_bphone = o['buyer_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
+                      <a href="https://wa.me/91{{ clean_bphone }}?text=Vanakkam%20{{ o['buyer_name'] }}%2C%20regarding%20your%20purchase%20order%20%23{{ o['id'] }}%20for%20{{ o['crop_name'] }}%20on%20FarmFresh%20Rescue." 
                          target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
                         💬 WhatsApp
                       </a>
@@ -264,10 +389,12 @@
         </table>
       </div>
     {% else %}
-      <div class="empty-state" style="padding: 2.5rem 1.5rem;">
-        <span class="empty-icon">📬</span>
-        <h3 class="empty-title">No Enquiries Yet</h3>
-        <p class="empty-text">When buyers view your listings and submit enquiries or counter-offers, they will appear right here.</p>
+      <div class="empty-state" style="padding: 2.5rem 1.5rem; text-align: center;">
+        <span class="empty-icon" style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">✉️</span>
+        <h3 class="empty-title" style="font-size: 1.15rem; font-weight: 700;">{{ _t('no_enquiries_farmer') }}</h3>
+        <p class="empty-text" style="color: var(--text-muted); font-size: 0.9rem;">
+          When wholesale buyers, shops, and restaurants send purchase requests for your produce, they will appear here.
+        </p>
       </div>
     {% endif %}
   </div>

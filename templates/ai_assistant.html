@@ -1,0 +1,330 @@
+{% extends "base.html" %}
+
+{% block title %}{{ _t('ai_assistant_title') }} - {{ _t('brand_name') }}{% endblock %}
+{% block meta_desc %}AI-powered agricultural selling strategy and post-harvest produce rescue advisor for Tamil Nadu farmers. Prevent food waste with actionable marketing and storage recommendations.{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+  
+  <!-- Breadcrumb -->
+  <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+    <a href="{{ url_for('index') }}">{{ _t('home') }}</a> &bull; 
+    <span>{{ _t('ai_assistant') }}</span>
+  </div>
+
+  <!-- Header Banner -->
+  <div class="dashboard-header" style="margin-bottom: 2rem;">
+    <div>
+      <div style="font-size: 0.85rem; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+        🤖 AI Produce Rescue Assistant &bull; {{ _t('tamil_nadu') }}
+      </div>
+      <h1 style="font-size: 2.25rem; font-weight: 800; margin-top: 0.25rem;">{{ _t('ai_assistant_title') }}</h1>
+      <p style="color: var(--text-muted); font-size: 0.95rem; max-width: 750px;">
+        {{ _t('ai_assistant_sub') }}
+      </p>
+    </div>
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+      <a href="{{ url_for('nearby_buyers') }}" class="btn btn-outline-primary btn-lg">
+        🔍 {{ _t('nearby_buyers') }}
+      </a>
+      {% if current_user and current_user['role'] == 'farmer' %}
+        <a href="{{ url_for('add_listing') }}" class="btn btn-primary btn-lg">
+          + {{ _t('list_produce') }}
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Main 2-Column Grid -->
+  <div class="ai-assistant-grid" style="display: grid; grid-template-columns: 1fr 1.25fr; gap: 2rem; align-items: start;">
+    
+    <!-- Left Column: Input Form -->
+    <div class="form-card" style="margin: 0; box-shadow: var(--shadow-sm);">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem;">
+        <h2 style="font-size: 1.35rem; font-weight: 700;">{{ _t('ai_input_title') }}</h2>
+      </div>
+
+      <!-- Quick Preset Produce Buttons -->
+      <div style="margin-bottom: 1.25rem; background: #f8fafc; padding: 0.85rem; border-radius: var(--radius-md); border: 1px solid #e2e8f0;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.5rem;">
+          ⚡ Quick Select Crop:
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+          <button type="button" class="preset-crop-btn pill-btn" data-crop="Krishnagiri Country Tomatoes" data-qty="500" data-unit="kg" data-obs="Naturally ripened firm red country tomatoes in 20kg crates" data-storage="Ambient / Room Temperature" data-urgency="High">🍅 Tomatoes (500 kg)</button>
+          <button type="button" class="preset-crop-btn pill-btn" data-crop="Dindigul Bellary Small Onions" data-qty="1000" data-unit="kg" data-obs="Dried shallots stored in jute bags, medium pungency" data-storage="Shaded Well-Ventilated Shed" data-urgency="Normal">🧅 Small Onions (1000 kg)</button>
+          <button type="button" class="preset-crop-btn pill-btn" data-crop="Ooty Crispy Mountain Carrots" data-qty="300" data-unit="kg" data-obs="Washed crunchy orange carrots straight from Nilgiris terrace harvest" data-storage="Ambient / Room Temperature" data-urgency="Moderate">🥕 Carrots (300 kg)</button>
+          <button type="button" class="preset-crop-btn pill-btn" data-crop="Madurai Gundu Malli (Jasmine)" data-qty="40" data-unit="kg" data-obs="Fresh morning buds harvested at dawn" data-storage="Ambient / Room Temperature" data-urgency="Critical">🌸 Jasmine Flowers (40 kg)</button>
+        </div>
+      </div>
+
+      <form action="{{ url_for('ai_assistant') }}" method="POST" id="aiAssistantForm">
+        <!-- Crop Name -->
+        <div class="form-group">
+          <label class="form-label">{{ _t('crop_name_label') }} <span class="required">*</span></label>
+          <input type="text" name="crop_name" id="aiCropName" value="{{ form_data.get('crop_name', '') }}" class="form-control" placeholder="e.g. Tomatoes, Shallots, Carrots, Bananas" required>
+        </div>
+
+        <!-- Quantity & Unit -->
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">{{ _t('quantity_label') }} <span class="required">*</span></label>
+            <input type="number" step="any" min="0.1" name="quantity" id="aiQuantity" value="{{ form_data.get('quantity', '100') }}" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label class="form-label">{{ _t('unit_label') }}</label>
+            <select name="unit" id="aiUnit" class="form-control">
+              {% for u in crop_units %}
+                <option value="{{ u }}" {% if form_data.get('unit') == u %}selected{% endif %}>{{ u }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Location District / Town -->
+        <div class="form-group">
+          <label class="form-label">{{ _t('filter_district') }} / Location</label>
+          <select name="location" id="aiLocation" class="form-control">
+            {% for d in tn_districts %}
+              <option value="{{ d }}" {% if form_data.get('location') == d or (not form_data.get('location') and d == 'Madurai') %}selected{% endif %}>{{ d }}, Tamil Nadu</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Harvest Date -->
+        <div class="form-group">
+          <label class="form-label">{{ _t('table_harvest_date') }}</label>
+          <input type="date" name="harvest_date" id="aiHarvestDate" value="{{ form_data.get('harvest_date', '') }}" class="form-control">
+        </div>
+
+        <!-- Current Freshness Observations -->
+        <div class="form-group">
+          <label class="form-label">{{ _t('ai_observations_label') }}</label>
+          <textarea name="freshness_obs" id="aiFreshnessObs" class="form-control" rows="2" placeholder="{{ _t('ai_observations_placeholder') }}">{{ form_data.get('freshness_obs', '') }}</textarea>
+        </div>
+
+        <!-- Storage Condition -->
+        <div class="form-group">
+          <label class="form-label">{{ _t('ai_storage_label') }}</label>
+          <select name="storage_condition" id="aiStorageCondition" class="form-control">
+            <option value="Ambient / Room Temperature" {% if form_data.get('storage_condition') == 'Ambient / Room Temperature' %}selected{% endif %}>{{ _t('ai_storage_ambient') }}</option>
+            <option value="Cold Storage Facility" {% if form_data.get('storage_condition') == 'Cold Storage Facility' %}selected{% endif %}>{{ _t('ai_storage_cold') }}</option>
+            <option value="Shaded Well-Ventilated Shed" {% if form_data.get('storage_condition') == 'Shaded Well-Ventilated Shed' %}selected{% endif %}>{{ _t('ai_storage_shade') }}</option>
+            <option value="Wooden / Plastic Crates Stacking" {% if form_data.get('storage_condition') == 'Wooden / Plastic Crates Stacking' %}selected{% endif %}>{{ _t('ai_storage_crates') }}</option>
+          </select>
+        </div>
+
+        <!-- Urgency Level -->
+        <div class="form-group">
+          <label class="form-label">{{ _t('ai_urgency_label') }}</label>
+          <select name="urgency" id="aiUrgency" class="form-control">
+            <option value="Normal" {% if form_data.get('urgency') == 'Normal' %}selected{% endif %}>{{ _t('ai_urgency_normal') }}</option>
+            <option value="Moderate" {% if form_data.get('urgency') == 'Moderate' %}selected{% endif %}>{{ _t('ai_urgency_moderate') }}</option>
+            <option value="Critical" {% if form_data.get('urgency') == 'Critical' %}selected{% endif %}>{{ _t('ai_urgency_critical') }}</option>
+          </select>
+        </div>
+
+        <!-- Submit Button -->
+        <button type="submit" class="btn btn-accent btn-lg btn-block" id="generateAiBtn" style="margin-top: 1rem;">
+          {{ _t('btn_generate_ai') }}
+        </button>
+      </form>
+    </div>
+
+    <!-- Right Column: AI Output Strategy Panel -->
+    <div class="ai-results-wrapper">
+      {% if ai_result %}
+        <div class="ai-result-card" style="background: white; border-radius: var(--radius-lg); border: 2px solid #bbf7d0; padding: 2rem; box-shadow: var(--shadow-md);">
+          
+          <!-- Header Banner -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.25rem;">
+            <div>
+              <span class="badge-available" style="font-size: 0.8rem; background: #ecfdf5; color: #166534; font-weight: 700;">
+                ✨ {{ ai_result.get('source', 'Agricultural Intelligence Engine') }}
+              </span>
+              <h2 style="font-size: 1.6rem; font-weight: 800; margin-top: 0.5rem; color: #0f172a;">
+                Rescue Strategy for {{ form_data.get('crop_name') }}
+              </h2>
+            </div>
+            <span class="badge-urgent" style="font-size: 0.85rem; padding: 0.4rem 0.8rem;">
+              {{ ai_result.get('urgency_assessment', 'Urgency Evaluated') }}
+            </span>
+          </div>
+
+          <!-- Shelf-Life Overview Box -->
+          {% if ai_result.get('shelf_life_overview') %}
+            <div style="background: #f0fdf4; border-left: 4px solid #16a34a; padding: 1rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+              <div style="font-weight: 700; color: #166534; font-size: 0.9rem; margin-bottom: 0.25rem;">
+                🌾 Harvest Physiology & Shelf-Life Estimation:
+              </div>
+              <div style="font-size: 0.95rem; color: #1e293b; line-height: 1.5;">
+                {{ ai_result.get('shelf_life_overview') }}
+              </div>
+            </div>
+          {% endif %}
+
+          <!-- Recommended Action Steps -->
+          <div style="margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.75rem; color: #0f172a;">
+              📋 Recommended Action Steps:
+            </h3>
+            <ul style="list-style: none; padding-left: 0;">
+              {% for action in ai_result.get('recommended_actions', []) %}
+                <li style="display: flex; gap: 0.75rem; align-items: flex-start; margin-bottom: 0.65rem; font-size: 0.925rem; color: #334155; line-height: 1.5;">
+                  <span style="color: #16a34a; font-weight: 800; font-size: 1.1rem; line-height: 1;">✓</span>
+                  <span>{{ action }}</span>
+                </li>
+              {% endfor %}
+            </ul>
+          </div>
+
+          <!-- Target Buyer Categories -->
+          <div style="margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.75rem; color: #0f172a;">
+              🎯 Target Buyer Categories in Tamil Nadu:
+            </h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+              {% for buyer in ai_result.get('target_buyers', []) %}
+                <span style="background: #f1f5f9; color: #0f172a; font-size: 0.85rem; font-weight: 600; padding: 0.4rem 0.85rem; border-radius: 9999px; border: 1px solid #cbd5e1;">
+                  🏢 {{ buyer }}
+                </span>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Storage & Moisture Tips -->
+          {% if ai_result.get('storage_tips') %}
+            <div style="margin-bottom: 1.5rem; background: #fffbeb; padding: 1rem; border-radius: var(--radius-md); border: 1px solid #fed7aa;">
+              <h4 style="font-size: 0.95rem; font-weight: 700; color: #92400e; margin-bottom: 0.35rem;">
+                📦 Post-Harvest Storage & Freshness Tip:
+              </h4>
+              <p style="font-size: 0.875rem; color: #78350f; line-height: 1.5; margin: 0;">
+                {{ ai_result.get('storage_tips') }}
+              </p>
+            </div>
+          {% endif %}
+
+          <!-- Ready-to-Send WhatsApp Marketing Pitches (English & Tamil) -->
+          <div style="margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 0.75rem; color: #0f172a;">
+              💬 Direct Marketing Pitches for WhatsApp & SMS:
+            </h3>
+
+            <!-- English Pitch -->
+            {% if ai_result.get('english_pitch') %}
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: var(--radius-md); padding: 1rem; margin-bottom: 0.75rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                  <span style="font-size: 0.8rem; font-weight: 700; color: #475569; text-transform: uppercase;">English Pitch</span>
+                  <button type="button" class="btn btn-secondary btn-sm copy-pitch-btn" data-text="{{ ai_result.get('english_pitch') }}" style="padding: 0.2rem 0.6rem; font-size: 0.75rem;">
+                    📋 Copy Text
+                  </button>
+                </div>
+                <div style="font-size: 0.875rem; color: #334155; line-height: 1.5; font-style: italic;">
+                  "{{ ai_result.get('english_pitch') }}"
+                </div>
+              </div>
+            {% endif %}
+
+            <!-- Tamil Pitch -->
+            {% if ai_result.get('tamil_pitch') %}
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: var(--radius-md); padding: 1rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem;">
+                  <span style="font-size: 0.8rem; font-weight: 700; color: #166534; text-transform: uppercase;">தமிழ் விளம்பர உரை (Tamil Pitch)</span>
+                  <button type="button" class="btn btn-secondary btn-sm copy-pitch-btn" data-text="{{ ai_result.get('tamil_pitch') }}" style="padding: 0.2rem 0.6rem; font-size: 0.75rem;">
+                    📋 Copy Text
+                  </button>
+                </div>
+                <div style="font-size: 0.875rem; color: #1e293b; line-height: 1.6; font-family: 'Mukta Malar', sans-serif;">
+                  "{{ ai_result.get('tamil_pitch') }}"
+                </div>
+              </div>
+            {% endif %}
+          </div>
+
+          <!-- Action CTA -->
+          <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px dashed var(--border-subtle);">
+            <a href="{{ url_for('nearby_buyers', district=form_data.get('location', '')) }}" class="btn btn-primary" style="flex: 1; justify-content: center;">
+              🔍 Match Nearby Buyers in {{ form_data.get('location', 'Tamil Nadu') }}
+            </a>
+            {% if current_user and current_user['role'] == 'farmer' %}
+              <a href="{{ url_for('add_listing') }}" class="btn btn-accent" style="flex: 1; justify-content: center;">
+                + Post Listing on Marketplace
+              </a>
+            {% endif %}
+          </div>
+
+          <!-- Disclaimer Note -->
+          <div style="font-size: 0.75rem; color: #64748b; margin-top: 1.25rem; line-height: 1.4;">
+            * <em>{{ ai_result.get('disclaimer', _t('ai_disclaimer')) }}</em>
+          </div>
+
+        </div>
+      {% else %}
+        <!-- Initial Guidance Panel -->
+        <div style="background: white; border-radius: var(--radius-lg); border: 1px dashed #cbd5e1; padding: 3rem 2rem; text-align: center;">
+          <div style="font-size: 3.5rem; margin-bottom: 1rem;">🤖</div>
+          <h3 style="font-size: 1.35rem; font-weight: 700; margin-bottom: 0.5rem; color: #0f172a;">
+            Ready to Analyze Your Harvest
+          </h3>
+          <p style="color: var(--text-muted); font-size: 0.95rem; max-width: 480px; margin: 0 auto 1.5rem; line-height: 1.6;">
+            Fill in the produce details on the left, or click one of the quick crop presets (Tomatoes, Small Onions, Carrots, Jasmine) to receive AI-powered selling strategies, lot splitting recommendations, and marketing pitches.
+          </p>
+          <div style="background: #f8fafc; border-radius: var(--radius-md); padding: 1.25rem; max-width: 440px; margin: 0 auto; text-align: left; border: 1px solid #e2e8f0;">
+            <div style="font-weight: 700; font-size: 0.85rem; color: #166534; margin-bottom: 0.5rem;">
+              💡 How AI Produces Rescue Value:
+            </div>
+            <ul style="font-size: 0.85rem; color: #475569; padding-left: 1.25rem; line-height: 1.5;">
+              <li>Identifies high-volume commercial buyers (hotels, messes, processors).</li>
+              <li>Calculates optimal lot sizes to sell faster before quality drops.</li>
+              <li>Generates copy-paste Tamil & English WhatsApp announcements.</li>
+              <li>Protects your hard work from uncompensated dump yard spoilage.</li>
+            </ul>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // Preset buttons handler
+  document.querySelectorAll('.preset-crop-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('aiCropName').value = btn.dataset.crop;
+      document.getElementById('aiQuantity').value = btn.dataset.qty;
+      document.getElementById('aiUnit').value = btn.dataset.unit;
+      document.getElementById('aiFreshnessObs').value = btn.dataset.obs;
+      document.getElementById('aiStorageCondition').value = btn.dataset.storage;
+      document.getElementById('aiUrgency').value = btn.dataset.urgency;
+      // Visual feedback
+      btn.style.borderColor = '#16a34a';
+      setTimeout(() => btn.style.borderColor = '', 1000);
+    });
+  });
+
+  // Copy pitch handler
+  document.querySelectorAll('.copy-pitch-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const text = btn.getAttribute('data-text');
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(() => {
+          const original = btn.innerText;
+          btn.innerText = '✓ Copied!';
+          btn.style.backgroundColor = '#dcfce7';
+          btn.style.color = '#166534';
+          setTimeout(() => {
+            btn.innerText = original;
+            btn.style.backgroundColor = '';
+            btn.style.color = '';
+          }, 2000);
+        });
+      }
+    });
+  });
+});
+</script>
+{% endblock %}

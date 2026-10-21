@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+
+{% block title %}{{ _t('analytics_title') }} - {{ _t('brand_name') }}{% endblock %}
+{% block meta_desc %}Real-time agricultural produce waste reduction metrics, saved harvest kilograms, and confirmed farmer sales analytics across Tamil Nadu.{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+  
+  <!-- Breadcrumb -->
+  <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+    <a href="{{ url_for('index') }}">{{ _t('home') }}</a> &bull; 
+    <span>{{ _t('analytics') }}</span>
+  </div>
+
+  <!-- Header Banner -->
+  <div class="dashboard-header" style="margin-bottom: 2rem;">
+    <div>
+      <div style="font-size: 0.85rem; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+        📊 Platform Impact & Waste Prevention &bull; {{ _t('tamil_nadu') }}
+      </div>
+      <h1 style="font-size: 2.25rem; font-weight: 800; margin-top: 0.25rem;">{{ _t('analytics_title') }}</h1>
+      <p style="color: var(--text-muted); font-size: 0.95rem; max-width: 750px;">
+        {{ _t('analytics_sub') }}
+      </p>
+    </div>
+
+    <!-- Timeframe Filter Tabs -->
+    <div style="display: flex; gap: 0.5rem; background: white; padding: 0.35rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); align-self: flex-start;">
+      <a href="{{ url_for('analytics_view', timeframe='all') }}" class="pill-btn {% if timeframe == 'all' %}active{% endif %}" style="margin: 0;">
+        {{ _t('analytics_period_all') }}
+      </a>
+      <a href="{{ url_for('analytics_view', timeframe='month') }}" class="pill-btn {% if timeframe == 'month' %}active{% endif %}" style="margin: 0;">
+        {{ _t('analytics_period_month') }}
+      </a>
+      <a href="{{ url_for('analytics_view', timeframe='week') }}" class="pill-btn {% if timeframe == 'week' %}active{% endif %}" style="margin: 0;">
+        {{ _t('analytics_period_week') }}
+      </a>
+    </div>
+  </div>
+
+  <!-- Primary Metric Summary Cards -->
+  <div class="dashboard-grid-kpis" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 2.5rem;">
+    
+    <!-- 1. Total Quantity Listed -->
+    <div class="kpi-card" style="border-top: 4px solid #64748b;">
+      <div>
+        <div style="font-size: 0.8rem; font-weight: 700; color: #64748b; text-transform: uppercase;">
+          {{ _t('analytics_total_listed') }}
+        </div>
+        <div class="kpi-num" style="color: #0f172a;">
+          {{ "%.0f"|format(total_qty_listed) }} <span style="font-size: 1rem; font-weight: 600; color: #64748b;">kg</span>
+        </div>
+        <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">
+          Total produce catalogued
+        </div>
+      </div>
+      <div class="kpi-icon">📋</div>
+    </div>
+
+    <!-- 2. Produce Sold / Cleared -->
+    <div class="kpi-card" style="border-top: 4px solid #0284c7;">
+      <div>
+        <div style="font-size: 0.8rem; font-weight: 700; color: #0284c7; text-transform: uppercase;">
+          {{ _t('analytics_total_sold') }}
+        </div>
+        <div class="kpi-num" style="color: #0284c7;">
+          {{ "%.0f"|format(total_qty_sold) }} <span style="font-size: 1rem; font-weight: 600; color: #64748b;">kg</span>
+        </div>
+        <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">
+          From {{ completed_orders_count }} completed orders
+        </div>
+      </div>
+      <div class="kpi-icon">🤝</div>
+    </div>
+
+    <!-- 3. Remaining Available Stock -->
+    <div class="kpi-card" style="border-top: 4px solid #16a34a;">
+      <div>
+        <div style="font-size: 0.8rem; font-weight: 700; color: #16a34a; text-transform: uppercase;">
+          {{ _t('analytics_available_stock') }}
+        </div>
+        <div class="kpi-num" style="color: #16a34a;">
+          {{ "%.0f"|format(available_qty) }} <span style="font-size: 1rem; font-weight: 600; color: #64748b;">kg</span>
+        </div>
+        <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">
+          Currently active on marketplace
+        </div>
+      </div>
+      <div class="kpi-icon">🥦</div>
+    </div>
+
+    <!-- 4. Total Verified Sales Revenue -->
+    <div class="kpi-card highlight" style="border-top: 4px solid #15803d;">
+      <div>
+        <div style="font-size: 0.8rem; font-weight: 700; color: #15803d; text-transform: uppercase;">
+          {{ _t('analytics_total_revenue') }}
+        </div>
+        <div class="kpi-num" style="color: #15803d;">
+          ₹{{ "{:,.0f}".format(total_sales_revenue) }}
+        </div>
+        <div style="font-size: 0.75rem; color: #15803d; font-weight: 600; margin-top: 0.25rem;">
+          Settled via completed transactions
+        </div>
+      </div>
+      <div class="kpi-icon">💰</div>
+    </div>
+
+    <!-- 5. Confirmed Rescued From Waste -->
+    <div class="kpi-card urgent" style="border-top: 4px solid #ea580c;">
+      <div>
+        <div style="font-size: 0.8rem; font-weight: 700; color: #ea580c; text-transform: uppercase;">
+          {{ _t('analytics_rescued_waste') }}
+        </div>
+        <div class="kpi-num" style="color: #ea580c;">
+          {{ "%.0f"|format(confirmed_rescued_kg) }} <span style="font-size: 1rem; font-weight: 600; color: #ea580c;">kg</span>
+        </div>
+        <div style="font-size: 0.75rem; color: #ea580c; font-weight: 600; margin-top: 0.25rem;">
+          Directly saved from post-harvest loss
+        </div>
+      </div>
+      <div class="kpi-icon">🛡️</div>
+    </div>
+
+  </div>
+
+  <!-- Detailed Impact Breakdown & Visual Charts -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2.5rem;" class="analytics-detail-grid">
+    
+    <!-- Left: Waste Prevention Ratio Card -->
+    <div style="background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); padding: 1.75rem; box-shadow: var(--shadow-sm);">
+      <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: #0f172a;">
+        🌱 Clearance & Waste Prevention Ratio
+      </h3>
+      
+      {% set clearance_rate = (total_qty_sold / total_qty_listed * 100) if total_qty_listed > 0 else 0 %}
+      {% set active_rate = (available_qty / total_qty_listed * 100) if total_qty_listed > 0 else 0 %}
+
+      <div style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 0.35rem;">
+          <span style="font-weight: 600; color: #0284c7;">Sold / Rescued Harvests</span>
+          <span style="font-weight: 700; color: #0284c7;">{{ "%.1f"|format(clearance_rate) }}%</span>
+        </div>
+        <div style="background: #e2e8f0; height: 12px; border-radius: 9999px; overflow: hidden;">
+          <div style="background: #0284c7; height: 100%; width: {{ clearance_rate|int }}%; border-radius: 9999px; transition: width 0.8s ease;"></div>
+        </div>
+      </div>
+
+      <div style="margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 0.35rem;">
+          <span style="font-weight: 600; color: #16a34a;">Active Fresh Stock</span>
+          <span style="font-weight: 700; color: #16a34a;">{{ "%.1f"|format(active_rate) }}%</span>
+        </div>
+        <div style="background: #e2e8f0; height: 12px; border-radius: 9999px; overflow: hidden;">
+          <div style="background: #16a34a; height: 100%; width: {{ active_rate|int }}%; border-radius: 9999px; transition: width 0.8s ease;"></div>
+        </div>
+      </div>
+
+      <div style="background: #f8fafc; border-radius: var(--radius-md); padding: 1rem; border: 1px solid #f1f5f9; font-size: 0.85rem; color: #475569; line-height: 1.5;">
+        <strong>Methodology Note:</strong> Revenue is calculated exclusively from transactions marked as <strong>Completed</strong> by the seller and buyer. Cancelled and declined enquiries are strictly excluded from all platform sales figures.
+      </div>
+    </div>
+
+    <!-- Right: Produce Category Distribution -->
+    <div style="background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); padding: 1.75rem; box-shadow: var(--shadow-sm);">
+      <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: #0f172a;">
+        🥦 Category-Wise Listing Breakdown
+      </h3>
+
+      {% if category_breakdown %}
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          {% for cat in category_breakdown %}
+            {% set cat_pct = (cat['total_kg'] / total_qty_listed * 100) if total_qty_listed > 0 else 0 %}
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 0.35rem;">
+                <span style="font-weight: 600; color: #0f172a;">{{ cat['category'] }} ({{ cat['count'] }} listings)</span>
+                <span style="font-weight: 700; color: #166534;">{{ "%.0f"|format(cat['total_kg']) }} kg ({{ "%.1f"|format(cat_pct) }}%)</span>
+              </div>
+              <div style="background: #f1f5f9; height: 10px; border-radius: 9999px; overflow: hidden;">
+                <div style="background: #15803d; height: 100%; width: {{ cat_pct|int }}%; border-radius: 9999px;"></div>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty-state" style="padding: 2rem 1rem; text-align: center;">
+          <span style="font-size: 2.5rem;">📊</span>
+          <p style="color: var(--text-muted); margin-top: 0.5rem;">No category data recorded for this timeframe.</p>
+        </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+  <!-- Operational Guidance & Verification Clarification -->
+  <div class="disclaimer-box">
+    <strong>🛡️ Authentic Data Transparency:</strong> FarmFresh Rescue only marks produce as "Rescued from Waste" when confirmed as sold before reaching terminal spoilage or after triggering the 3-day urgency threshold. We do not claim that all listed agricultural produce would have spoiled without our platform.
+  </div>
+
+</div>
+{% endblock %}

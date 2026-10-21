@@ -1,111 +1,147 @@
 {% extends "base.html" %}
 
-{% block title %}Buyer Dashboard - FarmFresh Rescue{% endblock %}
+{% block title %}{{ _t('buyer_portal_title') }} - {{ _t('brand_name') }}{% endblock %}
 
 {% block content %}
 <div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
   
-  <div class="dashboard-header">
+  <div class="dashboard-header" style="margin-bottom: 2rem;">
     <div>
-      <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">Buyer Procurement Center</div>
-      <h1 style="font-size: 2.25rem;">Vanakkam, {{ current_user['name'] }}!</h1>
+      <div style="font-size: 0.85rem; color: #0284c7; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+        🏢 {{ _t('buyer_portal_title') }} &bull; {{ _t('tamil_nadu') }}
+      </div>
+      <h1 style="font-size: 2.25rem; font-weight: 800; margin-top: 0.25rem;">{{ _t('welcome_vanakkam') }}, {{ current_user['name'] }}!</h1>
       <p style="color: var(--text-muted); font-size: 0.95rem;">
-        Track your purchase requests, connect directly with farmers, and source fresh farm harvests at fair rates.
+        {{ _t('buyer_intro') }}
       </p>
     </div>
-    <div>
+    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
       <a href="{{ url_for('browse_listings') }}" class="btn btn-primary btn-lg">
-        🔍 Explore Produce Marketplace
+        🔍 {{ _t('browse_produce') }}
+      </a>
+      <a href="#postRequirementSection" class="btn btn-outline-primary btn-lg">
+        + {{ _t('btn_post_req') }}
+      </a>
+      <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="btn btn-accent btn-lg">
+        ⚡ {{ _t('urgent_rescue') }}
       </a>
     </div>
   </div>
 
-  <!-- Buyer Sent Enquiries Table -->
-  <div class="data-table-card">
+  <!-- Buyer Sent Orders Table -->
+  <div class="data-table-card" style="margin-bottom: 3rem;">
     <div class="data-table-header">
       <div>
-        <h2 style="font-size: 1.35rem;">My Purchase Enquiries</h2>
-        <span style="font-size: 0.85rem; color: var(--text-muted);">Requests sent to local farmers</span>
+        <h2 style="font-size: 1.35rem; font-weight: 700;">{{ _t('buyer_my_enquiries') }}</h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">{{ orders|length }} purchase requests sent to local farmers</span>
       </div>
+      <a href="{{ url_for('browse_listings') }}" class="btn btn-outline-primary btn-sm">+ Find Fresh Produce</a>
     </div>
 
-    {% if enquiries %}
+    {% if orders %}
       <div class="table-responsive">
         <div class="table-scroll-hint"><span>👉 Swipe horizontally to view full table details</span></div>
         <table class="custom-table">
           <thead>
             <tr>
+              <th>Order #</th>
               <th>Produce Item</th>
               <th>Farmer Contact</th>
-              <th>Your Offer / Qty</th>
-              <th>Enquiry Note</th>
+              <th>Requested Qty & Offer</th>
+              <th>Delivery Preference</th>
               <th>Status</th>
-              <th style="text-align: right;">Action</th>
+              <th style="text-align: right;">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {% for e in enquiries %}
+            {% for o in orders %}
               <tr>
+                <td><strong>#{{ o['id'] }}</strong></td>
                 <td>
                   <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    {% if e['photo'] %}
-                      <img src="{{ url_for('static', filename='uploads/' ~ e['photo']) }}" alt="{{ e['crop_name'] }}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px;">
+                    {% if o['photo'] %}
+                      <img src="{{ url_for('static', filename='uploads/' ~ o['photo']) }}" alt="{{ o['crop_name'] }}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px;">
                     {% else %}
                       <div style="width: 44px; height: 44px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
                         🥦
                       </div>
                     {% endif %}
                     <div>
-                      <a href="{{ url_for('listing_detail', listing_id=e['listing_id']) }}" style="font-weight: 700; color: #0f172a;">
-                        {{ e['crop_name'] }}
+                      <a href="{{ url_for('listing_detail', listing_id=o['listing_id']) }}" style="font-weight: 700; color: #0f172a;">
+                        {{ o['crop_name'] }}
                       </a>
                       <div style="font-size: 0.75rem; color: #64748b;">
-                        Listing Rate: ₹{{ "%.0f"|format(e['price_per_unit']) }} / {{ e['unit'] }}
+                        Listing Rate: ₹{{ "%.0f"|format(o['price_per_unit']) }} / {{ o['unit'] }}
                       </div>
                     </div>
                   </div>
                 </td>
                 <td>
-                  <div style="font-weight: 700;">{{ e['farmer_name'] }}</div>
+                  <div style="font-weight: 700;">{{ o['farmer_name'] }}</div>
                   <div style="font-size: 0.775rem; color: #64748b;">
-                    📍 {{ e['village_town'] }}, {{ e['district'] }}<br>
-                    📞 {{ e['farmer_phone'] }}
+                    📍 {{ o['village_town'] }}, {{ o['district'] }}<br>
+                    📞 {{ o['farmer_phone'] }}
                   </div>
                 </td>
                 <td>
-                  {% if e['requested_quantity'] %}
-                    <div>Requested: <strong>{{ e['requested_quantity'] }}</strong> {{ e['unit'] }}</div>
+                  {% if o['requested_quantity'] %}
+                    <div>Qty: <strong>{{ o['requested_quantity'] }}</strong> {{ o['unit'] }}</div>
                   {% endif %}
-                  {% if e['offered_price'] %}
-                    <div style="color: #166534; font-weight: 700;">Offered: ₹{{ "%.0f"|format(e['offered_price']) }} / {{ e['unit'] }}</div>
+                  {% if o['offered_price'] %}
+                    <div style="color: #166534; font-weight: 700;">Offered: ₹{{ "%.0f"|format(o['offered_price']) }} / {{ o['unit'] }}</div>
+                  {% endif %}
+                  {% if o['total_price'] %}
+                    <div style="font-size: 0.8rem; color: #0f172a; font-weight: 700;">Total: ₹{{ "{:,.0f}".format(o['total_price']) }}</div>
                   {% endif %}
                 </td>
-                <td style="max-width: 250px;">
-                  <div style="font-size: 0.85rem; color: #334155;">{{ e['message'] }}</div>
-                  <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">Sent: {{ e['created_at'].split()[0] if ' ' in e['created_at'] else e['created_at'] }}</div>
+                <td style="max-width: 220px;">
+                  <span style="font-size: 0.75rem; background: #f1f5f9; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600;">
+                    🚚 {{ o['delivery_preference'] or 'Direct Farm Pickup' }}
+                  </span>
+                  <div style="font-size: 0.825rem; color: #334155; margin-top: 0.25rem; line-height: 1.4;">
+                    {{ o['message'] }}
+                  </div>
+                  <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">
+                    Sent: {{ o['created_at'].split()[0] if ' ' in o['created_at'] else o['created_at'] }}
+                  </div>
                 </td>
                 <td>
-                  {% if e['status'] == 'Pending' %}
+                  {% if o['status'] == 'Pending' %}
                     <span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Pending</span>
-                  {% elif e['status'] == 'Accepted' %}
+                  {% elif o['status'] == 'Accepted' %}
                     <span style="background: #dcfce7; color: #166534; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Accepted</span>
-                  {% elif e['status'] == 'Completed' %}
+                  {% elif o['status'] == 'Ready for Collection' %}
+                    <span style="background: #fef08a; color: #854d0e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Ready for Pickup</span>
+                  {% elif o['status'] == 'Completed' %}
                     <span style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Completed</span>
+                  {% elif o['status'] == 'Cancelled' %}
+                    <span style="background: #fee2e2; color: #991b1b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Cancelled</span>
                   {% else %}
-                    <span style="background: #f1f5f9; color: #64748b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ e['status'] }}</span>
+                    <span style="background: #f1f5f9; color: #64748b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ o['status'] }}</span>
                   {% endif %}
                 </td>
                 <td>
-                  <div style="display: flex; gap: 0.35rem; justify-content: flex-end;">
-                    <a href="tel:{{ e['farmer_phone'] }}" class="btn btn-secondary btn-sm" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">
-                      📞 Call
-                    </a>
-                    {% set wa_num = e['whatsapp_number'] or e['farmer_phone'] %}
-                    {% set clean_wa = wa_num.replace(' ', '').replace('-', '').replace('+91', '') %}
-                    <a href="https://wa.me/91{{ clean_wa }}?text=Hello%20{{ e['farmer_name'] }}%2C%20following%20up%20on%20my%20enquiry%20for%20{{ e['crop_name'] }}." 
-                       target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="padding: 0.3rem 0.6rem; font-size: 0.8rem;">
-                      💬 Chat
-                    </a>
+                  <div style="display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-end;">
+                    <div style="display: flex; gap: 0.35rem;">
+                      <a href="tel:{{ o['farmer_phone'] }}" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                        📞 Call
+                      </a>
+                      {% set wa_num = o['whatsapp_number'] or o['farmer_phone'] %}
+                      {% set clean_wa = wa_num.replace(' ', '').replace('-', '').replace('+91', '') %}
+                      <a href="https://wa.me/91{{ clean_wa }}?text=Vanakkam%20{{ o['farmer_name'] }}%2C%20following%20up%20on%20my%20enquiry%20%23{{ o['id'] }}%20for%20{{ o['crop_name'] }}." 
+                         target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                        💬 Chat
+                      </a>
+                    </div>
+
+                    <!-- Cancel button for Pending orders -->
+                    {% if o['status'] == 'Pending' %}
+                      <form action="{{ url_for('cancel_order', order_id=o['id']) }}" method="POST" onsubmit="return confirm('Cancel this purchase request?');">
+                        <button type="submit" class="btn btn-danger btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.725rem;">
+                          ✕ {{ _t('btn_cancel_order') }}
+                        </button>
+                      </form>
+                    {% endif %}
                   </div>
                 </td>
               </tr>
@@ -114,11 +150,147 @@
         </table>
       </div>
     {% else %}
-      <div class="empty-state" style="padding: 2.5rem 1.5rem;">
-        <span class="empty-icon">🛒</span>
-        <h3 class="empty-title">You Haven't Sent Any Enquiries Yet</h3>
-        <p class="empty-text">Browse our real-time farm marketplace to discover fresh produce from local farmers.</p>
-        <a href="{{ url_for('browse_listings') }}" class="btn btn-primary">Browse Produce Listings</a>
+      <div class="empty-state" style="padding: 3rem 1.5rem; text-align: center;">
+        <span class="empty-icon" style="font-size: 3rem; display: block; margin-bottom: 0.5rem;">🛒</span>
+        <h3 class="empty-title" style="font-size: 1.25rem; font-weight: 700;">You Haven't Sent Any Purchase Requests Yet</h3>
+        <p class="empty-text" style="color: var(--text-muted); margin-bottom: 1rem;">
+          Browse our real-time farm marketplace to discover fresh produce from local farmers in Tamil Nadu.
+        </p>
+        <a href="{{ url_for('browse_listings') }}" class="btn btn-primary">{{ _t('browse_produce') }}</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Section: Post Buyer Procurement Requirement -->
+  <div class="form-card" id="postRequirementSection" style="margin-bottom: 3rem; border: 1px solid #bbf7d0; background: #fcfdfc; padding: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem;">
+      <div>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: #166534;">
+          🏢 {{ _t('buyer_post_req_title') }}
+        </h2>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">
+          Farmers in your selected district will discover your requirements on the <strong>Smart Buyer Matching</strong> page.
+        </p>
+      </div>
+    </div>
+
+    <form action="{{ url_for('add_buyer_requirement') }}" method="POST">
+      <div class="form-row-3">
+        <div class="form-group">
+          <label class="form-label">Produce Needed <span class="required">*</span></label>
+          <input type="text" name="crop_name" class="form-control" placeholder="e.g. Country Tomatoes, Shallots, Carrots" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select name="category" class="form-control">
+            {% for c in crop_categories %}
+              <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Business Type</label>
+          <select name="business_type" class="form-control">
+            {% for bt in buyer_types %}
+              <option value="{{ bt }}" {% if current_user and current_user['user_type'] == bt %}selected{% endif %}>{{ bt }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <div class="form-row-3">
+        <div class="form-group">
+          <label class="form-label">Required Quantity <span class="required">*</span></label>
+          <input type="number" step="any" min="1" name="required_quantity" class="form-control" placeholder="e.g. 500" required>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Unit of Measure</label>
+          <select name="unit" class="form-control">
+            {% for u in crop_units %}
+              <option value="{{ u }}">{{ u }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Target Buying Price (₹ / unit)</label>
+          <input type="number" step="any" min="0" name="target_price" class="form-control" placeholder="Target purchase price">
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">District (Tamil Nadu) <span class="required">*</span></label>
+          <select name="district" class="form-control" required>
+            <option value="">Select District</option>
+            {% for d in tn_districts %}
+              <option value="{{ d }}">{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Town / Delivery Hub Location</label>
+          <input type="text" name="village_town" value="{{ current_user['location'] or '' }}" class="form-control" placeholder="e.g. Koyambedu, Madurai Central, RS Puram">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Contact Phone <span class="required">*</span></label>
+        <input type="tel" name="contact_phone" value="{{ current_user['phone'] }}" class="form-control" required style="max-width: 320px;">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Procurement Specifications / Quality Notes</label>
+        <textarea name="notes" class="form-control" rows="2" placeholder="Specify grading requirements, crate preferences, daily/weekly frequency, or same-day payment terms."></textarea>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end; margin-top: 1rem;">
+        <button type="submit" class="btn btn-primary btn-lg">
+          + {{ _t('btn_post_req') }}
+        </button>
+      </div>
+    </form>
+
+    <!-- My Active Requirements Table -->
+    {% if requirements %}
+      <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px dashed #cbd5e1;">
+        <h3 style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin-bottom: 0.75rem;">
+          My Posted Requirements ({{ requirements|length }})
+        </h3>
+        <div class="table-responsive">
+          <table class="custom-table" style="font-size: 0.875rem;">
+            <thead>
+              <tr>
+                <th>Crop Requested</th>
+                <th>Quantity</th>
+                <th>Target Rate</th>
+                <th>Location</th>
+                <th>Status</th>
+                <th style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in requirements %}
+                <tr>
+                  <td><strong>{{ r['crop_name'] }}</strong></td>
+                  <td>{{ r['required_quantity'] }} {{ r['unit'] }}</td>
+                  <td>{% if r['target_price'] %}₹{{ "%.0f"|format(r['target_price']) }} / {{ r['unit'] }}{% else %}Market{% endif %}</td>
+                  <td>{{ r['district'] }}</td>
+                  <td><span class="badge-available">Active</span></td>
+                  <td style="text-align: right;">
+                    <form action="{{ url_for('delete_buyer_requirement', req_id=r['id']) }}" method="POST" onsubmit="return confirm('Remove this requirement?');" style="display: inline;">
+                      <button type="submit" class="btn btn-danger btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Delete</button>
+                    </form>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
       </div>
     {% endif %}
   </div>
