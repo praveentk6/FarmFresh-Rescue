@@ -62,18 +62,30 @@
           <input type="number" step="any" name="original_price" value="{{ listing['original_price'] or '' }}" class="form-control">
         </div>
 
+      <!-- Harvest date, Storage condition & Estimated Freshness -->
+      <div class="form-row-3">
         <div class="form-group">
           <label class="form-label">Harvest Date <span class="required">*</span></label>
           <input type="date" name="harvest_date" value="{{ listing['harvest_date'] }}" class="form-control" required>
         </div>
-      </div>
 
-      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Storage Condition <span class="required">*</span></label>
+          <select name="storage_condition" class="form-control" required>
+            <option value="ambient" {% if listing['storage_condition'] == 'ambient' %}selected{% endif %}>Ambient (Room Temp)</option>
+            <option value="shaded_shed" {% if listing['storage_condition'] == 'shaded_shed' %}selected{% endif %}>Shaded Shed</option>
+            <option value="ventilated_crates" {% if listing['storage_condition'] == 'ventilated_crates' %}selected{% endif %}>Ventilated Crates</option>
+            <option value="cold_storage" {% if listing['storage_condition'] == 'cold_storage' %}selected{% endif %}>Cold Storage</option>
+          </select>
+        </div>
+
         <div class="form-group">
           <label class="form-label">Estimated Freshness Date <small style="color: #64748b;">(Optional)</small></label>
           <input type="date" name="estimated_freshness_date" value="{{ listing['estimated_freshness_date'] or '' }}" class="form-control">
         </div>
+      </div>
 
+      <div class="form-row">
         <div class="form-group">
           <label class="form-label">Urgency Level <span class="required">*</span></label>
           <select name="urgency_level" class="form-control">

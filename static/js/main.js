@@ -490,4 +490,238 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // ==========================================
+  // 9. FarmFresh AI 2.0 Floating Chatbot Widget
+  // ==========================================
+  const chatbotLauncher = document.getElementById('chatbotLauncher');
+  const chatbotWindow = document.getElementById('chatbotWindow');
+  const chatbotMinimizeBtn = document.getElementById('chatbotMinimizeBtn');
+  const chatbotForm = document.getElementById('chatbotForm');
+  const chatInput = document.getElementById('chatInput');
+  const chatbotMessages = document.getElementById('chatbotMessages');
+  const chatMicBtn = document.getElementById('chatMicBtn');
+  const chatbotVoiceToggle = document.getElementById('chatbotVoiceToggle');
+  const quickPills = document.querySelectorAll('.quick-pill');
+
+  let isSpeechEnabled = false;
+
+  if (chatbotLauncher && chatbotWindow) {
+    chatbotLauncher.addEventListener('click', () => {
+      const isHidden = chatbotWindow.style.display === 'none' || chatbotWindow.style.display === '';
+      chatbotWindow.style.display = isHidden ? 'flex' : 'none';
+      chatbotWindow.setAttribute('aria-hidden', String(!isHidden));
+      if (isHidden && chatInput) chatInput.focus();
+    });
+
+    if (chatbotMinimizeBtn) {
+      chatbotMinimizeBtn.addEventListener('click', () => {
+        chatbotWindow.style.display = 'none';
+        chatbotWindow.setAttribute('aria-hidden', 'true');
+      });
+    }
+
+    if (chatbotVoiceToggle) {
+      chatbotVoiceToggle.addEventListener('click', () => {
+        isSpeechEnabled = !isSpeechEnabled;
+        chatbotVoiceToggle.style.background = isSpeechEnabled ? '#16a34a' : 'rgba(255, 255, 255, 0.15)';
+        chatbotVoiceToggle.title = isSpeechEnabled ? 'Spoken Responses ON' : 'Spoken Responses OFF';
+      });
+    }
+
+    // Quick suggestions
+    quickPills.forEach(pill => {
+      pill.addEventListener('click', () => {
+        const prompt = pill.getAttribute('data-prompt');
+        if (prompt && chatInput) {
+          chatInput.value = prompt;
+          if (chatbotForm) {
+            chatbotForm.dispatchEvent(new Event('submit', { cancelable: true }));
+          }
+        }
+      });
+    });
+
+    // Chatbot Voice Input via Web Speech API
+    if (chatMicBtn && ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const chatRec = new SpeechRecognition();
+      chatRec.continuous = false;
+      chatRec.interimResults = false;
+      chatRec.lang = document.documentElement.lang === 'ta' ? 'ta-IN' : 'en-IN';
+
+      chatMicBtn.addEventListener('click', () => {
+        try {
+          chatRec.start();
+          chatMicBtn.classList.add('recording');
+        } catch (e) {
+          chatRec.stop();
+          chatMicBtn.classList.remove('recording');
+        }
+      });
+
+      chatRec.onresult = (evt) => {
+        chatMicBtn.classList.remove('recording');
+        const transcript = evt.results[0][0].transcript;
+        if (transcript && chatInput) {
+          chatInput.value = transcript;
+          chatbotForm.dispatchEvent(new Event('submit', { cancelable: true }));
+        }
+      };
+
+      chatRec.onerror = () => {
+        chatMicBtn.classList.remove('recording');
+      };
+
+      chatRec.onend = () => {
+        chatMicBtn.classList.remove('recording');
+      };
+    }
+
+    // Chat form submit
+    if (chatbotForm && chatInput && chatbotMessages) {
+      chatbotForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const text = chatInput.value.trim();
+        if (!text) return;
+
+        // Append user bubble
+        appendChatMessage('user', text);
+        chatInput.value = '';
+
+        // Add loading bubble
+        const loadingId = 'loading-' + Date.now();
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'chat-msg bot-msg';
+        loadingDiv.id = loadingId;
+        loadingDiv.innerHTML = '<div class="msg-bubble" style="color: #64748b; font-style: italic;">🌱 சிந்திக்கிறது / Analyzing...</div>';
+        chatbotMessages.appendChild(loadingDiv);
+        chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+
+        // Send to backend
+        fetch('/api/ai/chatbot', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text })
+        })
+          .then(res => res.json())
+          .then(data => {
+            const el = document.getElementById(loadingId);
+            if (el) el.remove();
+
+            const reply = data.reply || 'மன்னிக்கவும், தகவலைப் பெறுவதில் தாமதம் ஏற்பட்டுள்ளது.';
+            appendChatMessage('bot', reply);
+
+            // Spoken voice reply if enabled
+            if (isSpeechEnabled && 'speechSynthesis' in window) {
+              const utter = new SpeechSynthesisUtterance(reply.replace(/[#*`_]/g, ''));
+              utter.lang = (data.detected_lang === 'ta' || /[அ-ஹ]/.test(reply)) ? 'ta-IN' : 'en-IN';
+              window.speechSynthesis.speak(utter);
+            }
+          })
+          .catch(err => {
+            const el = document.getElementById(loadingId);
+            if (el) el.remove();
+            appendChatMessage('bot', '⚠️ Connection error. Please try again.');
+          });
+      });
+    }
+
+    function appendChatMessage(role, text) {
+      const div = document.createElement('div');
+      div.className = `chat-msg ${role}-msg`;
+      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      div.innerHTML = `
+        <div class="msg-bubble">${escapeHtml(text)}</div>
+        <span class="msg-time">${timeStr}</span>
+      `;
+      chatbotMessages.appendChild(div);
+      chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/\n/g, '<br>');
+    }
+  }
+
+  // ==========================================
+  // 10. AI Smart Price Recommendation in Add Listing
+  // ==========================================
+  const btnAiPrice = document.getElementById('btnAiPrice');
+  const aiPricePanel = document.getElementById('aiPricePanel');
+  const btnApplyAiPrice = document.getElementById('btnApplyAiPrice');
+  const fieldPrice = document.getElementById('fieldPrice');
+  const fieldCropName = document.getElementById('fieldCropName');
+  const fieldQuantity = document.getElementById('fieldQuantity');
+  const fieldHarvestDate = document.getElementById('fieldHarvestDate');
+  const fieldStorage = document.getElementById('fieldStorageCondition');
+
+  if (btnAiPrice && aiPricePanel) {
+    btnAiPrice.addEventListener('click', () => {
+      const crop = fieldCropName ? fieldCropName.value.trim() : '';
+      const qty = fieldQuantity ? fieldQuantity.value.trim() : 100;
+      const hDate = fieldHarvestDate ? fieldHarvestDate.value.trim() : '';
+      const storage = fieldStorage ? fieldStorage.value : 'ambient';
+      const askPrice = fieldPrice ? fieldPrice.value.trim() : '';
+
+      if (!crop) {
+        alert('தயவுசெய்து விளைபொருள் பெயரை உள்ளிடவும் (Please enter a produce name first).');
+        if (fieldCropName) fieldCropName.focus();
+        return;
+      }
+
+      btnAiPrice.innerText = '⏳ கணக்கிடுகிறது...';
+      btnAiPrice.disabled = true;
+
+      fetch('/api/ai/price-recommend', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          crop_name: crop,
+          quantity: qty,
+          harvest_date: hDate,
+          storage_condition: storage,
+          asking_price: askPrice
+        })
+      })
+        .then(res => res.json())
+        .then(data => {
+          btnAiPrice.innerHTML = '<span>🤖</span> AI விலை';
+          btnAiPrice.disabled = false;
+
+          if (data.success && data.recommendation) {
+            const rec = data.recommendation;
+            aiPricePanel.style.display = 'block';
+
+            const recEl = document.getElementById('aiRecPrice');
+            const mktEl = document.getElementById('aiMktPrice');
+            const revEl = document.getElementById('aiEstRevenue');
+            const ratEl = document.getElementById('aiPriceRationale');
+
+            if (recEl) recEl.innerText = '₹' + rec.suggested_price;
+            if (mktEl) mktEl.innerText = '₹' + rec.mandi_benchmark;
+            if (revEl) revEl.innerText = '₹' + Number(rec.expected_revenue || 0).toLocaleString();
+            if (ratEl) ratEl.innerText = rec.rationale || 'Recommendation based on wholesale Mandi benchmarks and freshness.';
+
+            if (btnApplyAiPrice) {
+              btnApplyAiPrice.onclick = () => {
+                if (fieldPrice) {
+                  fieldPrice.value = rec.suggested_price;
+                  highlightField(fieldPrice);
+                }
+                aiPricePanel.style.borderColor = '#16a34a';
+              };
+            }
+          }
+        })
+        .catch(err => {
+          btnAiPrice.innerHTML = '<span>🤖</span> AI விலை';
+          btnAiPrice.disabled = false;
+          alert('AI price recommendation service unavailable. Please enter price manually.');
+        });
+    });
+  }
+
 });

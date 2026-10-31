@@ -135,12 +135,65 @@ def init_db():
     )
     ''')
 
+    # Favorite Farmers (for Buyer Dashboard)
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS favorite_farmers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        buyer_id INTEGER NOT NULL,
+        farmer_id INTEGER NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(buyer_id, farmer_id),
+        FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (farmer_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    ''')
+
+    # AI Quality Inspections Table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS quality_inspections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        listing_id INTEGER,
+        farmer_id INTEGER NOT NULL,
+        crop_name TEXT NOT NULL,
+        image_filename TEXT NOT NULL,
+        quality_grade TEXT NOT NULL,
+        confidence REAL NOT NULL,
+        color_score REAL,
+        defect_score REAL,
+        freshness_assessment TEXT,
+        target_buyers TEXT,
+        source TEXT DEFAULT 'AI Visual Inspection',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (farmer_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    ''')
+
+    # AI Chat Logs Table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS ai_chat_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        session_id TEXT,
+        user_message TEXT NOT NULL,
+        bot_response TEXT NOT NULL,
+        lang TEXT DEFAULT 'en',
+        intent TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+
     # Safe Schema Migrations for existing database
     # 1. users migrations
     cursor.execute("PRAGMA table_info(users)")
     user_cols = [r[1] for r in cursor.fetchall()]
     if 'is_active' not in user_cols:
         cursor.execute("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1")
+    if 'latitude' not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN latitude REAL")
+    if 'longitude' not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN longitude REAL")
+    if 'district' not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN district TEXT")
 
     # 2. listings migrations
     cursor.execute("PRAGMA table_info(listings)")
@@ -153,6 +206,24 @@ def init_db():
         cursor.execute("ALTER TABLE listings ADD COLUMN urgency_level TEXT NOT NULL DEFAULT 'Normal'")
     if 'rescued_from_waste' not in listing_cols:
         cursor.execute("ALTER TABLE listings ADD COLUMN rescued_from_waste INTEGER DEFAULT 0")
+    if 'storage_condition' not in listing_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN storage_condition TEXT DEFAULT 'Ambient / Room Temperature'")
+    if 'freshness_score' not in listing_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN freshness_score REAL DEFAULT 85")
+    if 'freshness_grade' not in listing_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN freshness_grade TEXT DEFAULT 'Fresh'")
+    if 'quality_grade' not in listing_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN quality_grade TEXT DEFAULT 'Grade A'")
+    if 'quality_confidence' not in listing_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN quality_confidence REAL DEFAULT 90")
+    if 'quality_analysis' not in listing_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN quality_analysis TEXT")
+    if 'suggested_price' not in listing_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN suggested_price REAL")
+    if 'latitude' not in listing_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN latitude REAL")
+    if 'longitude' not in listing_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN longitude REAL")
 
     # 3. enquiries migrations (ensure new columns & status compatibility)
     cursor.execute("PRAGMA table_info(enquiries)")
@@ -165,14 +236,22 @@ def init_db():
         cursor.execute("ALTER TABLE enquiries ADD COLUMN updated_at TIMESTAMP DEFAULT NULL")
     if 'cancelled_reason' not in enquiry_cols:
         cursor.execute("ALTER TABLE enquiries ADD COLUMN cancelled_reason TEXT")
+    if 'tracking_notes' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN tracking_notes TEXT")
+    if 'delivery_address' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN delivery_address TEXT")
+    if 'delivery_lat' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN delivery_lat REAL")
+    if 'delivery_lng' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN delivery_lng REAL")
+    if 'status_timeline' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN status_timeline TEXT")
 
-    # Migrate enquiries CHECK constraint if needed
+    # Migrate enquiries CHECK constraint to include full 6-stage lifecycle
     try:
-        # Test inserting or updating status 'Rejected'
-        # If strict check fails, we recreate enquiries cleanly
         cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='enquiries'")
         enq_sql_row = cursor.fetchone()
-        if enq_sql_row and "CHECK(status IN ('Pending', 'Accepted', 'Declined', 'Completed'))" in enq_sql_row[0]:
+        if enq_sql_row and "'Packed'" not in enq_sql_row[0]:
             cursor.execute("PRAGMA foreign_keys = OFF")
             cursor.execute('''
             CREATE TABLE enquiries_migrated (
@@ -187,8 +266,13 @@ def init_db():
                 delivery_preference TEXT DEFAULT 'Direct Pickup / Collection',
                 total_price REAL DEFAULT 0,
                 message TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'Pending' CHECK(status IN ('Pending', 'Accepted', 'Rejected', 'Declined', 'Ready for Collection', 'Completed', 'Cancelled')),
+                status TEXT NOT NULL DEFAULT 'Pending' CHECK(status IN ('Pending', 'Accepted', 'Packed', 'Shipped', 'Delivered', 'Completed', 'Ready for Collection', 'Rejected', 'Declined', 'Cancelled')),
                 cancelled_reason TEXT,
+                tracking_notes TEXT,
+                delivery_address TEXT,
+                delivery_lat REAL,
+                delivery_lng REAL,
+                status_timeline TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE,
@@ -199,14 +283,17 @@ def init_db():
             INSERT INTO enquiries_migrated (
                 id, listing_id, buyer_id, buyer_name, buyer_phone, buyer_email,
                 offered_price, requested_quantity, delivery_preference, total_price,
-                message, status, cancelled_reason, created_at, updated_at
+                message, status, cancelled_reason, tracking_notes, delivery_address,
+                delivery_lat, delivery_lng, status_timeline, created_at, updated_at
             )
             SELECT 
                 id, listing_id, buyer_id, buyer_name, buyer_phone, buyer_email,
                 offered_price, requested_quantity, 
                 COALESCE(delivery_preference, 'Direct Pickup / Collection'),
                 COALESCE(total_price, 0),
-                message, status, cancelled_reason, created_at, 
+                message, status, cancelled_reason,
+                NULL, NULL, NULL, NULL, NULL,
+                created_at, 
                 COALESCE(updated_at, created_at)
             FROM enquiries
             ''')
@@ -296,6 +383,207 @@ def mark_all_notifications_read(user_id):
         return True
     except Exception:
         return False
+
+# ==========================================
+# AI 2.0 Helpers: Favorites, Quality & Orders
+# ==========================================
+
+def toggle_favorite_farmer(buyer_id, farmer_id):
+    """Toggle a farmer in a buyer's favorite list."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM favorite_farmers WHERE buyer_id = ? AND farmer_id = ?", (buyer_id, farmer_id))
+        row = cursor.fetchone()
+        if row:
+            cursor.execute("DELETE FROM favorite_farmers WHERE id = ?", (row['id'],))
+            favorited = False
+        else:
+            cursor.execute("INSERT INTO favorite_farmers (buyer_id, farmer_id) VALUES (?, ?)", (buyer_id, farmer_id))
+            favorited = True
+        conn.commit()
+        conn.close()
+        return {'success': True, 'favorited': favorited}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+def is_farmer_favorited(buyer_id, farmer_id):
+    """Check if farmer is favorited by buyer."""
+    if not buyer_id or not farmer_id:
+        return False
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id FROM favorite_farmers WHERE buyer_id = ? AND farmer_id = ?", (buyer_id, farmer_id))
+        fav = cursor.fetchone() is not None
+        conn.close()
+        return fav
+    except Exception:
+        return False
+
+def get_buyer_favorites(buyer_id):
+    """Fetch all favorite farmers for a buyer with their active listings count."""
+    if not buyer_id:
+        return []
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT u.id, u.name, u.email, u.phone, u.location, u.pin_code,
+                   COUNT(DISTINCT l.id) AS active_listings_count,
+                   ff.created_at AS favorited_at
+            FROM favorite_farmers ff
+            JOIN users u ON ff.farmer_id = u.id
+            LEFT JOIN listings l ON l.farmer_id = u.id AND l.status = 'Available'
+            WHERE ff.buyer_id = ?
+            GROUP BY u.id
+            ORDER BY ff.created_at DESC
+        ''', (buyer_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return rows
+    except Exception as e:
+        print(f"Error fetching favorites: {e}")
+        return []
+
+def save_quality_inspection(farmer_id, crop_name, image_filename, quality_grade,
+                            confidence, color_score=None, defect_score=None,
+                            freshness_assessment=None, target_buyers=None,
+                            listing_id=None, source='AI Visual Inspection'):
+    """Record a produce quality grading inspection."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO quality_inspections (
+                listing_id, farmer_id, crop_name, image_filename,
+                quality_grade, confidence, color_score, defect_score,
+                freshness_assessment, target_buyers, source
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            listing_id, farmer_id, crop_name, image_filename,
+            quality_grade, confidence, color_score, defect_score,
+            freshness_assessment, target_buyers, source
+        ))
+        inspection_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return inspection_id
+    except Exception as e:
+        print(f"Error saving quality inspection: {e}")
+        return None
+
+def get_farmer_quality_inspections(farmer_id, limit=15):
+    """Retrieve quality inspection history for farmer."""
+    if not farmer_id:
+        return []
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM quality_inspections
+            WHERE farmer_id = ?
+            ORDER BY created_at DESC
+            LIMIT ?
+        ''', (farmer_id, limit))
+        rows = cursor.fetchall()
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
+def log_ai_chat(user_id, session_id, user_message, bot_response, lang='en', intent=None):
+    """Persist conversation snippet for contextual assistance."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO ai_chat_logs (user_id, session_id, user_message, bot_response, lang, intent)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (user_id, session_id, user_message, bot_response, lang, intent))
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"Error logging AI chat: {e}")
+        return False
+
+def update_order_lifecycle(order_id, new_status, note=None, delivery_address=None,
+                           delivery_lat=None, delivery_lng=None):
+    """
+    Update order status and append an entry to the status_timeline JSON.
+    Supports: Pending -> Accepted -> Packed -> Shipped -> Delivered / Cancelled
+    """
+    import json
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT status, status_timeline FROM enquiries WHERE id = ?", (order_id,))
+        order = cursor.fetchone()
+        if not order:
+            conn.close()
+            return False, "Order not found"
+
+        current_timeline = []
+        if order['status_timeline']:
+            try:
+                current_timeline = json.loads(order['status_timeline'])
+            except Exception:
+                current_timeline = []
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        timeline_entry = {
+            'status': new_status,
+            'timestamp': now_str,
+            'note': note or f"Status changed from {order['status']} to {new_status}"
+        }
+        if delivery_lat and delivery_lng:
+            timeline_entry['lat'] = delivery_lat
+            timeline_entry['lng'] = delivery_lng
+
+        current_timeline.append(timeline_entry)
+        timeline_json = json.dumps(current_timeline)
+
+        cursor.execute('''
+            UPDATE enquiries
+            SET status = ?,
+                tracking_notes = COALESCE(?, tracking_notes),
+                delivery_address = COALESCE(?, delivery_address),
+                delivery_lat = COALESCE(?, delivery_lat),
+                delivery_lng = COALESCE(?, delivery_lng),
+                status_timeline = ?,
+                updated_at = ?
+            WHERE id = ?
+        ''', (
+            new_status, note, delivery_address,
+            delivery_lat, delivery_lng, timeline_json,
+            now_str, order_id
+        ))
+        conn.commit()
+        conn.close()
+        return True, "Order updated successfully"
+    except Exception as e:
+        return False, str(e)
+
+def get_order_timeline(order_id):
+    """Return parsed timeline list for an order."""
+    import json
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT status_timeline, created_at, status FROM enquiries WHERE id = ?", (order_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if not row:
+            return []
+        if row['status_timeline']:
+            try:
+                return json.loads(row['status_timeline'])
+            except Exception:
+                pass
+        return [{'status': row['status'], 'timestamp': str(row['created_at']), 'note': 'Order created'}]
+    except Exception:
+        return []
 
 def seed_db():
     conn = get_db()

@@ -87,6 +87,13 @@ class TestFarmFreshRescue(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
 
     def test_08_order_workflow_and_inventory(self):
+        # Reset listing 1 stock & status to Available for test repeatability
+        conn = get_db()
+        c = conn.cursor()
+        c.execute("UPDATE listings SET status = 'Available', quantity = 500 WHERE id = 1")
+        conn.commit()
+        conn.close()
+
         # 1. Buyer submits purchase order
         order_data = {
             'listing_id': '1',
@@ -180,6 +187,139 @@ class TestFarmFreshRescue(unittest.TestCase):
         res_reset = self.client.post('/admin/sample-data/reset', follow_redirects=True)
         self.assertEqual(res_reset.status_code, 200)
         self.assertIn(b'10 Demo Vegetables Active', res_reset.data)
+
+    def test_12_ai_freshness_api(self):
+        res = self.client.post('/api/ai/freshness-predict', json={
+            'crop_name': 'Tomatoes',
+            'harvest_date': '2026-10-29',
+            'storage_condition': 'cold_storage',
+            'quantity': 150
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertIn('freshness_score', data)
+        self.assertIn('status', data)
+
+    def test_13_ai_price_recommendation_api(self):
+        res = self.client.post('/api/ai/price-recommend', json={
+            'crop_name': 'Carrots',
+            'quantity': 200,
+            'harvest_date': '2026-10-30',
+            'storage_condition': 'ambient',
+            'asking_price': 35
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertIn('suggested_price', data)
+        self.assertIn('expected_revenue', data)
+
+    def test_14_ai_buyer_matching_api(self):
+        res = self.client.get('/api/ai/match-buyers/1')
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertIn('matches', data)
+
+    def test_15_voice_assistant_page_and_api(self):
+        # 1. Voice page GET
+        res_page = self.client.get('/voice-assistant')
+        self.assertEqual(res_page.status_code, 200)
+        self.assertIn(b'voice', res_page.data.lower())
+
+        # 2. Voice command parsing in Tamil
+        res_ta = self.client.post('/api/ai/voice-command', json={
+            'speech_text': 'தக்காளி 100 கிலோ விற்பனைக்கு சேர்க்கவும்',
+            'lang': 'ta'
+        })
+        self.assertEqual(res_ta.status_code, 200)
+        data_ta = res_ta.get_json()
+        self.assertEqual(data_ta['intent'], 'add_produce')
+
+        # 3. Voice command parsing in English
+        res_en = self.client.post('/api/ai/voice-command', json={
+            'speech_text': 'Where are my orders?',
+            'lang': 'en'
+        })
+        self.assertEqual(res_en.status_code, 200)
+        data_en = res_en.get_json()
+        self.assertEqual(data_en['intent'], 'check_orders')
+
+    def test_16_quality_grading_page_and_api(self):
+        import io
+        from PIL import Image
+
+        # 1. Quality grading page GET
+        res_page = self.client.get('/quality-grading')
+        self.assertEqual(res_page.status_code, 200)
+
+        # 2. Grade produce API with synthetic test image
+        img_byte_arr = io.BytesIO()
+        test_img = Image.new('RGB', (100, 100), color=(200, 40, 40))
+        test_img.save(img_byte_arr, format='JPEG')
+        img_byte_arr.seek(0)
+
+        res_grade = self.client.post('/api/ai/grade-produce', data={
+            'crop_name': 'Tomatoes',
+            'photo': (img_byte_arr, 'test_crop.jpg')
+        }, content_type='multipart/form-data')
+
+        self.assertEqual(res_grade.status_code, 200)
+        data_grade = res_grade.get_json()
+        self.assertIn('quality_grade', data_grade)
+        self.assertIn(data_grade['quality_grade'], ['Grade A', 'Grade B', 'Grade C'])
+
+    def test_17_demand_prediction_page_and_api(self):
+        # 1. Demand prediction page GET
+        res_page = self.client.get('/demand-prediction')
+        self.assertEqual(res_page.status_code, 200)
+
+        # 2. Demand prediction API GET
+        res_api = self.client.get('/api/ai/demand-prediction')
+        self.assertEqual(res_api.status_code, 200)
+        data_api = res_api.get_json()
+        self.assertIn('predictions', data_api)
+
+    def test_18_order_tracking_and_timeline(self):
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 1  # Admin
+            sess['user_role'] = 'admin'
+
+        # Order 1 tracking page
+        res = self.client.get('/order/track/1')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(b'deliveryMap', res.data)
+
+        # Order 1 timeline API
+        res_api = self.client.get('/api/order/timeline/1')
+        self.assertEqual(res_api.status_code, 200)
+        data = res_api.get_json()
+        self.assertTrue(data['success'])
+        self.assertIn('timeline', data)
+
+    def test_19_ai_chatbot_api(self):
+        res = self.client.post('/api/ai/chatbot', json={
+            'message': 'What is the current market price for tomatoes?'
+        })
+        self.assertEqual(res.status_code, 200)
+        data = res.get_json()
+        self.assertIn('reply', data)
+
+    def test_20_buyer_favorite_and_export_csv(self):
+        with self.client.session_transaction() as sess:
+            sess['user_id'] = 6  # Buyer
+            sess['user_role'] = 'buyer'
+
+        # Toggle favorite farmer
+        res_fav = self.client.post('/api/buyer/favorite-farmer/2')
+        self.assertEqual(res_fav.status_code, 200)
+        data_fav = res_fav.get_json()
+        self.assertTrue(data_fav['success'])
+        self.assertIn('favorited', data_fav)
+
+        # CSV Export
+        res_csv = self.client.get('/analytics/export-csv')
+        self.assertEqual(res_csv.status_code, 200)
+        self.assertEqual(res_csv.content_type, 'text/csv; charset=utf-8')
+        self.assertIn(b'Order ID', res_csv.data)
 
 
 if __name__ == '__main__':

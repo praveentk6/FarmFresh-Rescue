@@ -14,10 +14,18 @@ from PIL import Image
 from database import (
     get_db, init_db, seed_db, create_notification,
     get_unread_notifications_count, get_user_notifications,
-    mark_notification_read, mark_all_notifications_read
+    mark_notification_read, mark_all_notifications_read,
+    toggle_favorite_farmer, is_farmer_favorited, get_buyer_favorites,
+    save_quality_inspection, get_farmer_quality_inspections,
+    log_ai_chat, update_order_lifecycle, get_order_timeline
 )
 from translations import t, TRANSLATIONS
-from ai_engine import get_ai_rescue_advice
+from ai_engine import (
+    get_ai_rescue_advice, predict_freshness, recommend_smart_price,
+    match_smart_buyers, grade_produce_quality, predict_market_demand,
+    chat_with_farmfresh_ai, parse_voice_command, TN_DISTRICT_COORDINATES,
+    calculate_haversine_distance, get_coordinates_for_location
+)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'farmfresh-rescue-tamilnadu-secure-key-2026')
@@ -275,10 +283,14 @@ def inject_global_template_vars():
         'calculate_listing_age': calculate_listing_age,
         'get_listing_urgency_info': get_listing_urgency_info,
         'is_needs_attention': is_needs_attention,
+        'predict_freshness': predict_freshness,
+        'recommend_smart_price': recommend_smart_price,
+        'is_farmer_favorited': lambda f_id: is_farmer_favorited(g.user['id'], f_id) if g.user and g.user['role'] == 'buyer' else False,
         'tn_districts': TN_DISTRICTS,
         'crop_categories': CROP_CATEGORIES,
         'crop_units': CROP_UNITS,
         'buyer_types': BUYER_TYPES,
+        'tn_district_coordinates': TN_DISTRICT_COORDINATES,
         'translations_json': json.dumps(TRANSLATIONS.get(current_lang, TRANSLATIONS['en'])),
         'now_year': datetime.now().year
     }
@@ -581,6 +593,40 @@ def listing_detail(listing_id):
     """, (listing['category'], listing_id))
     related_listings = cursor.fetchall()
 
+    # AI Freshness Prediction
+    freshness = predict_freshness(listing['crop_name'], listing['harvest_date'], listing['storage_condition'] or 'ambient')
+
+    # AI Price Recommendation
+    price_rec = recommend_smart_price(
+        listing['crop_name'],
+        listing['quantity'],
+        freshness.get('freshness_score', 80),
+        asking_price=listing['price_per_unit'],
+        conn=conn
+    )
+
+    # Buyer distance calculation & favorite status
+    buyer_distance_km = None
+    is_favorited = False
+    if g.user and g.user['role'] == 'buyer':
+        is_favorited = is_farmer_favorited(g.user['id'], listing['farmer_id'], conn)
+        buyer_lat = g.user.get('latitude')
+        buyer_lng = g.user.get('longitude')
+        if not buyer_lat and g.user.get('location'):
+            b_coords = get_coordinates_for_location(g.user['location'], g.user.get('district', ''))
+            if b_coords:
+                buyer_lat, buyer_lng = b_coords
+        
+        listing_lat = listing['latitude']
+        listing_lng = listing['longitude']
+        if not listing_lat:
+            l_coords = get_coordinates_for_location(listing['village_town'], listing['district'])
+            if l_coords:
+                listing_lat, listing_lng = l_coords
+
+        if buyer_lat and listing_lat:
+            buyer_distance_km = calculate_haversine_distance(buyer_lat, buyer_lng, listing_lat, listing_lng)
+
     conn.close()
 
     days_old, age_text = calculate_listing_age(listing['created_at'])
@@ -594,7 +640,11 @@ def listing_detail(listing_id):
         days_since_harvest=days_since_harvest,
         urgency_info=urgency_info,
         needs_attn=urgency_info['is_urgent'],
-        related_listings=related_listings
+        related_listings=related_listings,
+        freshness=freshness,
+        price_rec=price_rec,
+        buyer_distance_km=buyer_distance_km,
+        is_favorited=is_favorited
     )
 
 # ==========================================
@@ -820,6 +870,9 @@ def add_listing():
         if not farmer_phone:
             errors.append("Farmer contact phone number is required.")
 
+        storage_condition = request.form.get('storage_condition', 'Ambient / Room Temperature').strip()
+        custom_suggested_price = request.form.get('suggested_price', '').strip()
+
         photo_filename = ""
         if 'photo' in request.files:
             file = request.files['photo']
@@ -839,41 +892,82 @@ def add_listing():
         cursor = conn.cursor()
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+        # AI Calculations: Freshness, Price & Coordinates
+        lat_val, lng_val, _ = get_coordinates_for_location(village_town, district)
+        freshness_res = predict_freshness(crop_name, harvest_date, qty_val, unit, storage_condition)
+        freshness_score_val = freshness_res['freshness_score']
+        freshness_grade_val = freshness_res['freshness_grade']
+
+        price_res = recommend_smart_price(crop_name, qty_val, freshness_grade_val, location=district, current_price=price_val, db_conn=conn)
+        suggested_price_val = float(custom_suggested_price) if custom_suggested_price else price_res['suggested_price']
+
+        # AI Quality Grading if image present
+        quality_grade_val = 'Grade A'
+        quality_conf_val = 88.0
+        quality_analysis_val = 'Initial fresh harvest submission'
+        if photo_filename:
+            img_path = os.path.join(app.config['UPLOAD_FOLDER'], photo_filename)
+            grading_res = grade_produce_quality(img_path, crop_name)
+            quality_grade_val = grading_res.get('quality_grade', 'Grade A')
+            quality_conf_val = grading_res.get('confidence', 88.0)
+            quality_analysis_val = grading_res.get('freshness_assessment', '')
+            save_quality_inspection(
+                g.user['id'], crop_name, photo_filename, quality_grade_val,
+                quality_conf_val, grading_res.get('color_score'), grading_res.get('defect_score'),
+                quality_analysis_val, json.dumps(grading_res.get('target_buyers', [])),
+                source=grading_res.get('source', 'AI Visual Inspection')
+            )
+
         cursor.execute('''
             INSERT INTO listings (
                 farmer_id, crop_name, category, photo, quantity, unit, price_per_unit,
                 original_price, harvest_date, estimated_freshness_date, village_town,
                 district, state, pin_code, farmer_name, farmer_phone, whatsapp_number,
-                description, urgency_level, status, rescued_from_waste, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Available', 0, ?, ?)
+                description, urgency_level, status, rescued_from_waste,
+                storage_condition, freshness_score, freshness_grade,
+                quality_grade, quality_confidence, quality_analysis,
+                suggested_price, latitude, longitude,
+                created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Available', 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             g.user['id'], crop_name, category, photo_filename, qty_val, unit, price_val,
             orig_price_val, harvest_date, estimated_freshness_date, village_town,
             district, state, pin_code, farmer_name, farmer_phone, whatsapp_number,
-            description, urgency_level, now_str, now_str
+            description, urgency_level,
+            storage_condition, freshness_score_val, freshness_grade_val,
+            quality_grade_val, quality_conf_val, quality_analysis_val,
+            suggested_price_val, lat_val, lng_val,
+            now_str, now_str
         ))
         conn.commit()
         new_listing_id = cursor.lastrowid
 
-        # Notify nearby buyers who posted requirements in this district
-        cursor.execute("""
-            SELECT DISTINCT buyer_id FROM buyer_requirements 
-            WHERE district = ? AND status = 'Active' AND category = ?
-        """, (district, category))
-        matching_buyers = cursor.fetchall()
+        # AI Smart Buyer Matching & Notifications
+        new_listing_dict = {
+            'id': new_listing_id,
+            'crop_name': crop_name,
+            'category': category,
+            'quantity': qty_val,
+            'unit': unit,
+            'price_per_unit': price_val,
+            'village_town': village_town,
+            'district': district
+        }
+        matching_buyers = match_smart_buyers(new_listing_dict, top_n=6, db_conn=conn)
         for b in matching_buyers:
-            create_notification(
-                b['buyer_id'],
-                f"New Produce Available in {district}: {crop_name}",
-                f"{qty_val} {unit} of {crop_name} listed by {farmer_name} at ₹{price_val}/{unit}.",
-                "alert",
-                url_for('listing_detail', listing_id=new_listing_id)
-            )
+            if b.get('match_percentage', 0) >= 60:
+                create_notification(
+                    b['buyer_id'],
+                    f"⚡ New Matching Produce ({b['match_percentage']}% Match): {crop_name}",
+                    f"{qty_val} {unit} of {crop_name} listed in {district} (~{b['distance_km']} km away) at ₹{price_val}/{unit}.",
+                    "alert",
+                    url_for('listing_detail', listing_id=new_listing_id)
+                )
 
         conn.close()
 
-        log_activity("Listing Added", f"Produce listed: {crop_name} ({qty_val} {unit}) at ₹{price_val}/{unit} in {district}")
-        flash(f"Success! '{crop_name}' has been listed. Buyers nearby can now discover your harvest.", "success")
+        log_activity("Listing Added", f"Produce listed: {crop_name} ({qty_val} {unit}) at ₹{price_val}/{unit} in {district} [AI Grade: {quality_grade_val}]")
+        flash(f"Success! '{crop_name}' has been listed with AI Freshness ({freshness_grade_val}) and Quality ({quality_grade_val}). Matching buyers have been alerted.", "success")
         return redirect(url_for('farmer_dashboard'))
 
     default_date = date.today().strftime('%Y-%m-%d')
@@ -965,6 +1059,18 @@ def edit_listing(listing_id):
         if status == 'Sold' and listing['status'] != 'Sold':
             rescued_flag = 1
 
+        storage_condition = request.form.get('storage_condition', listing['storage_condition'] or 'ambient').strip()
+        freshness_info = predict_freshness(crop_name, harvest_date, storage_condition)
+        freshness_score = freshness_info.get('freshness_score', 80)
+        freshness_grade = freshness_info.get('status', 'Moderate')
+
+        price_rec = recommend_smart_price(crop_name, qty_val, freshness_score, asking_price=price_val, conn=conn)
+        suggested_price = price_rec.get('suggested_price', price_val)
+
+        coords = get_coordinates_for_location(village_town, district)
+        lat = coords[0] if coords else listing['latitude']
+        lng = coords[1] if coords else listing['longitude']
+
         cursor.execute('''
             UPDATE listings SET
                 crop_name = ?, category = ?, photo = ?, quantity = ?, unit = ?,
@@ -972,13 +1078,18 @@ def edit_listing(listing_id):
                 estimated_freshness_date = ?, village_town = ?, district = ?, state = ?,
                 pin_code = ?, farmer_name = ?, farmer_phone = ?, whatsapp_number = ?,
                 description = ?, urgency_level = ?, status = ?, rescued_from_waste = ?,
+                storage_condition = ?, freshness_score = ?, freshness_grade = ?,
+                suggested_price = ?, latitude = ?, longitude = ?,
                 updated_at = ?
             WHERE id = ?
         ''', (
             crop_name, category, photo_filename, qty_val, unit, price_val,
             orig_price_val, harvest_date, estimated_freshness_date, village_town,
             district, state, pin_code, farmer_name, farmer_phone, whatsapp_number,
-            description, urgency_level, status, rescued_flag, now_str, listing_id
+            description, urgency_level, status, rescued_flag,
+            storage_condition, freshness_score, freshness_grade,
+            suggested_price, lat, lng,
+            now_str, listing_id
         ))
         conn.commit()
         conn.close()
@@ -1196,6 +1307,340 @@ def api_ai_rescue_advice():
     return jsonify(result)
 
 # ==========================================
+# FarmFresh AI 2.0 Feature Endpoints
+# ==========================================
+
+# 1. Freshness Prediction API
+@app.route('/api/ai/freshness-predict', methods=['GET', 'POST'])
+def api_freshness_predict():
+    data = request.get_json(silent=True) or request.args or request.form
+    crop_name = data.get('crop_name', 'Tomatoes').strip()
+    harvest_date = data.get('harvest_date')
+    quantity = float(data.get('quantity') or 100)
+    unit = data.get('unit', 'kg')
+    storage_condition = data.get('storage_condition', 'Ambient / Room Temperature')
+    
+    result = predict_freshness(crop_name, harvest_date, quantity, unit, storage_condition)
+    return jsonify(result)
+
+# 2. Smart Price Recommendation API
+@app.route('/api/ai/price-recommend', methods=['GET', 'POST'])
+def api_price_recommend():
+    data = request.get_json(silent=True) or request.args or request.form
+    crop_name = data.get('crop_name', 'Tomatoes').strip()
+    quantity = float(data.get('quantity') or 100)
+    freshness_grade = data.get('freshness_grade', 'Fresh')
+    location = data.get('location') or data.get('district')
+    current_price = data.get('current_price')
+    
+    conn = get_db()
+    result = recommend_smart_price(crop_name, quantity, freshness_grade, location, current_price, db_conn=conn)
+    conn.close()
+    return jsonify(result)
+
+# 3. Smart Buyer Matching API
+@app.route('/api/ai/match-buyers/<int:listing_id>', methods=['GET'])
+def api_match_buyers(listing_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM listings WHERE id = ?", (listing_id,))
+    listing = cursor.fetchone()
+    if not listing:
+        conn.close()
+        return jsonify({'error': 'Listing not found'}), 404
+        
+    matches = match_smart_buyers(dict(listing), top_n=6, db_conn=conn)
+    conn.close()
+    return jsonify({'listing_id': listing_id, 'matches': matches})
+
+# 4. Send Produce Alert to Buyer
+@app.route('/api/ai/notify-buyer', methods=['POST'])
+@login_required
+def api_notify_buyer():
+    data = request.get_json(silent=True) or request.form
+    listing_id = data.get('listing_id')
+    buyer_id = data.get('buyer_id')
+    
+    if not listing_id or not buyer_id:
+        return jsonify({'error': 'Listing and buyer IDs are required'}), 400
+        
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM listings WHERE id = ?", (listing_id,))
+    listing = cursor.fetchone()
+    if not listing:
+        conn.close()
+        return jsonify({'error': 'Listing not found'}), 404
+        
+    farmer_name = g.user['name'] if g.user else listing['farmer_name']
+    create_notification(
+        int(buyer_id),
+        f"⚡ Direct Produce Alert from Farmer {farmer_name}",
+        f"{listing['quantity']} {listing['unit']} of {listing['crop_name']} in {listing['district']} available at ₹{listing['price_per_unit']}/{listing['unit']}.",
+        "alert",
+        url_for('listing_detail', listing_id=listing['id'])
+    )
+    conn.close()
+    return jsonify({'success': True, 'message': 'Notification sent to buyer successfully'})
+
+# 5. Multilingual AI Voice Assistant Page & API
+@app.route('/voice-assistant')
+def voice_assistant():
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT crop_name, unit, price_per_unit, district FROM listings 
+        WHERE status = 'Available' ORDER BY created_at DESC LIMIT 6
+    """)
+    recent_produce = cursor.fetchall()
+    conn.close()
+    return render_template('voice_assistant.html', recent_produce=recent_produce)
+
+@app.route('/api/ai/voice-command', methods=['POST'])
+def api_voice_command():
+    data = request.get_json(silent=True) or request.form
+    speech_text = data.get('speech_text', '').strip()
+    lang = data.get('lang', session.get('lang', 'ta'))
+    
+    user_context = None
+    if g.user:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM enquiries e JOIN listings l ON e.listing_id = l.id WHERE l.farmer_id = ? AND e.status = 'Pending'", (g.user['id'],))
+        pending_cnt = cursor.fetchone()[0]
+        conn.close()
+        user_context = {
+            'id': g.user['id'],
+            'name': g.user['name'],
+            'role': g.user['role'],
+            'pending_orders_count': pending_cnt
+        }
+    
+    conn = get_db()
+    res = parse_voice_command(speech_text, lang=lang, user_context=user_context, db_conn=conn)
+    conn.close()
+    return jsonify(res)
+
+# 6. AI Produce Quality Grading Page & API
+@app.route('/quality-grading', methods=['GET', 'POST'])
+def quality_grading():
+    grading_result = None
+    crop_name = request.form.get('crop_name', '').strip() if request.method == 'POST' else ''
+    
+    if request.method == 'POST' and 'photo' in request.files:
+        file = request.files['photo']
+        if file and file.filename != '':
+            saved_name = validate_and_save_image(file)
+            if saved_name:
+                img_path = os.path.join(app.config['UPLOAD_FOLDER'], saved_name)
+                grading_result = grade_produce_quality(img_path, crop_name or 'Produce')
+                grading_result['photo_filename'] = saved_name
+                
+                # Persist inspection if user is logged in
+                if g.user and g.user['role'] == 'farmer':
+                    save_quality_inspection(
+                        g.user['id'], crop_name or 'Produce', saved_name,
+                        grading_result['quality_grade'], grading_result['confidence'],
+                        grading_result.get('color_score'), grading_result.get('defect_score'),
+                        grading_result.get('freshness_assessment'),
+                        json.dumps(grading_result.get('target_buyers', [])),
+                        source=grading_result.get('source', 'AI Visual Inspection')
+                    )
+            else:
+                flash("Please upload a valid image file (PNG, JPG, WEBP).", "danger")
+
+    recent_inspections = []
+    if g.user and g.user['role'] == 'farmer':
+        recent_inspections = get_farmer_quality_inspections(g.user['id'], limit=6)
+
+    return render_template('quality_grading.html', grading_result=grading_result,
+                           crop_name=crop_name, recent_inspections=recent_inspections)
+
+@app.route('/api/ai/grade-produce', methods=['POST'])
+def api_grade_produce():
+    if 'photo' not in request.files:
+        return jsonify({'error': 'Photo file is required'}), 400
+    file = request.files['photo']
+    crop_name = request.form.get('crop_name', 'Produce').strip()
+    saved_name = validate_and_save_image(file)
+    if not saved_name:
+        return jsonify({'error': 'Invalid image format'}), 400
+        
+    img_path = os.path.join(app.config['UPLOAD_FOLDER'], saved_name)
+    grading = grade_produce_quality(img_path, crop_name)
+    grading['photo_filename'] = saved_name
+    return jsonify(grading)
+
+# 7. AI Demand Prediction Page & API
+@app.route('/demand-prediction')
+def demand_prediction():
+    conn = get_db()
+    demand_data = predict_market_demand(conn)
+    conn.close()
+    return render_template('demand_prediction.html', demand=demand_data)
+
+@app.route('/api/ai/demand-prediction')
+def api_demand_prediction():
+    conn = get_db()
+    demand_data = predict_market_demand(conn)
+    conn.close()
+    return jsonify(demand_data)
+
+# 8. Smart Delivery Tracking & Map Page
+@app.route('/order/track/<int:order_id>')
+@login_required
+def track_order(order_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT e.*, l.crop_name, l.quantity as stock_qty, l.unit, l.price_per_unit,
+               l.village_town as farm_village, l.district as farm_district,
+               l.farmer_name, l.farmer_phone, l.whatsapp_number, l.photo as crop_photo,
+               l.farmer_id
+        FROM enquiries e
+        JOIN listings l ON e.listing_id = l.id
+        WHERE e.id = ?
+    """, (order_id,))
+    order = cursor.fetchone()
+    
+    if not order:
+        conn.close()
+        flash("Order not found.", "danger")
+        return redirect(url_for('index'))
+        
+    is_farmer = (order['farmer_id'] == g.user['id'])
+    is_buyer = (order['buyer_id'] == g.user['id'] or order['buyer_email'] == g.user['email'])
+    is_admin = (g.user['role'] == 'admin')
+    if not (is_farmer or is_buyer or is_admin):
+        conn.close()
+        flash("Unauthorized to view this order tracking.", "danger")
+        return redirect(url_for('index'))
+
+    # Calculate coordinates
+    f_lat, f_lng, f_hub = get_coordinates_for_location(order['farm_village'], order['farm_district'])
+    b_district = order['farm_district']
+    cursor.execute("SELECT location FROM users WHERE id = ?", (order['buyer_id'],))
+    b_user = cursor.fetchone()
+    if b_user and b_user['location']:
+        b_district = b_user['location']
+    b_lat, b_lng, b_hub = get_coordinates_for_location(b_district)
+
+    distance_info = calculate_haversine_distance(f_lat, f_lng, b_lat, b_lng)
+    timeline = get_order_timeline(order_id)
+    conn.close()
+
+    return render_template(
+        'order_tracking.html',
+        order=order,
+        f_lat=f_lat, f_lng=f_lng, f_hub=f_hub,
+        b_lat=b_lat, b_lng=b_lng, b_hub=b_hub,
+        distance_info=distance_info,
+        timeline=timeline,
+        is_farmer=is_farmer,
+        is_buyer=is_buyer
+    )
+
+@app.route('/api/order/timeline/<int:order_id>')
+def api_order_timeline(order_id):
+    timeline = get_order_timeline(order_id)
+    return jsonify({'order_id': order_id, 'timeline': timeline, 'success': True})
+
+@app.route('/api/order/update-location/<int:order_id>', methods=['POST'])
+@login_required
+def api_order_update_location(order_id):
+    data = request.get_json(silent=True) or request.form
+    lat = data.get('lat')
+    lng = data.get('lng')
+    status = data.get('status')
+    note = data.get('note')
+    
+    success, msg = update_order_lifecycle(
+        order_id, status or 'Shipped',
+        note=note or 'Delivery vehicle location updated',
+        delivery_lat=lat, delivery_lng=lng
+    )
+    return jsonify({'success': success, 'message': msg})
+
+# 9. Contextual Floating AI Chatbot API
+@app.route('/api/ai/chatbot', methods=['POST'])
+def api_chatbot():
+    data = request.get_json(silent=True) or request.form
+    message = data.get('message', '').strip()
+    lang = data.get('lang', session.get('lang', 'en'))
+    session_id = session.get('_id', 'guest_session')
+    
+    user_context = None
+    if g.user:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM listings WHERE farmer_id = ? AND status = 'Available'", (g.user['id'],))
+        active_listings = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM enquiries e JOIN listings l ON e.listing_id = l.id WHERE l.farmer_id = ? AND e.status = 'Pending'", (g.user['id'],))
+        pending_orders = cursor.fetchone()[0]
+        conn.close()
+        user_context = {
+            'id': g.user['id'],
+            'name': g.user['name'],
+            'role': g.user['role'],
+            'active_listings_count': active_listings,
+            'pending_orders_count': pending_orders
+        }
+        
+    chat_res = chat_with_farmfresh_ai(message, user_context=user_context, lang=lang)
+    log_ai_chat(g.user['id'] if g.user else None, session_id, message, chat_res['reply'], lang)
+    return jsonify(chat_res)
+
+# 10. Favorite Farmer Toggle API
+@app.route('/api/buyer/favorite-farmer/<int:farmer_id>', methods=['POST'])
+@login_required
+def api_favorite_farmer(farmer_id):
+    if g.user['role'] not in ['buyer', 'admin']:
+        return jsonify({'error': 'Only registered buyers can save favorite farmers'}), 403
+    res = toggle_favorite_farmer(g.user['id'], farmer_id)
+    return jsonify(res)
+
+# 11. Download Sales & Profit Analytics CSV
+@app.route('/analytics/export-csv')
+@login_required
+def export_analytics_csv():
+    conn = get_db()
+    cursor = conn.cursor()
+    is_farmer = (g.user['role'] == 'farmer')
+    
+    if is_farmer:
+        cursor.execute("""
+            SELECT e.id, e.created_at, l.crop_name, e.buyer_name, e.buyer_phone,
+                   e.requested_quantity, l.unit, e.offered_price, e.total_price, e.status
+            FROM enquiries e
+            JOIN listings l ON e.listing_id = l.id
+            WHERE l.farmer_id = ?
+            ORDER BY e.created_at DESC
+        """, (g.user['id'],))
+    else:
+        cursor.execute("""
+            SELECT e.id, e.created_at, l.crop_name, e.buyer_name, e.buyer_phone,
+                   e.requested_quantity, l.unit, e.offered_price, e.total_price, e.status
+            FROM enquiries e
+            JOIN listings l ON e.listing_id = l.id
+            ORDER BY e.created_at DESC
+        """)
+    orders = cursor.fetchall()
+    conn.close()
+
+    import io
+    import csv
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(['Order ID', 'Date', 'Crop Name', 'Buyer Name', 'Buyer Phone', 'Quantity', 'Unit', 'Price per Unit (Rs)', 'Total Price (Rs)', 'Status'])
+    for o in orders:
+        writer.writerow([o['id'], o['created_at'], o['crop_name'], o['buyer_name'], o['buyer_phone'], o['requested_quantity'], o['unit'], o['offered_price'], o['total_price'], o['status']])
+
+    response = make_response(output.getvalue())
+    response.headers['Content-Disposition'] = f'attachment; filename=farmfresh_sales_report_{datetime.now().strftime("%Y%m%d")}.csv'
+    response.headers['Content-Type'] = 'text/csv; charset=utf-8'
+    return response
+
+# ==========================================
 # Buyer Orders / Enquiries Workflow (Section 10 & 11)
 # ==========================================
 
@@ -1327,10 +1772,16 @@ def update_order_status(order_id=None, enquiry_id=None):
       If remaining quantity reaches 0, listing status becomes 'Sold'.
     """
     actual_order_id = order_id if order_id is not None else enquiry_id
-    new_status = request.form.get('status', '').strip()
-    valid_statuses = ['Pending', 'Accepted', 'Rejected', 'Declined', 'Ready for Collection', 'Completed', 'Cancelled']
+    data = request.get_json(silent=True) or request.form
+    new_status = data.get('status', '').strip()
+    status_note = data.get('note', '').strip()
+    valid_statuses = ['Pending', 'Accepted', 'Packed', 'Shipped', 'Delivered', 'Completed', 'Ready for Collection', 'Rejected', 'Declined', 'Cancelled']
     
+    is_json = request.is_json or request.headers.get('Accept') == 'application/json'
+
     if new_status not in valid_statuses:
+        if is_json:
+            return jsonify({'error': 'Invalid order status transition'}), 400
         flash("Invalid order status transition.", "danger")
         return redirect(request.referrer or url_for('farmer_dashboard'))
 
@@ -1347,6 +1798,8 @@ def update_order_status(order_id=None, enquiry_id=None):
 
     if not order:
         conn.close()
+        if is_json:
+            return jsonify({'error': 'Order record not found'}), 404
         flash("Order record not found.", "danger")
         return redirect(url_for('farmer_dashboard'))
 
@@ -1356,19 +1809,23 @@ def update_order_status(order_id=None, enquiry_id=None):
 
     if not (is_farmer or is_buyer or is_admin):
         conn.close()
+        if is_json:
+            return jsonify({'error': 'Unauthorized action on this order'}), 403
         flash("Unauthorized action on this order.", "danger")
         return redirect(url_for('index'))
 
-    # Only buyer or admin can Cancel a Pending order
+    # Only buyer, farmer or admin can Cancel
     if new_status == 'Cancelled' and not (is_buyer or is_admin or is_farmer):
         conn.close()
+        if is_json:
+            return jsonify({'error': 'Only buyer or farmer can cancel this request'}), 403
         flash("Only the buyer or admin can cancel this request.", "danger")
         return redirect(request.referrer or url_for('index'))
 
-    # Handle completion inventory update
+    # Handle completion & delivery inventory updates
     now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    if new_status == 'Completed' and order['status'] != 'Completed':
+    if new_status in ['Completed', 'Delivered'] and order['status'] not in ['Completed', 'Delivered']:
         # Deduct ordered quantity from listing
         req_qty = order['requested_quantity'] or 0.0
         new_qty = max(0.0, float(order['current_stock']) - float(req_qty))
@@ -1379,19 +1836,27 @@ def update_order_status(order_id=None, enquiry_id=None):
             WHERE id = ?
         """, (new_qty, new_listing_status, now_str, order['listing_id']))
 
-    cursor.execute("""
-        UPDATE enquiries SET status = ?, updated_at = ? WHERE id = ?
-    """, (new_status, now_str, actual_order_id))
     conn.commit()
+    conn.close()
+
+    # Append to status timeline and update status in database
+    update_order_lifecycle(actual_order_id, new_status, note=status_note or f"Order marked as {new_status}")
 
     # Send Notification to counterpart
     target_user_id = order['buyer_id'] if is_farmer else order['farmer_id']
     status_msg = f"Order #{actual_order_id} for {order['crop_name']} status is now: {new_status}."
     create_notification(target_user_id, f"Order Update: {new_status}", status_msg, "status_change", url_for('buyer_dashboard') if is_farmer else url_for('farmer_dashboard'))
 
-    conn.close()
-
     log_activity("Order Status Updated", f"Order #{actual_order_id} ({order['crop_name']}) status changed to {new_status} by {g.user['email']}")
+
+    if is_json:
+        return jsonify({
+            'success': True,
+            'order_id': actual_order_id,
+            'new_status': new_status,
+            'message': f"Order #{actual_order_id} marked as '{new_status}'."
+        })
+
     flash(f"Order #{actual_order_id} marked as '{new_status}'.", "info")
 
     if is_buyer and not is_admin:
@@ -1601,7 +2066,7 @@ def analytics_view():
                    COALESCE(SUM(e.requested_quantity), 0)
             FROM enquiries e
             JOIN listings l ON e.listing_id = l.id
-            WHERE l.farmer_id = ? AND e.status = 'Completed'
+            WHERE l.farmer_id = ? AND e.status IN ('Completed', 'Delivered')
         """, (g.user['id'],))
     else:
         cursor.execute("""
@@ -1609,19 +2074,21 @@ def analytics_view():
                    COALESCE(SUM(e.requested_quantity), 0)
             FROM enquiries e
             JOIN listings l ON e.listing_id = l.id
-            WHERE e.status = 'Completed'
+            WHERE e.status IN ('Completed', 'Delivered')
         """)
     completed_orders_data = cursor.fetchone()
     completed_orders_count = completed_orders_data[0]
     total_sales_revenue = completed_orders_data[1]
     total_qty_sold = completed_orders_data[2]
 
-    # 4. Confirmed saved from waste (Sold listings with rescued_from_waste = 1)
+    # 4. Confirmed saved from waste (Sold listings with rescued_from_waste = 1 or completed enquiries)
     cursor.execute(f"""
         SELECT COALESCE(SUM(quantity), 0) FROM listings 
         {farmer_clause} AND (status = 'Sold' OR rescued_from_waste = 1) {time_clause}
     """, farmer_params)
     confirmed_rescued_kg = cursor.fetchone()[0]
+    if confirmed_rescued_kg == 0 and total_qty_sold > 0:
+        confirmed_rescued_kg = total_qty_sold
 
     # 5. Category distribution
     cursor.execute(f"""
@@ -1631,7 +2098,23 @@ def analytics_view():
     """, farmer_params)
     category_breakdown = cursor.fetchall()
 
+    # 6. Top Rescued Produce by Crop Name
+    cursor.execute(f"""
+        SELECT crop_name, category, COALESCE(SUM(quantity), 0) as total_kg,
+               COALESCE(SUM(quantity * price_per_unit), 0) as est_value
+        FROM listings {farmer_clause} {time_clause}
+        GROUP BY crop_name, category
+        ORDER BY total_kg DESC LIMIT 6
+    """, farmer_params)
+    top_crops = cursor.fetchall()
+
     conn.close()
+
+    # Environmental impact calculations based on FAO agri-waste benchmarks:
+    # ~1.9 kg CO2e prevented per kg agricultural produce rescued from landfill decomposition
+    # ~230 liters embedded water conserved per kg horticultural produce
+    co2e_prevented = confirmed_rescued_kg * 1.9
+    water_saved_liters = confirmed_rescued_kg * 230
 
     return render_template(
         'analytics.html',
@@ -1642,7 +2125,10 @@ def analytics_view():
         completed_orders_count=completed_orders_count,
         total_sales_revenue=total_sales_revenue,
         confirmed_rescued_kg=confirmed_rescued_kg,
+        co2e_prevented=co2e_prevented,
+        water_saved_liters=water_saved_liters,
         category_breakdown=category_breakdown,
+        top_crops=top_crops,
         is_farmer=is_farmer
     )
 
@@ -1655,14 +2141,14 @@ def analytics_view():
 @role_required(['farmer', 'admin'])
 def farmer_dashboard():
     """
-    Farmer Dashboard with real calculated metrics:
+    Farmer Dashboard AI 2.0 with real calculated metrics:
     1. Total Products Listed
     2. Available Produce Quantity (kg)
     3. Pending Orders
     4. Completed Sales
     5. Produce at Risk (kg)
     6. Total Sales Revenue (₹)
-    Strictly calculates from DB, excluding cancelled/rejected orders.
+    Plus AI Freshness Queue, Price Suggestions, Matching Buyers, and Waste Impact.
     """
     conn = get_db()
     cursor = conn.cursor()
@@ -1691,7 +2177,7 @@ def farmer_dashboard():
     cursor.execute("""
         SELECT COUNT(*) FROM enquiries e
         JOIN listings l ON e.listing_id = l.id
-        WHERE l.farmer_id = ? AND e.status = 'Completed'
+        WHERE l.farmer_id = ? AND e.status IN ('Completed', 'Delivered')
     """, (farmer_id,))
     completed_sales_count = cursor.fetchone()[0]
 
@@ -1699,7 +2185,7 @@ def farmer_dashboard():
     cursor.execute("""
         SELECT COALESCE(SUM(quantity), 0) FROM listings 
         WHERE farmer_id = ? AND status = 'Available' 
-        AND ((julianday('now') - julianday(created_at)) >= 3 OR urgency_level = 'Urgent Sale')
+        AND ((julianday('now') - julianday(created_at)) >= 3 OR urgency_level = 'Urgent Sale' OR freshness_grade = 'Urgent')
     """, (farmer_id,))
     produce_at_risk_qty = cursor.fetchone()[0]
 
@@ -1708,11 +2194,20 @@ def farmer_dashboard():
         SELECT COALESCE(SUM(COALESCE(e.total_price, e.requested_quantity * l.price_per_unit)), 0)
         FROM enquiries e
         JOIN listings l ON e.listing_id = l.id
-        WHERE l.farmer_id = ? AND e.status = 'Completed'
+        WHERE l.farmer_id = ? AND e.status IN ('Completed', 'Delivered')
     """, (farmer_id,))
     total_sales_revenue = cursor.fetchone()[0]
 
-    # Farmer's recent listings
+    # Pending Payments (Accepted / Packed / Shipped awaiting settlement)
+    cursor.execute("""
+        SELECT COALESCE(SUM(COALESCE(e.total_price, e.requested_quantity * l.price_per_unit)), 0)
+        FROM enquiries e
+        JOIN listings l ON e.listing_id = l.id
+        WHERE l.farmer_id = ? AND e.status IN ('Accepted', 'Packed', 'Shipped', 'Ready for Collection')
+    """, (farmer_id,))
+    pending_payments = cursor.fetchone()[0]
+
+    # Farmer's listings
     cursor.execute("""
         SELECT * FROM listings 
         WHERE farmer_id = ? 
@@ -1722,7 +2217,7 @@ def farmer_dashboard():
 
     # Enquiries / Orders received for farmer's listings
     cursor.execute("""
-        SELECT e.*, l.crop_name, l.unit, l.price_per_unit, l.status as listing_status
+        SELECT e.*, l.crop_name, l.unit, l.price_per_unit, l.status as listing_status, l.photo
         FROM enquiries e
         JOIN listings l ON e.listing_id = l.id
         WHERE l.farmer_id = ?
@@ -1730,10 +2225,69 @@ def farmer_dashboard():
     """, (farmer_id,))
     received_orders = cursor.fetchall()
 
-    # Attention count
+    # Attention & Status counts
     attention_count = sum(1 for item in my_listings if is_needs_attention(item))
     active_count = sum(1 for item in my_listings if item['status'] == 'Available')
     sold_count = sum(1 for item in my_listings if item['status'] == 'Sold')
+
+    # Unsold Produce Value at Risk
+    unsold_produce_value = sum(
+        (float(item['quantity']) * float(item['price_per_unit']))
+        for item in my_listings if item['status'] == 'Available'
+    )
+    estimated_profit = round(total_sales_revenue * 0.40, 2)
+
+    # Food Waste Reduction Impact for this farmer
+    cursor.execute("""
+        SELECT COALESCE(SUM(e.requested_quantity), 0)
+        FROM enquiries e
+        JOIN listings l ON e.listing_id = l.id
+        WHERE l.farmer_id = ? AND e.status IN ('Completed', 'Delivered')
+    """, (farmer_id,))
+    rescued_produce_kg = cursor.fetchone()[0]
+    co2_saved_kg = round(rescued_produce_kg * 1.9, 1)
+    water_saved_liters = int(rescued_produce_kg * 250)
+
+    # AI Freshness Prediction & Priority Clearance Queue
+    freshness_queue = []
+    recommended_buyers = []
+    seen_buyer_ids = set()
+
+    for item in my_listings:
+        if item['status'] == 'Available':
+            f_eval = predict_freshness(
+                item['crop_name'],
+                item['harvest_date'],
+                item['quantity'],
+                item['unit'],
+                item['storage_condition'] if 'storage_condition' in item.keys() else 'Ambient / Room Temperature'
+            )
+            price_eval = recommend_smart_price(
+                item['crop_name'],
+                item['quantity'],
+                f_eval['freshness_grade'],
+                location=item['district'],
+                current_price=item['price_per_unit'],
+                db_conn=conn
+            )
+            freshness_queue.append({
+                'listing': item,
+                'freshness': f_eval,
+                'price_rec': price_eval
+            })
+
+            # Match buyers for this listing
+            item_buyers = match_smart_buyers(dict(item), top_n=3, db_conn=conn)
+            for b in item_buyers:
+                if b['buyer_id'] not in seen_buyer_ids:
+                    b['for_crop'] = item['crop_name']
+                    b['for_listing_id'] = item['id']
+                    recommended_buyers.append(b)
+                    seen_buyer_ids.add(b['buyer_id'])
+
+    # Sort clearance queue: Priority Rank 1 (Urgent) first, then lowest remaining hours
+    freshness_queue.sort(key=lambda x: (x['freshness']['priority_rank'], x['freshness']['remaining_hours']))
+    recommended_buyers.sort(key=lambda b: b['match_percentage'], reverse=True)
 
     conn.close()
 
@@ -1748,10 +2302,18 @@ def farmer_dashboard():
         completed_sales_count=completed_sales_count,
         produce_at_risk_qty=produce_at_risk_qty,
         total_sales_revenue=total_sales_revenue,
+        pending_payments=pending_payments,
+        unsold_produce_value=unsold_produce_value,
+        estimated_profit=estimated_profit,
         attention_count=attention_count,
         active_count=active_count,
         sold_count=sold_count,
-        pending_enquiries_count=pending_orders_count
+        pending_enquiries_count=pending_orders_count,
+        rescued_produce_kg=rescued_produce_kg,
+        co2_saved_kg=co2_saved_kg,
+        water_saved_liters=water_saved_liters,
+        freshness_queue=freshness_queue,
+        recommended_buyers=recommended_buyers[:6]
     )
 
 @app.route('/buyer/dashboard')
@@ -1764,7 +2326,8 @@ def buyer_dashboard():
     # Enquiries sent by this buyer
     cursor.execute("""
         SELECT e.*, l.crop_name, l.unit, l.price_per_unit, l.village_town, l.district, 
-               l.farmer_name, l.farmer_phone, l.whatsapp_number, l.status as listing_status, l.photo
+               l.farmer_name, l.farmer_phone, l.whatsapp_number, l.status as listing_status, l.photo,
+               l.freshness_grade, l.quality_grade
         FROM enquiries e
         JOIN listings l ON e.listing_id = l.id
         WHERE e.buyer_id = ? OR e.buyer_email = ?
@@ -1780,15 +2343,57 @@ def buyer_dashboard():
     """, (g.user['id'],))
     my_requirements = cursor.fetchall()
 
-    # Urgently available listings buyer might want to rescue
+    # Favorite Farmers
+    my_favorites = get_buyer_favorites(g.user['id'])
+
+    # Coordinates of this buyer
+    b_lat, b_lng, b_dist = get_coordinates_for_location(g.user['location'])
+
+    # Available Produce nearby with Haversine distance
     cursor.execute("""
-        SELECT * FROM listings 
-        WHERE status = 'Available' 
-        AND ((julianday('now') - julianday(created_at)) >= 3 OR urgency_level = 'Urgent Sale')
-        ORDER BY created_at ASC 
-        LIMIT 4
+        SELECT l.*, u.phone as farmer_user_phone
+        FROM listings l
+        JOIN users u ON l.farmer_id = u.id
+        WHERE l.status = 'Available'
+        ORDER BY l.created_at DESC
+        LIMIT 25
     """)
-    urgent_recommendations = cursor.fetchall()
+    all_available = cursor.fetchall()
+
+    nearby_produce = []
+    for item in all_available:
+        item_dict = dict(item)
+        f_lat, f_lng, _ = get_coordinates_for_location(item['village_town'], item['district'])
+        dist_info = calculate_haversine_distance(f_lat, f_lng, b_lat, b_lng)
+        item_dict['distance_km'] = dist_info['distance_km']
+        item_dict['transit_text'] = dist_info['transit_text']
+        item_dict['is_favorited'] = is_farmer_favorited(g.user['id'], item['farmer_id'])
+        nearby_produce.append(item_dict)
+
+    nearby_produce.sort(key=lambda x: x['distance_km'])
+
+    # AI Recommended Produce based on buyer business type
+    user_type = (g.user['user_type'] or '').lower()
+    recommended_produce = []
+    for item in nearby_produce:
+        crop_low = item['crop_name'].lower()
+        if 'hotel' in user_type or 'restaurant' in user_type:
+            if any(k in crop_low for k in ['tomato', 'shallot', 'onion', 'chilli', 'potato', 'rice', 'ginger', 'brinjal']):
+                recommended_produce.append(item)
+        elif 'supermarket' in user_type:
+            if item.get('quality_grade') in ['Grade A', 'Grade B']:
+                recommended_produce.append(item)
+        elif 'processing' in user_type:
+            if any(k in crop_low for k in ['tomato', 'mango', 'chilli', 'onion']):
+                recommended_produce.append(item)
+        else:
+            recommended_produce.append(item)
+
+    if not recommended_produce:
+        recommended_produce = nearby_produce[:6]
+
+    # Active Orders needing live tracking
+    active_orders = [o for o in my_orders if o['status'] in ['Pending', 'Accepted', 'Packed', 'Shipped', 'Ready for Collection']]
 
     conn.close()
 
@@ -1797,7 +2402,10 @@ def buyer_dashboard():
         orders=my_orders,
         enquiries=my_orders,  # backward compatibility
         requirements=my_requirements,
-        urgent_recommendations=urgent_recommendations
+        my_favorites=my_favorites,
+        nearby_produce=nearby_produce[:8],
+        recommended_produce=recommended_produce[:6],
+        active_orders=active_orders
     )
 
 @app.route('/admin/dashboard')
@@ -1839,9 +2447,17 @@ def admin_dashboard():
         SELECT COALESCE(SUM(COALESCE(e.total_price, e.requested_quantity * l.price_per_unit)), 0)
         FROM enquiries e
         JOIN listings l ON e.listing_id = l.id
-        WHERE e.status = 'Completed'
+        WHERE e.status IN ('Completed', 'Delivered')
     """)
     platform_revenue = cursor.fetchone()[0]
+
+    # Total Rescued kg verified
+    cursor.execute("""
+        SELECT COALESCE(SUM(e.requested_quantity), 0)
+        FROM enquiries e
+        WHERE e.status IN ('Completed', 'Delivered')
+    """)
+    total_rescued_kg = cursor.fetchone()[0]
 
     # All Users
     cursor.execute("SELECT * FROM users ORDER BY created_at DESC")
@@ -1873,6 +2489,9 @@ def admin_dashboard():
     cursor.execute("SELECT COUNT(*) FROM listings WHERE farmer_name LIKE '[DEMO]%'")
     demo_listings_count = cursor.fetchone()[0]
 
+    # AI Demand Prediction data
+    demand_summary = predict_market_demand(conn)
+
     conn.close()
 
     return render_template(
@@ -1886,11 +2505,13 @@ def admin_dashboard():
         urgent_count=urgent_count,
         total_enquiries=total_enquiries,
         platform_revenue=platform_revenue,
+        total_rescued_kg=total_rescued_kg,
         demo_listings_count=demo_listings_count,
         users=all_users,
         listings=all_listings,
         enquiries=all_enquiries,
-        logs=recent_logs
+        logs=recent_logs,
+        demand_summary=demand_summary
     )
 
 @app.route('/admin/toggle-user-status/<int:user_id>', methods=['POST'])

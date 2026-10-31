@@ -24,16 +24,21 @@
       </p>
     </div>
 
-    <!-- Timeframe Filter Tabs -->
-    <div style="display: flex; gap: 0.5rem; background: white; padding: 0.35rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle); align-self: flex-start;">
-      <a href="{{ url_for('analytics_view', timeframe='all') }}" class="pill-btn {% if timeframe == 'all' %}active{% endif %}" style="margin: 0;">
-        {{ _t('analytics_period_all') }}
-      </a>
-      <a href="{{ url_for('analytics_view', timeframe='month') }}" class="pill-btn {% if timeframe == 'month' %}active{% endif %}" style="margin: 0;">
-        {{ _t('analytics_period_month') }}
-      </a>
-      <a href="{{ url_for('analytics_view', timeframe='week') }}" class="pill-btn {% if timeframe == 'week' %}active{% endif %}" style="margin: 0;">
-        {{ _t('analytics_period_week') }}
+    <!-- Timeframe Filter Tabs & Export -->
+    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+      <div style="display: flex; gap: 0.35rem; background: white; padding: 0.35rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+        <a href="{{ url_for('analytics_view', timeframe='all') }}" class="pill-btn {% if timeframe == 'all' %}active{% endif %}" style="margin: 0;">
+          {{ _t('analytics_period_all') }}
+        </a>
+        <a href="{{ url_for('analytics_view', timeframe='month') }}" class="pill-btn {% if timeframe == 'month' %}active{% endif %}" style="margin: 0;">
+          {{ _t('analytics_period_month') }}
+        </a>
+        <a href="{{ url_for('analytics_view', timeframe='week') }}" class="pill-btn {% if timeframe == 'week' %}active{% endif %}" style="margin: 0;">
+          {{ _t('analytics_period_week') }}
+        </a>
+      </div>
+      <a href="{{ url_for('export_analytics_csv') }}" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.5rem 0.85rem;">
+        <span>📥</span> {{ _t('export_csv') }}
       </a>
     </div>
   </div>
@@ -123,6 +128,27 @@
 
   </div>
 
+  <!-- Environmental Impact Highlights -->
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem; margin-bottom: 2.5rem;">
+    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: var(--radius-lg); padding: 1.5rem; display: flex; align-items: center; gap: 1.25rem;">
+      <div style="font-size: 2.5rem; background: #fff; width: 60px; height: 60px; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">🌍</div>
+      <div>
+        <div style="font-size: 0.8rem; font-weight: 700; color: #166534; text-transform: uppercase;">CO2e Emissions Diverted</div>
+        <div style="font-size: 1.75rem; font-weight: 800; color: #14532d;">{{ "%.1f"|format(co2e_prevented) }} <span style="font-size: 0.95rem; font-weight: 600;">kg CO2e</span></div>
+        <div style="font-size: 0.75rem; color: #166534;">Landfill methane release avoided (~1.9 kg CO2e / kg produce)</div>
+      </div>
+    </div>
+
+    <div style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); border: 1px solid #7dd3fc; border-radius: var(--radius-lg); padding: 1.5rem; display: flex; align-items: center; gap: 1.25rem;">
+      <div style="font-size: 2.5rem; background: #fff; width: 60px; height: 60px; border-radius: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">💧</div>
+      <div>
+        <div style="font-size: 0.8rem; font-weight: 700; color: #0369a1; text-transform: uppercase;">Embedded Water Conserved</div>
+        <div style="font-size: 1.75rem; font-weight: 800; color: #0c4a6e;">{{ "{:,.0f}".format(water_saved_liters) }} <span style="font-size: 0.95rem; font-weight: 600;">Liters</span></div>
+        <div style="font-size: 0.75rem; color: #0369a1;">Agricultural irrigation preserved (~230 L / kg produce)</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Detailed Impact Breakdown & Visual Charts -->
   <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2.5rem;" class="analytics-detail-grid">
     
@@ -160,22 +186,25 @@
       </div>
     </div>
 
-    <!-- Right: Produce Category Distribution -->
+    <!-- Right: Produce Category Distribution & Chart -->
     <div style="background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); padding: 1.75rem; box-shadow: var(--shadow-sm);">
       <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: #0f172a;">
         🥦 Category-Wise Listing Breakdown
       </h3>
 
       {% if category_breakdown %}
-        <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <div style="max-height: 200px; display: flex; justify-content: center; margin-bottom: 1.5rem;">
+          <canvas id="categoryChart" style="max-height: 200px;"></canvas>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
           {% for cat in category_breakdown %}
             {% set cat_pct = (cat['total_kg'] / total_qty_listed * 100) if total_qty_listed > 0 else 0 %}
             <div>
-              <div style="display: flex; justify-content: space-between; font-size: 0.875rem; margin-bottom: 0.35rem;">
+              <div style="display: flex; justify-content: space-between; font-size: 0.85rem; margin-bottom: 0.25rem;">
                 <span style="font-weight: 600; color: #0f172a;">{{ cat['category'] }} ({{ cat['count'] }} listings)</span>
                 <span style="font-weight: 700; color: #166534;">{{ "%.0f"|format(cat['total_kg']) }} kg ({{ "%.1f"|format(cat_pct) }}%)</span>
               </div>
-              <div style="background: #f1f5f9; height: 10px; border-radius: 9999px; overflow: hidden;">
+              <div style="background: #f1f5f9; height: 8px; border-radius: 9999px; overflow: hidden;">
                 <div style="background: #15803d; height: 100%; width: {{ cat_pct|int }}%; border-radius: 9999px;"></div>
               </div>
             </div>
@@ -191,10 +220,88 @@
 
   </div>
 
+  <!-- Top Rescued Produce Table -->
+  {% if top_crops %}
+  <div class="data-table-card" style="margin-bottom: 2.5rem;">
+    <div class="data-table-header">
+      <div>
+        <h3 style="font-size: 1.25rem; font-weight: 700; color: #0f172a;">🌾 Highest-Volume Rescued Agricultural Produce</h3>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Aggregated volume and economic valuation across Tamil Nadu farmgate listings</span>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="custom-table">
+        <thead>
+          <tr>
+            <th>Produce Name</th>
+            <th>Category</th>
+            <th>Total Volume (kg)</th>
+            <th>Estimated Trade Value</th>
+            <th>CO2e Offset</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tc in top_crops %}
+          <tr>
+            <td style="font-weight: 700; color: #0f172a;">{{ tc['crop_name'] }}</td>
+            <td><span class="user-badge" style="background: #e2e8f0; color: #334155; font-size: 0.75rem;">{{ tc['category'] }}</span></td>
+            <td><strong style="color: #166534;">{{ "%.0f"|format(tc['total_kg']) }} kg</strong></td>
+            <td>₹{{ "{:,.0f}".format(tc['est_value']) }}</td>
+            <td style="color: #059669; font-weight: 600;">{{ "%.1f"|format(tc['total_kg'] * 1.9) }} kg CO2e</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
   <!-- Operational Guidance & Verification Clarification -->
   <div class="disclaimer-box">
     <strong>🛡️ Authentic Data Transparency:</strong> FarmFresh Rescue only marks produce as "Rescued from Waste" when confirmed as sold before reaching terminal spoilage or after triggering the 3-day urgency threshold. We do not claim that all listed agricultural produce would have spoiled without our platform.
   </div>
 
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var ctx = document.getElementById('categoryChart');
+    if (ctx && typeof Chart !== 'undefined') {
+      var labels = [
+        {% for cat in category_breakdown %}
+          "{{ cat['category'] }}",
+        {% endfor %}
+      ];
+      var data = [
+        {% for cat in category_breakdown %}
+          {{ cat['total_kg'] }},
+        {% endfor %}
+      ];
+      if (labels.length > 0) {
+        new Chart(ctx, {
+          type: 'doughnut',
+          data: {
+            labels: labels,
+            datasets: [{
+              data: data,
+              backgroundColor: ['#16a34a', '#0284c7', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6'],
+              borderWidth: 2,
+              borderColor: '#ffffff'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: {
+                position: 'bottom',
+                labels: { boxWidth: 12, font: { size: 11 } }
+              }
+            }
+          }
+        });
+      }
+    }
+  });
+</script>
 {% endblock %}

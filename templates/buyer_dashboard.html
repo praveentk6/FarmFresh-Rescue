@@ -15,18 +15,147 @@
         {{ _t('buyer_intro') }}
       </p>
     </div>
-    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
       <a href="{{ url_for('browse_listings') }}" class="btn btn-primary btn-lg">
         🔍 {{ _t('browse_produce') }}
       </a>
       <a href="#postRequirementSection" class="btn btn-outline-primary btn-lg">
         + {{ _t('btn_post_req') }}
       </a>
-      <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="btn btn-accent btn-lg">
+      <a href="{{ url_for('voice_assistant') }}" class="btn btn-accent btn-lg">
+        🎤 Voice AI
+      </a>
+      <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="btn btn-secondary btn-lg">
         ⚡ {{ _t('urgent_rescue') }}
       </a>
     </div>
   </div>
+
+  <!-- Active Order Tracking Banner (if any orders are in progress) -->
+  {% if active_orders %}
+    <div class="data-table-card" style="margin-bottom: 2.5rem; border-top: 4px solid #0284c7; background: #f0f9ff;">
+      <div class="data-table-header" style="background: transparent; border: none; padding-bottom: 0.5rem;">
+        <div>
+          <h2 style="font-size: 1.25rem; font-weight: 700; color: #0369a1;">
+            🚚 Active Orders in Transit & Logistics Tracking
+          </h2>
+          <span style="font-size: 0.85rem; color: #475569;">Track live milestones from farmgate packing to delivery verification</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; padding: 0 1rem 1rem;">
+        {% for act in active_orders %}
+          <div style="background: white; border-radius: var(--radius-md); padding: 1.25rem; border: 1px solid #bae6fd; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                <span style="font-weight: 800; color: #0f172a; font-size: 1.1rem;">Order #{{ act['id'] }}</span>
+                <span class="badge-category" style="font-size: 0.8rem; font-weight: 700;">{{ act['status'] }}</span>
+              </div>
+              <div style="font-size: 0.95rem; font-weight: 700; color: #166534; margin-bottom: 0.25rem;">
+                {{ act['crop_name'] }} ({{ act['requested_quantity'] }} {{ act['unit'] }})
+              </div>
+              <div style="font-size: 0.8rem; color: #64748b; margin-bottom: 0.75rem;">
+                Farmer: <strong>{{ act['farmer_name'] }}</strong> &bull; {{ act['district'] }}
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 0.5rem;">
+              <a href="{{ url_for('track_order', order_id=act['id']) }}" class="btn btn-primary btn-sm btn-block">
+                🗺️ Track Route & Delivery
+              </a>
+              {% set clean_fphone = act['farmer_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
+              <a href="https://wa.me/91{{ clean_fphone }}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm">💬</a>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- AI Recommended Produce for Your Business Type -->
+  {% if recommended_produce %}
+    <div style="margin-bottom: 3rem;">
+      <div class="section-header">
+        <div>
+          <h2 class="section-title">✨ AI Recommended for Your Business ({{ current_user['user_type'] or 'Wholesale' }})</h2>
+          <p class="section-subtitle">Produce batches intelligently matched to your procurement volume, quality grade and region.</p>
+        </div>
+      </div>
+
+      <div class="produce-grid">
+        {% for item in recommended_produce %}
+          <div class="produce-card">
+            <div class="card-image-wrap">
+              {% if item.get('quality_grade') %}
+                <div class="card-floating-badge">
+                  <span class="{% if item['quality_grade'] == 'Grade A' %}badge-available{% else %}badge-category{% endif %}" style="font-size: 0.75rem;">
+                    {{ item['quality_grade'] }}
+                  </span>
+                </div>
+              {% endif %}
+              <div class="card-age-tag">~{{ item['distance_km'] }} km away</div>
+              {% if item['photo'] %}
+                <img src="{{ url_for('static', filename='uploads/' ~ item['photo']) }}" alt="{{ item['crop_name'] }}" class="card-img" loading="lazy">
+              {% else %}
+                <div class="card-img-placeholder">🥦</div>
+              {% endif %}
+            </div>
+            <div class="card-body">
+              <h3 class="crop-title">
+                <a href="{{ url_for('listing_detail', listing_id=item['id']) }}">{{ item['crop_name'] }}</a>
+              </h3>
+              <div class="crop-location">📍 {{ item['village_town'] }}, {{ item['district'] }} ({{ item['transit_text'] }})</div>
+              <div class="crop-pricing-box">
+                <span class="price-main">₹{{ "%.0f"|format(item['price_per_unit']) }}</span>
+                <span class="price-unit">/ {{ item['unit'] }}</span>
+                <span style="font-size: 0.8rem; color: #64748b; margin-left: auto;">Stock: {{ item['quantity'] }} {{ item['unit'] }}</span>
+              </div>
+              <div style="display: flex; gap: 0.4rem; margin-top: 0.5rem;">
+                <a href="{{ url_for('listing_detail', listing_id=item['id']) }}" class="btn btn-primary btn-sm btn-block">Enquire Now</a>
+                <button type="button" class="btn btn-secondary btn-sm btn-fav-farmer" data-farmer-id="{{ item['farmer_id'] }}" title="Favorite Farmer">
+                  {% if item.get('is_favorited') %}❤️{% else %}🤍{% endif %}
+                </button>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- Favorite Farmers Section -->
+  {% if my_favorites %}
+    <div class="data-table-card" style="margin-bottom: 3rem;">
+      <div class="data-table-header">
+        <div>
+          <h2 style="font-size: 1.35rem; font-weight: 700; color: #0f172a;">
+            ❤️ {{ _t('favorite_farmers_title') }}
+          </h2>
+          <span style="font-size: 0.85rem; color: var(--text-muted);">Trusted farmers you frequently buy from in Tamil Nadu</span>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; padding: 1rem;">
+        {% for f in my_favorites %}
+          <div style="border: 1px solid #e2e8f0; border-radius: var(--radius-md); padding: 1.25rem; background: #ffffff; box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <h4 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0;">{{ f['name'] }}</h4>
+              <div style="font-size: 0.85rem; color: #475569; margin-top: 0.2rem;">📍 {{ f['location'] }}</div>
+              <div style="font-size: 0.775rem; color: #166534; font-weight: 600; margin-top: 0.25rem;">
+                🥦 {{ f['active_listings_count'] }} Active Harvest(s)
+              </div>
+            </div>
+            <div style="display: flex; gap: 0.35rem;">
+              <a href="tel:{{ f['phone'] }}" class="btn btn-secondary btn-sm" title="Call">📞</a>
+              {% set clean_p = f['phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
+              <a href="https://wa.me/91{{ clean_p }}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" title="WhatsApp">💬</a>
+              <button type="button" class="btn btn-outline-danger btn-sm btn-fav-farmer" data-farmer-id="{{ f['id'] }}" title="Remove Favorite">✕</button>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
 
   <!-- Buyer Sent Orders Table -->
   <div class="data-table-card" style="margin-bottom: 3rem;">
@@ -50,6 +179,7 @@
               <th>Requested Qty & Offer</th>
               <th>Delivery Preference</th>
               <th>Status</th>
+              <th>Live Tracking</th>
               <th style="text-align: right;">Actions</th>
             </tr>
           </thead>
@@ -94,7 +224,7 @@
                     <div style="font-size: 0.8rem; color: #0f172a; font-weight: 700;">Total: ₹{{ "{:,.0f}".format(o['total_price']) }}</div>
                   {% endif %}
                 </td>
-                <td style="max-width: 220px;">
+                <td style="max-width: 200px;">
                   <span style="font-size: 0.75rem; background: #f1f5f9; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600;">
                     🚚 {{ o['delivery_preference'] or 'Direct Farm Pickup' }}
                   </span>
@@ -110,15 +240,22 @@
                     <span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Pending</span>
                   {% elif o['status'] == 'Accepted' %}
                     <span style="background: #dcfce7; color: #166534; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Accepted</span>
-                  {% elif o['status'] == 'Ready for Collection' %}
-                    <span style="background: #fef08a; color: #854d0e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Ready for Pickup</span>
-                  {% elif o['status'] == 'Completed' %}
-                    <span style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Completed</span>
+                  {% elif o['status'] in ['Packed', 'Ready for Collection'] %}
+                    <span style="background: #fef08a; color: #854d0e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Packed / Ready</span>
+                  {% elif o['status'] == 'Shipped' %}
+                    <span style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">In Transit</span>
+                  {% elif o['status'] in ['Completed', 'Delivered'] %}
+                    <span style="background: #dcfce7; color: #15803d; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Delivered</span>
                   {% elif o['status'] == 'Cancelled' %}
                     <span style="background: #fee2e2; color: #991b1b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Cancelled</span>
                   {% else %}
                     <span style="background: #f1f5f9; color: #64748b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ o['status'] }}</span>
                   {% endif %}
+                </td>
+                <td>
+                  <a href="{{ url_for('track_order', order_id=o['id']) }}" class="btn btn-outline-primary btn-sm" style="white-space: nowrap;">
+                    🗺️ Track Route
+                  </a>
                 </td>
                 <td>
                   <div style="display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-end;">
@@ -295,50 +432,35 @@
     {% endif %}
   </div>
 
-  <!-- Urgent Rescue Spotlight for Buyer -->
-  {% if urgent_recommendations %}
-    <div style="margin-top: 3rem;">
-      <div class="section-header">
-        <div>
-          <h2 class="section-title">⚡ High-Priority Produce Needing Rescue</h2>
-          <p class="section-subtitle">These batches are 3+ days old and available at attractive clearance prices.</p>
-        </div>
-        <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="btn btn-outline-primary btn-sm">
-          View All Urgent &rarr;
-        </a>
-      </div>
-
-      <div class="produce-grid">
-        {% for item in urgent_recommendations %}
-          <div class="produce-card is-urgent">
-            <div class="card-image-wrap">
-              <div class="card-floating-badge">
-                <span class="badge-urgent"><span class="pulse-dot"></span> Needs Attention</span>
-              </div>
-              {% set days_old, age_label = calculate_listing_age(item['created_at']) %}
-              <div class="card-age-tag">Listed {{ age_label }}</div>
-              {% if item['photo'] %}
-                <img src="{{ url_for('static', filename='uploads/' ~ item['photo']) }}" alt="{{ item['crop_name'] }}" class="card-img" loading="lazy">
-              {% else %}
-                <div class="card-img-placeholder">🥦</div>
-              {% endif %}
-            </div>
-            <div class="card-body">
-              <h3 class="crop-title">
-                <a href="{{ url_for('listing_detail', listing_id=item['id']) }}">{{ item['crop_name'] }}</a>
-              </h3>
-              <div class="crop-location">📍 {{ item['village_town'] }}, {{ item['district'] }}</div>
-              <div class="crop-pricing-box">
-                <span class="price-main">₹{{ "%.0f"|format(item['price_per_unit']) }}</span>
-                <span class="price-unit">/ {{ item['unit'] }}</span>
-              </div>
-              <a href="{{ url_for('listing_detail', listing_id=item['id']) }}" class="btn btn-accent btn-sm btn-block">Enquire Now</a>
-            </div>
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  {% endif %}
-
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.btn-fav-farmer').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const farmerId = this.getAttribute('data-farmer-id');
+      fetch('/api/buyer/favorite-farmer/' + farmerId, {
+        method: 'POST'
+      })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          if (d.favorited) {
+            this.textContent = '❤️';
+          } else {
+            this.textContent = '🤍';
+            // If in favorites table, remove card
+            const card = this.closest('.data-table-card div');
+            if (this.textContent === '✕') {
+              this.closest('div[style*="border: 1px solid"]').remove();
+            }
+          }
+        }
+      });
+    });
+  });
+});
+</script>
 {% endblock %}

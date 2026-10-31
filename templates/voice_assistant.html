@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+
+{% block title %}{{ _t('voice_assistant_title') }} - {{ _t('brand_name') }}{% endblock %}
+{% block meta_desc %}Bilingual Tamil and English AI Voice Assistant for Tamil Nadu farmers. List produce, check order status, get fair market prices and find buyers using voice commands.{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+
+  <!-- Breadcrumb -->
+  <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+    <a href="{{ url_for('index') }}">{{ _t('home') }}</a> &bull; 
+    <span>{{ _t('voice_assistant_title') }}</span>
+  </div>
+
+  <!-- Header Banner -->
+  <div class="dashboard-header" style="margin-bottom: 2rem;">
+    <div>
+      <div style="font-size: 0.85rem; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+        🎤 AI Voice Recognition & Natural Language &bull; தமிழ் & English
+      </div>
+      <h1 style="font-size: 2.25rem; font-weight: 800; margin-top: 0.25rem;">
+        {{ _t('voice_assistant_title') }}
+      </h1>
+      <p style="color: var(--text-muted); font-size: 0.95rem; max-width: 750px;">
+        {{ _t('voice_assistant_sub') }}
+      </p>
+    </div>
+
+    <!-- Language Selector Pill for Voice -->
+    <div style="display: flex; gap: 0.5rem; align-items: center; background: white; padding: 0.4rem 0.8rem; border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+      <span style="font-size: 0.85rem; font-weight: 600; color: #475569;">Voice Language:</span>
+      <button type="button" class="voice-lang-btn pill-btn active" id="voiceLangTa" data-lang="ta">தமிழ் (Tamil)</button>
+      <button type="button" class="voice-lang-btn pill-btn" id="voiceLangEn" data-lang="en">English</button>
+    </div>
+  </div>
+
+  <!-- Main Voice Hub Card -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: start;" class="voice-grid">
+
+    <!-- Left Column: Big Interactive Microphone Controller -->
+    <div class="data-table-card" style="padding: 2.5rem 2rem; text-align: center; background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);">
+      <div style="font-size: 0.9rem; font-weight: 700; color: #166534; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 1rem;">
+        {{ 'குரல் மூலம் கட்டளையிட மைக் பொத்தானை அழுத்தவும்' if lang == 'ta' else 'Tap the Microphone to Speak' }}
+      </div>
+
+      <!-- Glowing Animated Mic Button -->
+      <div class="voice-mic-wrapper" style="margin: 2rem auto;">
+        <button type="button" class="big-mic-button" id="bigMicBtn" aria-label="Activate Microphone">
+          <span class="mic-icon-symbol">🎤</span>
+        </button>
+        <div class="mic-pulse-ring" id="micPulseRing"></div>
+      </div>
+
+      <!-- Listening Status Indicator -->
+      <div id="micStatusText" style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin-bottom: 0.5rem;">
+        {{ 'மைக் தயாராக உள்ளது. பேச பொத்தானை அழுத்தவும்' if lang == 'ta' else 'Microphone ready. Tap button to speak.' }}
+      </div>
+      <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 1.5rem;" id="micStatusSub">
+        Supported in Chrome, Edge & Android browsers. Works in Tamil and English.
+      </p>
+
+      <!-- Live Speech Transcript Box -->
+      <div class="transcript-box" id="transcriptBox" style="background: white; border: 2px dashed #bbf7d0; border-radius: var(--radius-md); padding: 1.25rem; min-height: 80px; text-align: left; margin-bottom: 1.5rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #16a34a; text-transform: uppercase; margin-bottom: 0.35rem;">
+          {{ 'நீங்கள் பேசியது (Recognized Speech):' if lang == 'ta' else 'You Spoke (Transcript):' }}
+        </div>
+        <div id="liveSpeechText" style="font-size: 1.05rem; font-weight: 600; color: #1e293b; line-height: 1.5;">
+          <span style="color: #94a3b8; font-style: italic;">{{ 'உங்கள் குரல் இங்கே உரையாகத் தோன்றும்...' if lang == 'ta' else 'Your spoken speech will appear here...' }}</span>
+        </div>
+      </div>
+
+      <!-- Fallback Text Input (if mic permission is blocked) -->
+      <div style="margin-top: 1rem; border-top: 1px solid #e2e8f0; padding-top: 1.25rem;">
+        <form id="textFallbackForm" style="display: flex; gap: 0.5rem;">
+          <input type="text" id="manualTextInput" class="form-control" placeholder="{{ 'அல்லது தட்டச்சு செய்து கட்டளையிடவும்...' if lang == 'ta' else 'Or type command here...' }}">
+          <button type="submit" class="btn btn-primary" style="white-space: nowrap;">Send</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Right Column: AI Spoken Response & Action Center -->
+    <div>
+      <!-- Live Assistant Response Card -->
+      <div class="data-table-card" id="aiResponseCard" style="padding: 2rem; margin-bottom: 1.5rem; border-top: 4px solid #16a34a;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <div style="font-weight: 700; font-size: 1.2rem; color: #0f172a; display: flex; align-items: center; gap: 0.5rem;">
+            <span>🤖</span>
+            <span>{{ 'AI பதிலளிப்பு' if lang == 'ta' else 'AI Voice Response' }}</span>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="playAudioReplyBtn" style="display: none;">
+            🔊 {{ 'பதிலைக் கேள்' if lang == 'ta' else 'Listen to Voice' }}
+          </button>
+        </div>
+
+        <div id="aiResponseText" style="font-size: 1.05rem; color: #334155; line-height: 1.6; min-height: 70px; background: #f8fafc; padding: 1.25rem; border-radius: var(--radius-md); border: 1px solid #e2e8f0;">
+          {{ 'வணக்கம்! விளைபொருட்களைப் பதிவு செய்ய அல்லது விலையை அறிய பேசவும்.' if lang == 'ta' else 'Vanakkam! Speak a command to list produce, check pending orders, or find nearby buyers.' }}
+        </div>
+
+        <!-- Dynamic Action Button based on parsed intent -->
+        <div id="actionContainer" style="margin-top: 1.25rem; display: none;">
+          <a href="#" id="actionBtn" class="btn btn-accent btn-lg btn-block"></a>
+        </div>
+      </div>
+
+      <!-- Sample Tamil & English Voice Commands Cards -->
+      <div class="data-table-card" style="padding: 1.75rem;">
+        <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 1rem; color: #0f172a;">
+          💡 {{ _t('voice_examples_title') }} (Click any to test):
+        </h3>
+
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <!-- Command 1: Add Produce -->
+          <div class="voice-cmd-card" data-cmd="தக்காளி 100 கிலோ விற்பனைக்கு சேர்க்கவும்" data-lang="ta">
+            <div style="font-weight: 700; font-size: 0.95rem; color: #166534;">
+              🍅 "தக்காளி 100 கிலோ விற்பனைக்கு சேர்க்கவும்"
+            </div>
+            <div style="font-size: 0.8rem; color: #64748b;">
+              Adds 100 kg Tomatoes directly to produce listing form.
+            </div>
+          </div>
+
+          <!-- Command 2: Where are my orders? -->
+          <div class="voice-cmd-card" data-cmd="எனது ஆர்டர்கள் எங்கே?" data-lang="ta">
+            <div style="font-weight: 700; font-size: 0.95rem; color: #0284c7;">
+              📦 "எனது ஆர்டர்கள் எங்கே?"
+            </div>
+            <div style="font-size: 0.8rem; color: #64748b;">
+              Checks real-time pending & accepted purchase requests.
+            </div>
+          </div>
+
+          <!-- Command 3: Nearby Buyers -->
+          <div class="voice-cmd-card" data-cmd="அருகில் வாங்குபவர்கள் யார்?" data-lang="ta">
+            <div style="font-weight: 700; font-size: 0.95rem; color: #b45309;">
+              🏢 "அருகில் வாங்குபவர்கள் யார்?"
+            </div>
+            <div style="font-size: 0.8rem; color: #64748b;">
+              Finds commercial buyers, hotels, and processors matching your crops.
+            </div>
+          </div>
+
+          <!-- Command 4: Smart Price -->
+          <div class="voice-cmd-card" data-cmd="எனது பொருளின் விலையை பரிந்துரை செய்யவும்" data-lang="ta">
+            <div style="font-weight: 700; font-size: 0.95rem; color: #15803d;">
+              💰 "எனது பொருளின் விலையை பரிந்துரை செய்யவும்"
+            </div>
+            <div style="font-size: 0.8rem; color: #64748b;">
+              Recommends optimal selling price per kg using market benchmarks.
+            </div>
+          </div>
+
+          <!-- English Example 1 -->
+          <div class="voice-cmd-card" data-cmd="Add 200 kg carrots for sale in Ooty" data-lang="en">
+            <div style="font-weight: 700; font-size: 0.95rem; color: #475569;">
+              🥕 "Add 200 kg carrots for sale in Ooty"
+            </div>
+            <div style="font-size: 0.8rem; color: #64748b;">
+              Pre-fills carrot listing with 200 kg quantity.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const bigMicBtn = document.getElementById('bigMicBtn');
+  const micPulseRing = document.getElementById('micPulseRing');
+  const micStatusText = document.getElementById('micStatusText');
+  const liveSpeechText = document.getElementById('liveSpeechText');
+  const aiResponseText = document.getElementById('aiResponseText');
+  const playAudioReplyBtn = document.getElementById('playAudioReplyBtn');
+  const actionContainer = document.getElementById('actionContainer');
+  const actionBtn = document.getElementById('actionBtn');
+  const voiceLangTa = document.getElementById('voiceLangTa');
+  const voiceLangEn = document.getElementById('voiceLangEn');
+  const textFallbackForm = document.getElementById('textFallbackForm');
+  const manualTextInput = document.getElementById('manualTextInput');
+
+  let currentLang = window.APP_LANG === 'ta' ? 'ta' : 'ta';
+  let isListening = false;
+  let recognition = null;
+  let lastAudioText = '';
+
+  // Language buttons
+  voiceLangTa.addEventListener('click', () => {
+    currentLang = 'ta';
+    voiceLangTa.classList.add('active');
+    voiceLangEn.classList.remove('active');
+  });
+  voiceLangEn.addEventListener('click', () => {
+    currentLang = 'en';
+    voiceLangEn.classList.add('active');
+    voiceLangTa.classList.remove('active');
+  });
+
+  // Check Web Speech API support
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognition) {
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+
+    recognition.onstart = function() {
+      isListening = true;
+      bigMicBtn.classList.add('active-recording');
+      micPulseRing.classList.add('pulsing');
+      micStatusText.textContent = currentLang === 'ta' ? 'கேட்கிறது... இப்போது பேசவும்' : 'Listening... Speak now';
+      micStatusText.style.color = '#dc2626';
+    };
+
+    recognition.onresult = function(event) {
+      let interim = '';
+      let final = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          final += event.results[i][0].transcript;
+        } else {
+          interim += event.results[i][0].transcript;
+        }
+      }
+      liveSpeechText.textContent = final || interim;
+      if (final) {
+        processVoiceCommand(final.trim(), currentLang);
+      }
+    };
+
+    recognition.onerror = function(event) {
+      isListening = false;
+      bigMicBtn.classList.remove('active-recording');
+      micPulseRing.classList.remove('pulsing');
+      micStatusText.textContent = 'Microphone notice: ' + (event.error || 'Please speak again');
+      micStatusText.style.color = '#0f172a';
+    };
+
+    recognition.onend = function() {
+      isListening = false;
+      bigMicBtn.classList.remove('active-recording');
+      micPulseRing.classList.remove('pulsing');
+      if (micStatusText.textContent.includes('Listening') || micStatusText.textContent.includes('கேட்கிறது')) {
+        micStatusText.textContent = currentLang === 'ta' ? 'கேட்டறிந்தது! பகுப்பாய்வு செய்யப்படுகிறது...' : 'Processing your voice command...';
+        micStatusText.style.color = '#16a34a';
+      }
+    };
+  }
+
+  bigMicBtn.addEventListener('click', function() {
+    if (!SpeechRecognition) {
+      alert("Voice speech recognition is not supported in this browser. Please type your query in the text box below.");
+      return;
+    }
+    if (isListening) {
+      recognition.stop();
+    } else {
+      recognition.lang = currentLang === 'ta' ? 'ta-IN' : 'en-IN';
+      try {
+        recognition.start();
+      } catch (e) {
+        recognition.stop();
+      }
+    }
+  });
+
+  // Example clickable command cards
+  document.querySelectorAll('.voice-cmd-card').forEach(card => {
+    card.addEventListener('click', function() {
+      const cmd = this.getAttribute('data-cmd');
+      const lang = this.getAttribute('data-lang') || 'ta';
+      liveSpeechText.textContent = cmd;
+      processVoiceCommand(cmd, lang);
+    });
+  });
+
+  // Manual fallback form
+  textFallbackForm.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const val = manualTextInput.value.trim();
+    if (val) {
+      liveSpeechText.textContent = val;
+      processVoiceCommand(val, currentLang);
+      manualTextInput.value = '';
+    }
+  });
+
+  // Send speech to backend
+  function processVoiceCommand(speechText, lang) {
+    aiResponseText.innerHTML = '<span style="color:#16a34a;">⏳ Thinking & processing command...</span>';
+    actionContainer.style.display = 'none';
+
+    fetch('/api/ai/voice-command', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({speech_text: speechText, lang: lang})
+    })
+    .then(r => r.json())
+    .then(data => {
+      aiResponseText.textContent = data.reply_text || 'Processed';
+      lastAudioText = data.audio_text || data.reply_text;
+      playAudioReplyBtn.style.display = 'inline-block';
+
+      // Automatically speak reply
+      speakAloud(lastAudioText, lang);
+
+      // Show Action Button if redirect is present
+      if (data.redirect_url) {
+        actionContainer.style.display = 'block';
+        if (data.intent === 'add_produce') {
+          actionBtn.textContent = '➡️ ' + (lang === 'ta' ? 'விளைபொருள் சேர்க்கும் படிவத்திற்குச் செல்' : 'Proceed to Add Listing Form');
+          actionBtn.className = 'btn btn-primary btn-lg btn-block';
+        } else if (data.intent === 'check_orders') {
+          actionBtn.textContent = '📦 ' + (lang === 'ta' ? 'ஆர்டர்களைப் பார்க்க' : 'View Orders in Dashboard');
+          actionBtn.className = 'btn btn-accent btn-lg btn-block';
+        } else if (data.intent === 'find_buyers') {
+          actionBtn.textContent = '🔍 ' + (lang === 'ta' ? 'வாங்குபவர்களைப் பார்க்க' : 'Browse Matching Buyers');
+          actionBtn.className = 'btn btn-outline-primary btn-lg btn-block';
+        } else {
+          actionBtn.textContent = '➡️ ' + (lang === 'ta' ? 'தொடரவும்' : 'Continue');
+          actionBtn.className = 'btn btn-secondary btn-lg btn-block';
+        }
+        actionBtn.href = data.redirect_url;
+      }
+    })
+    .catch(err => {
+      aiResponseText.textContent = 'Error communicating with AI Voice service. Please try again.';
+    });
+  }
+
+  // Text to Speech
+  function speakAloud(text, lang) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = lang === 'ta' ? 'ta-IN' : 'en-IN';
+    utterance.rate = 0.95;
+    window.speechSynthesis.speak(utterance);
+  }
+
+  playAudioReplyBtn.addEventListener('click', function() {
+    if (lastAudioText) {
+      speakAloud(lastAudioText, currentLang);
+    }
+  });
+});
+</script>
+{% endblock %}
+

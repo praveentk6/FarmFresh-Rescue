@@ -63,7 +63,25 @@
           <span class="badge-available" style="font-size: 0.85rem; padding: 0.4rem 0.85rem;">● Fresh Listing ({{ age_text }})</span>
         {% endif %}
         <span class="badge-category">{{ listing['category'] }}</span>
-        <span style="font-size: 0.8rem; color: #64748b;">Listing #{{ listing['id'] }}</span>
+        
+        <!-- AI 2.0 Badges -->
+        <span style="background: {% if freshness.status == 'Fresh' %}#dcfce7; color: #166534; border: 1px solid #86efac;{% elif freshness.status == 'Moderate' %}#fef3c7; color: #92400e; border: 1px solid #fde68a;{% else %}#fee2e2; color: #991b1b; border: 1px solid #fca5a5;{% endif %} padding: 0.3rem 0.65rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700;">
+          🌱 {{ freshness.status }} ({{ freshness.freshness_score }}%)
+        </span>
+
+        {% if listing['quality_grade'] %}
+          <span style="background: {% if listing['quality_grade'] == 'Grade A' %}#16a34a{% elif listing['quality_grade'] == 'Grade B' %}#2563eb{% else %}#ea580c{% endif %}; color: #ffffff; padding: 0.3rem 0.65rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700;">
+            🏆 {{ listing['quality_grade'] }} (AI Inspection)
+          </span>
+        {% endif %}
+
+        {% if buyer_distance_km is not none %}
+          <span style="background: #e0f2fe; color: #0369a1; border: 1px solid #7dd3fc; padding: 0.3rem 0.65rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700;">
+            📍 {{ "%.1f"|format(buyer_distance_km) }} km from you
+          </span>
+        {% endif %}
+
+        <span style="font-size: 0.8rem; color: #64748b; margin-left: auto;">Listing #{{ listing['id'] }}</span>
       </div>
 
       <h1 class="detail-title">{{ listing['crop_name'] }}</h1>
@@ -114,6 +132,51 @@
         </div>
       </div>
 
+      <!-- AI 2.0 Freshness & Market Pricing Intelligence -->
+      <div style="background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%); border: 1px solid #bbf7d0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.4rem; font-weight: 700; color: #166534; font-size: 0.95rem;">
+            <span>🤖</span> AI Freshness & Market Intelligence
+          </div>
+          <span style="font-size: 0.75rem; color: #64748b; background: #fff; padding: 0.2rem 0.5rem; border-radius: 999px; border: 1px solid #e2e8f0;">
+            Storage: {{ (listing['storage_condition'] or 'Ambient')|capitalize }}
+          </span>
+        </div>
+
+        <!-- Freshness Progress Meter -->
+        <div style="margin-bottom: 0.85rem;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.8rem; margin-bottom: 0.3rem;">
+            <span style="color: #475569; font-weight: 600;">Freshness Index: <strong>{{ freshness.status }}</strong></span>
+            <span style="font-weight: 700; color: {% if freshness.freshness_score >= 70 %}#16a34a{% elif freshness.freshness_score >= 40 %}#d97706{% else %}#dc2626{% endif %};">
+              {{ freshness.freshness_score }}% &bull; ~{{ freshness.remaining_hours }}h shelf-life
+            </span>
+          </div>
+          <div style="background: #e2e8f0; height: 8px; border-radius: 999px; overflow: hidden;">
+            <div style="background: {% if freshness.freshness_score >= 70 %}#16a34a{% elif freshness.freshness_score >= 40 %}#f59e0b{% else %}#ef4444{% endif %}; height: 100%; width: {{ freshness.freshness_score }}%; border-radius: 999px;"></div>
+          </div>
+        </div>
+
+        <!-- Smart Pricing Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.5rem; font-size: 0.8rem; background: #fff; padding: 0.75rem; border-radius: 8px; border: 1px solid #dcfce7; margin-bottom: 0.5rem;">
+          <div>
+            <div style="color: #64748b;">Suggested Price</div>
+            <strong style="color: #15803d; font-size: 0.95rem;">₹{{ price_rec.suggested_price }} / {{ listing['unit'] }}</strong>
+          </div>
+          <div>
+            <div style="color: #64748b;">Market Benchmark</div>
+            <strong style="color: #0f172a; font-size: 0.95rem;">₹{{ price_rec.mandi_benchmark }} / {{ listing['unit'] }}</strong>
+          </div>
+          <div>
+            <div style="color: #64748b;">Expected Total Revenue</div>
+            <strong style="color: #0369a1; font-size: 0.95rem;">₹{{ "{:,.0f}".format(price_rec.expected_revenue or 0) }}</strong>
+          </div>
+        </div>
+
+        <div style="font-size: 0.72rem; color: #64748b; line-height: 1.35;">
+          ℹ️ <em>{{ freshness.disclaimer }}</em>
+        </div>
+      </div>
+
       <!-- Specs Grid -->
       <div class="spec-grid">
         <div class="spec-box">
@@ -158,13 +221,21 @@
 
       <!-- Farmer Contact & Rescue Action Card -->
       <div class="farmer-contact-card">
-        <div class="farmer-contact-header">
-          <div class="farmer-big-avatar">{{ listing['farmer_name'][0] }}</div>
-          <div>
-            <div style="font-size: 0.8rem; color: #15803d; font-weight: 700; text-transform: uppercase;">Listed By Farmer</div>
-            <div style="font-size: 1.2rem; font-weight: 700;">{{ listing['farmer_name'] }}</div>
-            <div style="font-size: 0.85rem; color: #64748b;">{{ listing['farmer_type'] or 'Local Farmer' }} &bull; {{ listing['village_town'] }}</div>
+        <div class="farmer-contact-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div class="farmer-big-avatar">{{ listing['farmer_name'][0] }}</div>
+            <div>
+              <div style="font-size: 0.8rem; color: #15803d; font-weight: 700; text-transform: uppercase;">Listed By Farmer</div>
+              <div style="font-size: 1.2rem; font-weight: 700;">{{ listing['farmer_name'] }}</div>
+              <div style="font-size: 0.85rem; color: #64748b;">{{ listing['farmer_type'] or 'Local Farmer' }} &bull; {{ listing['village_town'] }}</div>
+            </div>
           </div>
+          {% if current_user and current_user['role'] == 'buyer' %}
+            <button type="button" class="btn btn-sm {% if is_favorited %}btn-accent{% else %}btn-secondary{% endif %}" id="btnToggleFav" data-farmer-id="{{ listing['farmer_id'] }}" style="display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.8rem;">
+              <span id="favStar">{% if is_favorited %}⭐{% else %}☆{% endif %}</span>
+              <span id="favText">{% if is_favorited %}Favorited{% else %}Favorite Farmer{% endif %}</span>
+            </button>
+          {% endif %}
         </div>
 
         {% if listing['status'] == 'Available' %}
@@ -315,4 +386,35 @@
     </form>
   </div>
 </div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function() {
+    var btnFav = document.getElementById('btnToggleFav');
+    if (btnFav) {
+      btnFav.addEventListener('click', function() {
+        var fId = this.getAttribute('data-farmer-id');
+        fetch('/api/buyer/favorite-farmer/' + fId, { method: 'POST' })
+          .then(function(r) { return r.json(); })
+          .then(function(d) {
+            if (d.success) {
+              var star = document.getElementById('favStar');
+              var txt = document.getElementById('favText');
+              if (d.is_favorite) {
+                btnFav.className = 'btn btn-sm btn-accent';
+                star.innerText = '⭐';
+                txt.innerText = 'Favorited';
+              } else {
+                btnFav.className = 'btn btn-sm btn-secondary';
+                star.innerText = '☆';
+                txt.innerText = 'Favorite Farmer';
+              }
+            }
+          })
+          .catch(function(err) {
+            console.error('Favorite toggle failed', err);
+          });
+      });
+    }
+  });
+</script>
 {% endblock %}

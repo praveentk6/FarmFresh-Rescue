@@ -14,9 +14,16 @@
   <!-- CSS Stylesheet -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
+  <!-- Leaflet Interactive Maps CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <!-- Chart.js for Recharts-style Analytics -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
   <script>
     window.APP_LANG = "{{ lang }}";
     window.APP_TRANSLATIONS = {{ translations_json|safe }};
+    window.CURRENT_USER = {% if current_user %}{"id": {{ current_user['id'] }}, "name": "{{ current_user['name'] }}", "role": "{{ current_user['role'] }}"}{% else %}null{% endif %};
   </script>
 
   {% block extra_head %}{% endblock %}
@@ -53,10 +60,11 @@
               ⚡ {{ _t('urgent_rescue') }}
             </a>
           </li>
+          <li><a href="{{ url_for('voice_assistant') }}" class="nav-link {% if request.endpoint == 'voice_assistant' %}active{% endif %}">🎤 {{ 'குரல் AI' if lang == 'ta' else 'Voice AI' }}</a></li>
+          <li><a href="{{ url_for('quality_grading') }}" class="nav-link {% if request.endpoint == 'quality_grading' %}active{% endif %}">🔍 {{ 'தர மதிப்பீடு' if lang == 'ta' else 'Quality AI' }}</a></li>
+          <li><a href="{{ url_for('demand_prediction') }}" class="nav-link {% if request.endpoint == 'demand_prediction' %}active{% endif %}">📈 {{ 'தேவை கணிப்பு' if lang == 'ta' else 'Demand Trends' }}</a></li>
           <li><a href="{{ url_for('nearby_buyers') }}" class="nav-link {% if request.endpoint == 'nearby_buyers' %}active{% endif %}">{{ _t('nearby_buyers') }}</a></li>
-          <li><a href="{{ url_for('ai_assistant') }}" class="nav-link {% if request.endpoint == 'ai_assistant' %}active{% endif %}">🤖 {{ _t('ai_assistant') }}</a></li>
           <li><a href="{{ url_for('analytics_view') }}" class="nav-link {% if request.endpoint == 'analytics_view' %}active{% endif %}">📊 {{ _t('analytics') }}</a></li>
-          <li><a href="{{ url_for('about') }}" class="nav-link {% if request.endpoint == 'about' %}active{% endif %}">{{ _t('about_mission') }}</a></li>
         </ul>
 
         <div class="nav-actions">
@@ -187,6 +195,74 @@
       </div>
     </div>
   </footer>
+
+  <!-- Floating AI FarmFresh Chatbot Widget -->
+  <div class="chatbot-container" id="chatbotContainer">
+    <!-- Chatbot Floating Window -->
+    <div class="chatbot-window" id="chatbotWindow" style="display: none;" aria-hidden="true">
+      <div class="chatbot-header">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
+          <div class="chatbot-avatar">🌾</div>
+          <div>
+            <div style="font-weight: 700; font-size: 0.95rem; color: white;">FarmFresh AI 2.0</div>
+            <div style="font-size: 0.75rem; color: #bbf7d0; display: flex; align-items: center; gap: 0.3rem;">
+              <span class="live-dot"></span> {{ 'ஆன்லைன் &bull; தமிழ் / English' if lang == 'ta' else 'Online &bull; Tamil / English' }}
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 0.4rem;">
+          <button type="button" id="chatbotVoiceToggle" class="chat-icon-btn" title="Toggle Voice Response" aria-label="Toggle Voice Audio">🔊</button>
+          <button type="button" id="chatbotMinimizeBtn" class="chat-icon-btn" title="Minimize Chat" aria-label="Minimize">&minus;</button>
+        </div>
+      </div>
+
+      <!-- User Context Indicator -->
+      <div class="chatbot-context-bar">
+        {% if current_user %}
+          <span>👤 {{ current_user['name'].split()[0] }} ({{ _t('role_' ~ current_user['role']) }}) &bull; {{ current_user['location'] or 'Tamil Nadu' }}</span>
+        {% else %}
+          <span>🌾 Welcome Guest! Log in for personalized order tracking.</span>
+        {% endif %}
+      </div>
+
+      <!-- Quick Suggestion Pills -->
+      <div class="chatbot-quick-pills">
+        <button type="button" class="quick-pill" data-prompt="{{ 'தக்காளி விலை என்ன?' if lang == 'ta' else 'What is the current market price for tomatoes?' }}">🍅 {{ 'தக்காளி விலை' if lang == 'ta' else 'Tomato Prices' }}</button>
+        <button type="button" class="quick-pill" data-prompt="{{ 'எனது ஆர்டர்கள் எங்கே?' if lang == 'ta' else 'Where are my pending orders?' }}">📦 {{ 'எனது ஆர்டர்கள்' if lang == 'ta' else 'My Orders' }}</button>
+        <button type="button" class="quick-pill" data-prompt="{{ 'அருகில் வாங்குபவர்கள் யார்?' if lang == 'ta' else 'Who are nearby commercial buyers?' }}">🏢 {{ 'வாங்குபவர்கள்' if lang == 'ta' else 'Find Buyers' }}</button>
+        <button type="button" class="quick-pill" data-prompt="{{ 'காய்கறி அழுகலைத் தடுப்பது எப்படி?' if lang == 'ta' else 'How to prevent post-harvest vegetable spoilage?' }}">🛡️ {{ 'சேமிப்பு உத்திகள்' if lang == 'ta' else 'Spoilage Tips' }}</button>
+      </div>
+
+      <!-- Message History -->
+      <div class="chatbot-messages" id="chatbotMessages">
+        <div class="chat-msg bot-msg">
+          <div class="msg-bubble">
+            {% if lang == 'ta' %}
+              வணக்கம்! நான் உங்கள் பார்ம்ஃப்ரெஷ் AI விவசாய உதவியாளர். விளைபொருள் விலை, வாங்குபவர்கள், சேமிப்பு அல்லது ஆர்டர்கள் பற்றி நீங்கள் என்னிடம் கேட்கலாம்.
+            {% else %}
+              Vanakkam! I am your FarmFresh AI Assistant. Ask me about crop pricing, nearby buyers, spoilage prevention, or your order status in Tamil or English!
+            {% endif %}
+          </div>
+          <span class="msg-time">{{ 'இப்போது' if lang == 'ta' else 'Just now' }}</span>
+        </div>
+      </div>
+
+      <!-- Input Footer -->
+      <div class="chatbot-footer">
+        <form id="chatbotForm" style="display: flex; gap: 0.4rem; align-items: center; width: 100%;">
+          <button type="button" id="chatMicBtn" class="chat-mic-btn" title="Speak Voice Input" aria-label="Speak">🎤</button>
+          <input type="text" id="chatInput" class="chat-input" placeholder="{{ 'தமிழில் அல்லது ஆங்கிலத்தில் கேளுங்கள்...' if lang == 'ta' else 'Ask in Tamil or English...' }}" autocomplete="off" required>
+          <button type="submit" id="chatSendBtn" class="chat-send-btn" title="Send Message" aria-label="Send">➤</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Floating Chatbot Launcher Toggle -->
+    <button type="button" class="chatbot-launcher" id="chatbotLauncher" aria-label="Open AI FarmFresh Chatbot">
+      <span class="launcher-icon">🌾</span>
+      <span class="launcher-label">{{ 'AI உதவி' if lang == 'ta' else 'AI Chat' }}</span>
+    </button>
+  </div>
 
   <!-- Main JavaScript File -->
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>

@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block title %}{{ _t('quality_grading_title') }} - {{ _t('brand_name') }}{% endblock %}
+{% block meta_desc %}AI-powered agricultural produce visual quality inspection. Grade harvested fruits and vegetables into Grade A, B, and C with confidence metrics and targeted buyer recommendations.{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+
+  <!-- Breadcrumb -->
+  <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.75rem;">
+    <a href="{{ url_for('index') }}">{{ _t('home') }}</a> &bull; 
+    <span>{{ _t('quality_grading_title') }}</span>
+  </div>
+
+  <!-- Header Banner -->
+  <div class="dashboard-header" style="margin-bottom: 2rem;">
+    <div>
+      <div style="font-size: 0.85rem; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+        🔍 Computer Vision & Multimodal Inspection &bull; {{ _t('tamil_nadu') }}
+      </div>
+      <h1 style="font-size: 2.25rem; font-weight: 800; margin-top: 0.25rem;">
+        {{ _t('quality_grading_title') }}
+      </h1>
+      <p style="color: var(--text-muted); font-size: 0.95rem; max-width: 750px;">
+        {{ 'விளைபொருளின் புகைப்படத்தைப் பதிவேற்றி தரம் A, B, அல்லது C மற்றும் பொருத்தமான வாங்குபவர்களின் பரிந்துரையைப் பெறுங்கள்.' if lang == 'ta' else 'Upload produce photos to analyze surface uniformity, color vibrancy, and visual blemishes. Categorize harvests into Grade A, B, or C with matched commercial buyers.' }}
+      </p>
+    </div>
+
+    <div>
+      <a href="{{ url_for('add_listing') }}" class="btn btn-primary btn-lg">
+        + {{ _t('list_produce') }}
+      </a>
+    </div>
+  </div>
+
+  <!-- 2-Column Grid: Upload form & Analysis Results -->
+  <div style="display: grid; grid-template-columns: 1fr 1.25fr; gap: 2rem; align-items: start;" class="grading-grid">
+
+    <!-- Left Column: Image Upload Form -->
+    <div class="data-table-card" style="padding: 2rem;">
+      <h2 style="font-size: 1.35rem; font-weight: 700; margin-bottom: 1.25rem;">
+        📸 {{ 'விளைபொருள் புகைப்படத்தைப் பதிவேற்றவும்' if lang == 'ta' else 'Upload Produce Photo' }}
+      </h2>
+
+      <form action="{{ url_for('quality_grading') }}" method="POST" enctype="multipart/form-data" id="gradingForm">
+        <!-- Crop Name Input -->
+        <div class="form-group">
+          <label class="form-label">{{ _t('crop_name_label') }}</label>
+          <input type="text" name="crop_name" id="gradingCropName" class="form-control" value="{{ crop_name or 'Tomatoes' }}" placeholder="e.g. Tomatoes, Carrots, Shallots" required>
+        </div>
+
+        <!-- File Upload Drag & Drop Area -->
+        <div class="form-group">
+          <label class="form-label">{{ 'புகைப்படம் (PNG, JPG, WEBP - Max 3MB)' if lang == 'ta' else 'Crop Photo (PNG, JPG, WEBP - Max 3MB)' }}</label>
+          <div class="image-dropzone" id="gradingDropzone" style="border: 2px dashed #86efac; border-radius: var(--radius-md); padding: 2rem; text-align: center; background: #f0fdf4; cursor: pointer;">
+            <div id="dropzonePrompt">
+              <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">📷</span>
+              <strong style="color: #166534;">{{ 'படத்தைத் தேர்வு செய்ய இங்கே கிளிக் செய்யவும்' if lang == 'ta' else 'Click to select or drop image here' }}</strong>
+              <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">Supports camera capture on mobile</div>
+            </div>
+            <input type="file" name="photo" id="gradingPhotoInput" accept="image/*" style="display: none;" required>
+            <div id="gradingPreviewWrap" style="display: none; margin-top: 1rem;">
+              <img id="gradingImgPreview" src="" alt="Selected Produce" style="max-height: 220px; border-radius: var(--radius-sm); object-fit: contain; box-shadow: var(--shadow-sm);">
+            </div>
+          </div>
+        </div>
+
+        <!-- Sample Images for Instant Demonstration -->
+        <div style="margin-bottom: 1.5rem; background: #f8fafc; padding: 1rem; border-radius: var(--radius-md); border: 1px solid #e2e8f0;">
+          <div style="font-size: 0.775rem; font-weight: 700; color: #475569; text-transform: uppercase; margin-bottom: 0.5rem;">
+            ⚡ Quick Test with Sample Crop:
+          </div>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            <button type="button" class="sample-crop-btn pill-btn" data-crop="Country Tomatoes" data-src="/static/uploads/tomatoes.jpg">🍅 Tomatoes</button>
+            <button type="button" class="sample-crop-btn pill-btn" data-crop="Ooty Carrots" data-src="/static/uploads/carrots.jpg">🥕 Carrots</button>
+            <button type="button" class="sample-crop-btn pill-btn" data-crop="Dindigul Shallots" data-src="/static/uploads/shallots.jpg">🧅 Shallots</button>
+            <button type="button" class="sample-crop-btn pill-btn" data-crop="Cabbage" data-src="/static/uploads/cabbage.jpg">🥬 Cabbage</button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-accent btn-lg btn-block" id="runInspectionBtn">
+          🔍 {{ 'AI தரத்தை ஆய்வு செய்' if lang == 'ta' else 'Run AI Quality Inspection' }}
+        </button>
+      </form>
+    </div>
+
+    <!-- Right Column: Inspection Results -->
+    <div>
+      {% if grading_result %}
+        <div class="data-table-card" style="padding: 2rem; border-top: 5px solid {% if grading_result['quality_grade'] == 'Grade A' %}#16a34a{% elif grading_result['quality_grade'] == 'Grade B' %}#0284c7{% else %}#ea580c{% endif %}; margin-bottom: 2rem;">
+          
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+            <div>
+              <div style="font-size: 0.8rem; font-weight: 700; color: #166534; text-transform: uppercase;">
+                ✨ {{ grading_result.get('source', 'AI Vision Inspector') }}
+              </div>
+              <h2 style="font-size: 1.6rem; font-weight: 800; margin-top: 0.25rem; color: #0f172a;">
+                {{ crop_name or 'Produce' }} Inspection Result
+              </h2>
+            </div>
+
+            <!-- Grade Badge -->
+            <div style="text-align: right;">
+              <span class="{% if grading_result['quality_grade'] == 'Grade A' %}badge-available{% elif grading_result['quality_grade'] == 'Grade B' %}badge-category{% else %}badge-urgent{% endif %}" style="font-size: 1.1rem; padding: 0.5rem 1rem; font-weight: 800;">
+                {{ grading_result['quality_grade'] }}
+              </span>
+              <div style="font-size: 0.775rem; color: #64748b; margin-top: 0.35rem;">
+                {{ _t('confidence_label') }}: <strong>{{ grading_result['confidence'] }}%</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grade Description Banner -->
+          <div style="background: {% if grading_result['quality_grade'] == 'Grade A' %}#f0fdf4{% elif grading_result['quality_grade'] == 'Grade B' %}#f0f9ff{% else %}#fff7ed{% endif %}; border-radius: var(--radius-md); padding: 1.25rem; margin-bottom: 1.5rem; border: 1px solid #e2e8f0;">
+            <div style="font-weight: 700; font-size: 1.05rem; color: #0f172a; margin-bottom: 0.35rem;">
+              {% if grading_result['quality_grade'] == 'Grade A' %}
+                🏆 {{ _t('grade_a_title') }}
+              {% elif grading_result['quality_grade'] == 'Grade B' %}
+                🥦 {{ _t('grade_b_title') }}
+              {% else %}
+                🥫 {{ _t('grade_c_title') }}
+              {% endif %}
+            </div>
+            <p style="font-size: 0.95rem; color: #334155; margin: 0; line-height: 1.5;">
+              {{ grading_result['freshness_assessment'] }}
+            </p>
+          </div>
+
+          <!-- Visual Metrics Gauges -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+            <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-sm); border: 1px solid #e2e8f0;">
+              <div style="font-size: 0.8rem; color: #64748b; font-weight: 600;">Color Vibrancy & Uniformity</div>
+              <div style="font-size: 1.35rem; font-weight: 800; color: #166534;">{{ grading_result['color_score'] }}/100</div>
+              <div style="background: #e2e8f0; height: 6px; border-radius: 9999px; overflow: hidden; margin-top: 0.35rem;">
+                <div style="background: #166534; height: 100%; width: {{ grading_result['color_score']|int }}%;"></div>
+              </div>
+            </div>
+
+            <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-sm); border: 1px solid #e2e8f0;">
+              <div style="font-size: 0.8rem; color: #64748b; font-weight: 600;">Surface Blemish Ratio</div>
+              <div style="font-size: 1.35rem; font-weight: 800; color: #d97706;">{{ grading_result['defect_score'] }}%</div>
+              <div style="background: #e2e8f0; height: 6px; border-radius: 9999px; overflow: hidden; margin-top: 0.35rem;">
+                <div style="background: #d97706; height: 100%; width: {{ grading_result['defect_score']|int }}%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Targeted Commercial Buyers -->
+          <div style="margin-bottom: 1.5rem;">
+            <h3 style="font-size: 1.1rem; font-weight: 700; margin-bottom: 0.75rem; color: #0f172a;">
+              🎯 Recommended Target Buyers for this Grade:
+            </h3>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+              {% for b in grading_result.get('target_buyers', []) %}
+                <span style="background: #ecfdf5; color: #166534; font-weight: 700; font-size: 0.85rem; padding: 0.4rem 0.85rem; border-radius: 9999px; border: 1px solid #86efac;">
+                  🏢 {{ b }}
+                </span>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Shelf life commercial impact -->
+          {% if grading_result.get('shelf_life_impact') %}
+            <div style="font-size: 0.875rem; color: #475569; margin-bottom: 1.5rem; line-height: 1.5;">
+              <strong>Commercial Advice:</strong> {{ grading_result['shelf_life_impact'] }}
+            </div>
+          {% endif %}
+
+          <div style="display: flex; gap: 0.75rem;">
+            <a href="{{ url_for('add_listing') }}?crop={{ crop_name }}&grade={{ grading_result['quality_grade'] }}" class="btn btn-primary btn-block">
+              + Post Listing with this Grade
+            </a>
+          </div>
+
+          <!-- Scientific Disclaimer -->
+          <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 1.25rem; border-top: 1px solid #f1f5f9; padding-top: 0.75rem;">
+            * {{ _t('visual_inspection_notice') }} FarmFresh Rescue AI utilizes image analysis models for commercial lot prioritization.
+          </div>
+        </div>
+      {% else %}
+        <!-- Placeholder / Explanatory Card -->
+        <div class="data-table-card" style="padding: 2.5rem 2rem; text-align: center;">
+          <span style="font-size: 3rem; display: block; margin-bottom: 0.5rem;">🔬</span>
+          <h3 style="font-size: 1.35rem; font-weight: 700; margin-bottom: 0.5rem; color: #0f172a;">
+            {{ 'விளைபொருள் தரப் பிரிவுகள்' if lang == 'ta' else 'Agricultural Quality Grade Categories' }}
+          </h3>
+          <p style="color: var(--text-muted); font-size: 0.95rem; max-width: 500px; margin: 0 auto 2rem;">
+            Upload an image on the left or click any quick sample crop to see automated computer vision quality classification.
+          </p>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; text-align: left;" class="grade-explainer-grid">
+            <div style="border: 1px solid #86efac; border-radius: var(--radius-md); padding: 1rem; background: #f0fdf4;">
+              <span class="badge-available" style="font-size: 0.75rem; margin-bottom: 0.5rem; display: inline-block;">Grade A</span>
+              <div style="font-weight: 700; font-size: 0.875rem; color: #166534;">Premium Quality</div>
+              <div style="font-size: 0.75rem; color: #475569; margin-top: 0.25rem;">Supermarkets, Retail Chains & Exports</div>
+            </div>
+
+            <div style="border: 1px solid #bae6fd; border-radius: var(--radius-md); padding: 1rem; background: #f0f9ff;">
+              <span class="badge-category" style="font-size: 0.75rem; margin-bottom: 0.5rem; display: inline-block;">Grade B</span>
+              <div style="font-weight: 700; font-size: 0.875rem; color: #0369a1;">Standard Market</div>
+              <div style="font-size: 0.75rem; color: #475569; margin-top: 0.25rem;">Hotels, Restaurants, Local Mandis</div>
+            </div>
+
+            <div style="border: 1px solid #fed7aa; border-radius: var(--radius-md); padding: 1rem; background: #fff7ed;">
+              <span class="badge-urgent" style="font-size: 0.75rem; margin-bottom: 0.5rem; display: inline-block;">Grade C</span>
+              <div style="font-weight: 700; font-size: 0.875rem; color: #c2410c;">Processing Grade</div>
+              <div style="font-size: 0.75rem; color: #475569; margin-top: 0.25rem;">Purees, Juices, Sauces & Pickles</div>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      <!-- Recent Inspections History for Farmer -->
+      {% if recent_inspections %}
+        <div class="data-table-card" style="margin-top: 2rem;">
+          <div class="data-table-header">
+            <h3 style="font-size: 1.15rem; font-weight: 700;">Your Recent Inspections</h3>
+          </div>
+          <div class="table-responsive">
+            <table class="custom-table">
+              <thead>
+                <tr>
+                  <th>Crop</th>
+                  <th>Grade</th>
+                  <th>Confidence</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for insp in recent_inspections %}
+                  <tr>
+                    <td><strong>{{ insp['crop_name'] }}</strong></td>
+                    <td>
+                      <span class="{% if insp['quality_grade'] == 'Grade A' %}badge-available{% elif insp['quality_grade'] == 'Grade B' %}badge-category{% else %}badge-urgent{% endif %}" style="font-size: 0.75rem;">
+                        {{ insp['quality_grade'] }}
+                      </span>
+                    </td>
+                    <td>{{ insp['confidence'] }}%</td>
+                    <td style="font-size: 0.8rem; color: #64748b;">{{ insp['created_at'].split()[0] if ' ' in insp['created_at'] else insp['created_at'] }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const dropzone = document.getElementById('gradingDropzone');
+  const fileInput = document.getElementById('gradingPhotoInput');
+  const previewWrap = document.getElementById('gradingPreviewWrap');
+  const imgPreview = document.getElementById('gradingImgPreview');
+  const dropzonePrompt = document.getElementById('dropzonePrompt');
+  const cropNameInput = document.getElementById('gradingCropName');
+
+  dropzone.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', function() {
+    if (this.files && this.files[0]) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        imgPreview.src = e.target.result;
+        previewWrap.style.display = 'block';
+        dropzonePrompt.style.display = 'none';
+      };
+      reader.readAsDataURL(this.files[0]);
+    }
+  });
+
+  // Sample quick buttons
+  document.querySelectorAll('.sample-crop-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const crop = this.getAttribute('data-crop');
+      const src = this.getAttribute('data-src');
+      cropNameInput.value = crop;
+      imgPreview.src = src;
+      previewWrap.style.display = 'block';
+      dropzonePrompt.style.display = 'none';
+      
+      // Fetch sample image and populate file input via DataTransfer
+      fetch(src)
+        .then(r => r.blob())
+        .then(blob => {
+          const file = new File([blob], crop.toLowerCase() + ".jpg", {type: "image/jpeg"});
+          const dataTransfer = new DataTransfer();
+          dataTransfer.items.add(file);
+          fileInput.files = dataTransfer.files;
+        });
+    });
+  });
+});
+</script>
+{% endblock %}
+

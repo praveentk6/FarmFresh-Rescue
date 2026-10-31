@@ -18,24 +18,27 @@
     </div>
     
     <!-- Action Shortcuts -->
-    <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+    <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
       <a href="{{ url_for('add_listing') }}" class="btn btn-primary btn-lg" id="dashboardAddListingBtn">
         + {{ _t('btn_post_listing') }}
       </a>
-      <a href="{{ url_for('nearby_buyers') }}" class="btn btn-outline-primary btn-lg">
+      <a href="{{ url_for('voice_assistant') }}" class="btn btn-accent btn-lg">
+        🎤 Voice AI
+      </a>
+      <a href="{{ url_for('quality_grading') }}" class="btn btn-outline-primary btn-lg">
+        🔍 Quality Grading
+      </a>
+      <a href="{{ url_for('nearby_buyers') }}" class="btn btn-secondary btn-lg">
         {{ _t('btn_find_buyers') }}
       </a>
-      <a href="{{ url_for('ai_assistant') }}" class="btn btn-secondary btn-lg">
-        {{ _t('btn_ai_rescue') }}
-      </a>
-      <a href="{{ url_for('analytics_view') }}" class="btn btn-secondary btn-lg">
-        {{ _t('btn_view_analytics') }}
+      <a href="{{ url_for('export_analytics_csv') }}" class="btn btn-secondary btn-lg" title="Download Sales CSV Report">
+        📥 Export CSV
       </a>
     </div>
   </div>
 
-  <!-- Section 3: Exact 6 Calculated KPI Summary Cards -->
-  <div class="dashboard-grid-kpis" style="grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); margin-bottom: 2rem;">
+  <!-- Primary 6 Calculated KPI Summary Cards (Preserved) -->
+  <div class="dashboard-grid-kpis" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 2rem;">
     
     <!-- 1. Total Products Listed -->
     <div class="kpi-card" style="border-top: 4px solid #64748b;">
@@ -127,7 +130,7 @@
           ₹{{ "{:,.0f}".format(total_sales_revenue) }}
         </div>
         <div style="font-size: 0.75rem; color: #166534; margin-top: 0.2rem;">
-          From completed orders
+          From settled orders
         </div>
       </div>
       <div class="kpi-icon">💰</div>
@@ -135,29 +138,227 @@
 
   </div>
 
-  <!-- Produce at Risk Warning Banner -->
-  {% if attention_count > 0 or produce_at_risk_qty > 0 %}
-    <div class="disclaimer-box" style="margin-bottom: 2rem; background: #fff7ed; border-color: #fdba74;">
-      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
-        <div>
-          <strong style="color: #c2410c;">⚠️ {{ _t('attention_warning') }}</strong>
-          <div style="font-size: 0.85rem; color: #7c2d12; margin-top: 0.25rem;">
-            You have <strong>{{ attention_count }}</strong> produce listing(s) totaling <strong>{{ "%.0f"|format(produce_at_risk_qty) }} kg</strong> that have remained unsold for 3+ days or are marked for urgent clearance.
+  <!-- AI Profit & Food Waste Impact Row -->
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;" class="farmer-analytics-row">
+    <!-- Profit Breakdown Card -->
+    <div style="background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); padding: 1.5rem; box-shadow: var(--shadow-sm);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 0;">
+          💰 Farmer Earnings & Profit Breakdown
+        </h3>
+        <a href="{{ url_for('analytics_view') }}" class="btn btn-sm btn-secondary">Full Analytics</a>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+        <div style="background: #f8fafc; padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid #e2e8f0;">
+          <div style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Pending In Transit</div>
+          <div style="font-size: 1.2rem; font-weight: 800; color: #d97706; margin-top: 0.2rem;">
+            ₹{{ "{:,.0f}".format(pending_payments) }}
           </div>
+          <div style="font-size: 0.7rem; color: #64748b;">Awaiting delivery verification</div>
         </div>
-        <div style="display: flex; gap: 0.5rem;">
-          <a href="{{ url_for('nearby_buyers') }}" class="btn btn-accent btn-sm">
-            🔍 Match Local Buyers
-          </a>
-          <a href="{{ url_for('ai_assistant') }}" class="btn btn-secondary btn-sm">
-            🤖 AI Selling Advice
-          </a>
+
+        <div style="background: #f0fdf4; padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid #bbf7d0;">
+          <div style="font-size: 0.75rem; color: #166534; font-weight: 600;">Estimated Net Profit</div>
+          <div style="font-size: 1.2rem; font-weight: 800; color: #166534; margin-top: 0.2rem;">
+            ₹{{ "{:,.0f}".format(estimated_profit) }}
+          </div>
+          <div style="font-size: 0.7rem; color: #166534;">~40% farm margin basis</div>
         </div>
+
+        <div style="background: #fff7ed; padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid #fed7aa;">
+          <div style="font-size: 0.75rem; color: #c2410c; font-weight: 600;">Unsold Stock Value</div>
+          <div style="font-size: 1.2rem; font-weight: 800; color: #c2410c; margin-top: 0.2rem;">
+            ₹{{ "{:,.0f}".format(unsold_produce_value) }}
+          </div>
+          <div style="font-size: 0.7rem; color: #7c2d12;">Active in inventory</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Food Waste Reduction Card -->
+    <div style="background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); padding: 1.5rem; box-shadow: var(--shadow-sm);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h3 style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 0;">
+          🛡️ Your Food Waste Prevention Impact
+        </h3>
+        <span class="badge-available" style="font-size: 0.75rem;">Verified Sales</span>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+        <div style="background: #ecfdf5; padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid #a7f3d0;">
+          <div style="font-size: 0.75rem; color: #065f46; font-weight: 600;">Rescued Produce</div>
+          <div style="font-size: 1.2rem; font-weight: 800; color: #065f46; margin-top: 0.2rem;">
+            {{ "%.0f"|format(rescued_produce_kg) }} kg
+          </div>
+          <div style="font-size: 0.7rem; color: #065f46;">Directly saved from spoilage</div>
+        </div>
+
+        <div style="background: #f0fdf4; padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid #bbf7d0;">
+          <div style="font-size: 0.75rem; color: #166534; font-weight: 600;">CO₂e Prevented</div>
+          <div style="font-size: 1.2rem; font-weight: 800; color: #166534; margin-top: 0.2rem;">
+            {{ co2_saved_kg }} kg
+          </div>
+          <div style="font-size: 0.7rem; color: #166534;">FAO emission factor</div>
+        </div>
+
+        <div style="background: #f0f9ff; padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid #bae6fd;">
+          <div style="font-size: 0.75rem; color: #0369a1; font-weight: 600;">Agri Water Saved</div>
+          <div style="font-size: 1.2rem; font-weight: 800; color: #0369a1; margin-top: 0.2rem;">
+            {{ "{:,}".format(water_saved_liters) }} L
+          </div>
+          <div style="font-size: 0.7rem; color: #0369a1;">Embedded water retained</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Freshness Priority Clearance Queue (Sell First) -->
+  {% if freshness_queue %}
+    <div class="data-table-card" style="margin-bottom: 2rem; border-top: 4px solid #ea580c;">
+      <div class="data-table-header">
+        <div>
+          <h2 style="font-size: 1.35rem; font-weight: 700; color: #0f172a;">
+            ⚡ {{ _t('sell_first_queue') }}
+          </h2>
+          <span style="font-size: 0.85rem; color: var(--text-muted);">
+            AI-sorted priority queue: batches needing immediate clearance appear first to prevent post-harvest spoilage.
+          </span>
+        </div>
+      </div>
+
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Produce</th>
+              <th>Quantity</th>
+              <th>Freshness Status</th>
+              <th>Est. Window Remaining</th>
+              <th>Current Price</th>
+              <th>AI Suggested Price</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for q in freshness_queue %}
+              {% set item = q['listing'] %}
+              {% set f = q['freshness'] %}
+              {% set p = q['price_rec'] %}
+              <tr style="{% if f['priority_rank'] == 1 %}background: #fff7ed;{% endif %}">
+                <td>
+                  <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    {% if item['photo'] %}
+                      <img src="{{ url_for('static', filename='uploads/' ~ item['photo']) }}" alt="{{ item['crop_name'] }}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px;">
+                    {% else %}
+                      <div style="width: 44px; height: 44px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">🥦</div>
+                    {% endif %}
+                    <div>
+                      <a href="{{ url_for('listing_detail', listing_id=item['id']) }}" style="font-weight: 700; color: #0f172a;">
+                        {{ item['crop_name'] }}
+                      </a>
+                      <div style="font-size: 0.75rem; color: #64748b;">
+                        Harvested: {{ item['harvest_date'] }}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td><strong>{{ item['quantity'] }}</strong> {{ item['unit'] }}</td>
+                <td>
+                  <span class="{{ f['badge_class'] }}" style="font-size: 0.8rem; font-weight: 700;">
+                    {{ f['freshness_grade'] }} ({{ f['freshness_score'] }}%)
+                  </span>
+                </td>
+                <td>
+                  <div style="font-weight: 700; color: {% if f['priority_rank'] == 1 %}#c2410c{% elif f['priority_rank'] == 2 %}#d97706{% else %}#16a34a{% endif %};">
+                    ~{{ f['remaining_hours'] }} hours
+                  </div>
+                  <div style="font-size: 0.75rem; color: #64748b;">{{ f['remaining_days'] }} days remaining</div>
+                </td>
+                <td><strong>₹{{ "%.0f"|format(item['price_per_unit']) }}</strong> / {{ item['unit'] }}</td>
+                <td>
+                  <strong style="color: #166534;">₹{{ "%.0f"|format(p['suggested_price']) }}</strong> / {{ item['unit'] }}
+                  {% if p['price_difference'] != 0 %}
+                    <span style="font-size: 0.75rem; color: {% if p['price_difference'] < 0 %}#ea580c{% else %}#16a34a{% endif %};">
+                      ({{ "%.1f"|format(p['price_difference_percent']) }}%)
+                    </span>
+                  {% endif %}
+                </td>
+                <td style="text-align: right;">
+                  <div style="display: flex; gap: 0.4rem; justify-content: flex-end;">
+                    <a href="{{ url_for('nearby_buyers') }}?crop={{ item['crop_name'] }}" class="btn btn-sm btn-accent" title="Match Buyers">
+                      🔍 Match Buyers
+                    </a>
+                    <a href="{{ url_for('edit_listing', listing_id=item['id']) }}" class="btn btn-sm btn-secondary" title="Edit Price">
+                      ✏️ Edit
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
     </div>
   {% endif %}
 
-  <!-- Section 1: My Produce Listings Table -->
+  <!-- Top Recommended Nearby Buyers Matching Your Produce -->
+  {% if recommended_buyers %}
+    <div class="data-table-card" style="margin-bottom: 2rem;">
+      <div class="data-table-header">
+        <div>
+          <h2 style="font-size: 1.35rem; font-weight: 700; color: #0f172a;">
+            🏢 {{ _t('matching_buyers_title') }}
+          </h2>
+          <span style="font-size: 0.85rem; color: var(--text-muted);">
+            Nearby verified buyers in Tamil Nadu matched by crop type, distance, and procurement demand
+          </span>
+        </div>
+        <a href="{{ url_for('nearby_buyers') }}" class="btn btn-outline-primary btn-sm">View All Buyers</a>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 1rem; padding: 1rem;">
+        {% for b in recommended_buyers %}
+          <div style="border: 1px solid #e2e8f0; border-radius: var(--radius-md); padding: 1.25rem; background: #ffffff; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+                <div>
+                  <h4 style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin: 0;">{{ b['buyer_name'] }}</h4>
+                  <span class="badge-category" style="font-size: 0.75rem; margin-top: 0.25rem; display: inline-block;">{{ b['business_type'] }}</span>
+                </div>
+                <span class="badge-available" style="font-weight: 800; font-size: 0.85rem;">
+                  {{ b['match_percentage'] }}% Match
+                </span>
+              </div>
+
+              <div style="font-size: 0.85rem; color: #475569; margin: 0.5rem 0;">
+                📍 <strong>{{ b['district'] }}</strong> &bull; ~{{ b['distance_km'] }} km away
+                <div style="font-size: 0.775rem; color: #64748b;">{{ b['transit_text'] }}</div>
+              </div>
+
+              {% if b.get('for_crop') %}
+                <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.8rem; color: #166534; margin-bottom: 0.75rem;">
+                  Matched for: <strong>{{ b['for_crop'] }}</strong>
+                </div>
+              {% endif %}
+            </div>
+
+            <!-- Action Buttons: Call, WhatsApp, Produce Alert -->
+            <div style="display: flex; gap: 0.4rem; margin-top: 0.75rem;">
+              <a href="tel:{{ b['contact_phone'] }}" class="btn btn-secondary btn-sm" style="flex: 1; text-align: center;">📞 Call</a>
+              {% set clean_phone = b['contact_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
+              <a href="https://wa.me/91{{ clean_phone }}?text=Vanakkam%20{{ b['buyer_name'] }}%2C%20I%20have%20fresh%20harvest%20available%20on%20FarmFresh%20Rescue." target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="flex: 1; text-align: center;">💬 WhatsApp</a>
+              {% if b.get('for_listing_id') %}
+                <button type="button" class="btn btn-primary btn-sm btn-notify-buyer" data-listing-id="{{ b['for_listing_id'] }}" data-buyer-id="{{ b['buyer_id'] }}" title="Send instant produce notification to buyer">⚡ Alert</button>
+              {% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- My Produce Listings Table (Preserved & Enhanced with Freshness/Quality) -->
   <div class="data-table-card" style="margin-bottom: 2.5rem;">
     <div class="data-table-header">
       <div>
@@ -177,10 +378,11 @@
             <tr>
               <th>{{ _t('table_produce') }}</th>
               <th>{{ _t('table_category') }}</th>
+              <th>AI Grade</th>
               <th>{{ _t('table_stock') }}</th>
               <th>{{ _t('table_price') }}</th>
               <th>{{ _t('table_harvest_date') }}</th>
-              <th>{{ _t('table_age') }}</th>
+              <th>Freshness Window</th>
               <th>{{ _t('table_status') }}</th>
               <th style="text-align: right;">{{ _t('table_actions') }}</th>
             </tr>
@@ -208,18 +410,19 @@
                   </div>
                 </td>
                 <td><span class="badge-category">{{ item['category'] }}</span></td>
+                <td>
+                  <span class="{% if item['quality_grade'] == 'Grade A' %}badge-available{% elif item['quality_grade'] == 'Grade B' %}badge-category{% else %}badge-urgent{% endif %}" style="font-size: 0.75rem; font-weight: 700;">
+                    {{ item['quality_grade'] or 'Grade A' }}
+                  </span>
+                </td>
                 <td><strong>{{ item['quantity'] }}</strong> {{ item['unit'] }}</td>
                 <td><strong>₹{{ "%.0f"|format(item['price_per_unit']) }}</strong> / {{ item['unit'] }}</td>
                 <td>{{ item['harvest_date'] }}</td>
                 <td>
-                  {% set days_old, age_label = calculate_listing_age(item['created_at']) %}
-                  {% if is_needs_attention(item) %}
-                    <span class="badge-urgent" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">
-                      {{ age_label }} (Needs Attention)
-                    </span>
-                  {% else %}
-                    <span style="font-size: 0.85rem; color: #475569;">{{ age_label }}</span>
-                  {% endif %}
+                  {% set f_eval = predict_freshness(item['crop_name'], item['harvest_date'], item['quantity'], item['unit']) %}
+                  <span class="{{ f_eval['badge_class'] }}" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; font-weight: 700;">
+                    {{ f_eval['freshness_grade'] }} (~{{ f_eval['remaining_hours'] }}h)
+                  </span>
                 </td>
                 <td>
                   {% if item['status'] == 'Available' %}
@@ -244,9 +447,9 @@
                       {{ _t('btn_edit') }}
                     </a>
 
-                    <!-- AI Advice Shortcut -->
-                    <a href="{{ url_for('ai_assistant') }}?crop={{ item['crop_name'] }}&qty={{ item['quantity'] }}" class="btn btn-outline-primary btn-sm" title="AI Rescue Advice">
-                      🤖
+                    <!-- Match Buyers Shortcut -->
+                    <a href="{{ url_for('nearby_buyers') }}?crop={{ item['crop_name'] }}" class="btn btn-outline-primary btn-sm" title="Match Buyers">
+                      🔍
                     </a>
 
                     <!-- Delete -->
@@ -274,12 +477,12 @@
     {% endif %}
   </div>
 
-  <!-- Section 2: Recent Purchase Orders & Enquiries Received -->
+  <!-- Purchase Orders & Enquiries Received with 6-stage lifecycle -->
   <div class="data-table-card" id="ordersSection">
     <div class="data-table-header">
       <div>
         <h2 style="font-size: 1.35rem; font-weight: 700;">{{ _t('recent_orders') }}</h2>
-        <span style="font-size: 0.85rem; color: var(--text-muted);">Purchase requests from registered buyers</span>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">Purchase requests from registered buyers with delivery tracking</span>
       </div>
     </div>
 
@@ -295,7 +498,8 @@
               <th>Requested Qty & Price</th>
               <th>Delivery / Message</th>
               <th>Order Status</th>
-              <th style="text-align: right;">Update Workflow</th>
+              <th>Smart Logistics</th>
+              <th style="text-align: right;">Update Lifecycle</th>
             </tr>
           </thead>
           <tbody>
@@ -328,7 +532,7 @@
                     <div style="font-size: 0.8rem; color: #0f172a; font-weight: 600;">Total: ₹{{ "{:,.0f}".format(o['total_price']) }}</div>
                   {% endif %}
                 </td>
-                <td style="max-width: 250px;">
+                <td style="max-width: 200px;">
                   {% if o['delivery_preference'] %}
                     <span style="font-size: 0.75rem; background: #f1f5f9; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600;">
                       🚚 {{ o['delivery_preference'] }}
@@ -346,10 +550,12 @@
                     <span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Pending</span>
                   {% elif o['status'] == 'Accepted' %}
                     <span style="background: #dcfce7; color: #166534; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Accepted</span>
-                  {% elif o['status'] == 'Ready for Collection' %}
-                    <span style="background: #fef08a; color: #854d0e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Ready for Pickup</span>
-                  {% elif o['status'] == 'Completed' %}
-                    <span style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Completed</span>
+                  {% elif o['status'] in ['Packed', 'Ready for Collection'] %}
+                    <span style="background: #fef08a; color: #854d0e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Packed / Ready</span>
+                  {% elif o['status'] == 'Shipped' %}
+                    <span style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">In Transit</span>
+                  {% elif o['status'] in ['Delivered', 'Completed'] %}
+                    <span style="background: #dcfce7; color: #15803d; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Delivered & Rescued</span>
                   {% elif o['status'] == 'Cancelled' %}
                     <span style="background: #fee2e2; color: #991b1b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Cancelled</span>
                   {% else %}
@@ -357,15 +563,21 @@
                   {% endif %}
                 </td>
                 <td>
+                  <a href="{{ url_for('track_order', order_id=o['id']) }}" class="btn btn-outline-primary btn-sm" style="white-space: nowrap;">
+                    🗺️ Route Map
+                  </a>
+                </td>
+                <td>
                   <div style="display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end;">
-                    <!-- Status Form -->
+                    <!-- 6-Stage Lifecycle Form -->
                     <form action="{{ url_for('update_order_status', order_id=o['id']) }}" method="POST" style="display: flex; gap: 0.35rem;">
-                      <select name="status" class="filter-select" style="font-size: 0.8rem; padding: 0.3rem 0.5rem; width: 140px;">
+                      <select name="status" class="filter-select" style="font-size: 0.8rem; padding: 0.3rem 0.5rem; width: 145px;">
                         <option value="Pending" {% if o['status'] == 'Pending' %}selected{% endif %}>Pending</option>
                         <option value="Accepted" {% if o['status'] == 'Accepted' %}selected{% endif %}>Accept Request</option>
+                        <option value="Packed" {% if o['status'] in ['Packed', 'Ready for Collection'] %}selected{% endif %}>Mark Packed</option>
+                        <option value="Shipped" {% if o['status'] == 'Shipped' %}selected{% endif %}>Mark Shipped</option>
+                        <option value="Delivered" {% if o['status'] in ['Delivered', 'Completed'] %}selected{% endif %}>Mark Delivered</option>
                         <option value="Rejected" {% if o['status'] == 'Rejected' %}selected{% endif %}>Reject</option>
-                        <option value="Ready for Collection" {% if o['status'] == 'Ready for Collection' %}selected{% endif %}>Ready for Pickup</option>
-                        <option value="Completed" {% if o['status'] == 'Completed' %}selected{% endif %}>Complete Sale</option>
                       </select>
                       <button type="submit" class="btn btn-secondary btn-sm" style="padding: 0.3rem 0.6rem;">Update</button>
                     </form>
@@ -400,4 +612,37 @@
   </div>
 
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.btn-notify-buyer').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const listingId = this.getAttribute('data-listing-id');
+      const buyerId = this.getAttribute('data-buyer-id');
+      this.disabled = true;
+      this.textContent = 'Sending...';
+
+      fetch('/api/ai/notify-buyer', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({listing_id: listingId, buyer_id: buyerId})
+      })
+      .then(r => r.json())
+      .then(d => {
+        if (d.success) {
+          this.textContent = '✓ Alerted';
+          this.style.background = '#15803d';
+        } else {
+          this.textContent = 'Error';
+        }
+      })
+      .catch(() => {
+        this.textContent = 'Error';
+      });
+    });
+  });
+});
+</script>
 {% endblock %}

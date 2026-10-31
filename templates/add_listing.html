@@ -135,8 +135,40 @@
 
         <div class="form-group">
           <label class="form-label">{{ _t('asking_price_label') }} (₹ / {{ _t('unit_label') }}) <span class="required">*</span></label>
-          <input type="number" step="any" min="0.1" name="price_per_unit" id="fieldPrice" value="{{ form_data.get('price_per_unit', '') }}" class="form-control" placeholder="e.g. 22" required>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="number" step="any" min="0.1" name="price_per_unit" id="fieldPrice" value="{{ form_data.get('price_per_unit', '') }}" class="form-control" placeholder="e.g. 22" required>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btnAiPrice" style="white-space: nowrap; display: inline-flex; align-items: center; gap: 0.35rem;" title="Get algorithmic market recommendation">
+              <span>🤖</span> AI விலை
+            </button>
+          </div>
         </div>
+      </div>
+
+      <!-- AI Smart Price Recommendation Box -->
+      <div id="aiPricePanel" style="display: none; margin-bottom: 1.25rem; background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 1rem;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.5rem;">
+          <div style="font-size: 0.85rem; font-weight: 700; color: #166534;">
+            🤖 AI விலை பரிந்துரை (Smart Price Analysis)
+          </div>
+          <button type="button" id="btnApplyAiPrice" class="btn btn-primary btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.65rem;">
+            ✓ ஏற்றுக்கொள் (Accept AI Price)
+          </button>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem; margin-bottom: 0.5rem;">
+          <div style="background: #fff; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #bbf7d0;">
+            <div style="font-size: 0.7rem; color: #64748b;">பரிந்துரை விலை (Suggested)</div>
+            <div id="aiRecPrice" style="font-size: 1.15rem; font-weight: 800; color: #15803d;">₹--</div>
+          </div>
+          <div style="background: #fff; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #bbf7d0;">
+            <div style="font-size: 0.7rem; color: #64748b;">சந்தை விலை (Benchmark)</div>
+            <div id="aiMktPrice" style="font-size: 1.15rem; font-weight: 800; color: #0f172a;">₹--</div>
+          </div>
+          <div style="background: #fff; padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #bbf7d0;">
+            <div style="font-size: 0.7rem; color: #64748b;">மதிப்பிடப்பட்ட வருவாய் (Revenue)</div>
+            <div id="aiEstRevenue" style="font-size: 1.15rem; font-weight: 800; color: #0369a1;">₹--</div>
+          </div>
+        </div>
+        <div id="aiPriceRationale" style="font-size: 0.775rem; color: #166534; line-height: 1.4;"></div>
       </div>
 
       <div class="form-row">
@@ -155,15 +187,25 @@
         </div>
       </div>
 
-      <!-- Harvest Date & Estimated Freshness Date -->
-      <div class="form-row">
+      <!-- Harvest Date, Storage Condition & Estimated Freshness Date -->
+      <div class="form-row-3">
         <div class="form-group">
           <label class="form-label">{{ _t('harvest_date_label') }} <span class="required">*</span></label>
           <input type="date" name="harvest_date" id="fieldHarvestDate" value="{{ form_data.get('harvest_date', default_date) }}" class="form-control" required>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Estimated Freshness Date / எதிர்பார்க்கும் புத்துணர்ச்சி தேதி <small style="color: #64748b;">(Optional)</small></label>
+          <label class="form-label">சேமிப்பு நிலை / Storage Condition <span class="required">*</span></label>
+          <select name="storage_condition" id="fieldStorageCondition" class="form-control" required>
+            <option value="ambient" {% if form_data.get('storage_condition') == 'ambient' %}selected{% endif %}>Ambient Room Temp (திறந்த வெளி)</option>
+            <option value="shaded_shed" {% if form_data.get('storage_condition') == 'shaded_shed' %}selected{% endif %}>Shaded Shed (நிழல் கொட்டகை)</option>
+            <option value="ventilated_crates" {% if form_data.get('storage_condition') == 'ventilated_crates' %}selected{% endif %}>Ventilated Crates (காற்றோட்ட கூடை)</option>
+            <option value="cold_storage" {% if form_data.get('storage_condition') == 'cold_storage' %}selected{% endif %}>Cold Storage (குளிர்பதன கிடங்கு)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Estimated Freshness Date <small style="color: #64748b;">(Optional)</small></label>
           <input type="date" name="estimated_freshness_date" id="fieldFreshnessDate" value="{{ form_data.get('estimated_freshness_date', '') }}" class="form-control">
         </div>
       </div>
