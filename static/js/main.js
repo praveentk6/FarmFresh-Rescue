@@ -62,6 +62,18 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   // 1b. User Profile Dropdown Popover (Desktop, Laptop & Mobile)
   // ==========================================
+  window.toggleUserProfileDropdown = function(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const btn = document.getElementById('userProfileBtn');
+    if (btn) {
+      btn.click();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
   const userProfileTrigger = document.getElementById('userProfileBtn');
   const userProfilePopover = document.getElementById('userProfilePopover');
 

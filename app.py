@@ -2069,6 +2069,15 @@ def delete_buyer_requirement(req_id):
 # In-App Notifications Center (Section 12)
 # ==========================================
 
+@app.route('/profile')
+@login_required
+def user_profile():
+    if g.user['role'] == 'farmer':
+        return redirect(url_for('farmer_dashboard'))
+    elif g.user['role'] == 'buyer':
+        return redirect(url_for('buyer_dashboard'))
+    return redirect(url_for('admin_dashboard'))
+
 @app.route('/notifications')
 @login_required
 def notifications_view():
