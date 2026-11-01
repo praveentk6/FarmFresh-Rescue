@@ -760,9 +760,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnAiPrice = document.getElementById('btnAiPrice');
   const aiPricePanel = document.getElementById('aiPricePanel');
   const btnApplyAiPrice = document.getElementById('btnApplyAiPrice');
-  const fieldPrice = document.getElementById('fieldPrice');
-  const fieldCropName = document.getElementById('fieldCropName');
-  const fieldQuantity = document.getElementById('fieldQuantity');
   const fieldHarvestDate = document.getElementById('fieldHarvestDate');
   const fieldStorage = document.getElementById('fieldStorageCondition');
 
