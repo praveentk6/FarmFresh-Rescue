@@ -2925,13 +2925,60 @@ def checkout_direct(listing_id):
 
     return redirect(url_for('checkout_order', order_id=order_id))
 
+# ==========================================
+# Razorpay Standard Checkout & Payment Endpoints
+# ==========================================
+
+@app.route('/api/create-order', methods=['POST'])
 @app.route('/api/payment/create-order', methods=['POST'])
-@login_required
 def api_create_payment_order():
     data = request.get_json() or {}
     order_id = data.get('order_id')
+    amount_param = data.get('amount')
+    amount_paise_param = data.get('amount_paise')
+    currency = data.get('currency', 'INR')
+    receipt = data.get('receipt')
+
+    # 1. Standalone Direct Order Creation (Amount specified in request)
+    if amount_param is not None or amount_paise_param is not None:
+        if amount_paise_param is not None:
+            try:
+                paise = int(amount_paise_param)
+            except (ValueError, TypeError):
+                return jsonify({'success': False, 'error': 'Invalid amount_paise'}), 400
+        else:
+            try:
+                paise = int(amount_param)
+            except (ValueError, TypeError):
+                return jsonify({'success': False, 'error': 'Invalid amount'}), 400
+
+        if paise < 100:
+            return jsonify({'success': False, 'error': 'Minimum order amount is 100 paise (₹1.00)'}), 400
+
+        rzp_res = create_razorpay_order(
+            amount_paise=paise,
+            receipt_id=receipt,
+            currency=currency,
+            notes=data.get('notes', {})
+        )
+        if not rzp_res['success']:
+            status_code = rzp_res.get('status_code', 500)
+            return jsonify({'success': False, 'error': rzp_res.get('error', 'Order creation failed')}), status_code
+
+        return jsonify({
+            'success': True,
+            'order_id': rzp_res['order_id'],
+            'amount': rzp_res['amount'],
+            'currency': rzp_res['currency'],
+            'key_id': rzp_res['key_id']
+        }), 200
+
+    # 2. Marketplace Order Checkout Flow (order_id specified)
     if not order_id:
-        return jsonify({'success': False, 'error': 'Missing order_id'}), 400
+        return jsonify({'success': False, 'error': 'Missing order_id or amount'}), 400
+
+    if not g.user:
+        return jsonify({'success': False, 'error': 'Authentication required'}), 401
 
     conn = get_db()
     cursor = conn.cursor()
@@ -2958,6 +3005,9 @@ def api_create_payment_order():
     subtotal = float(order['total_price'] or (order['requested_quantity'] * order['price_per_unit']))
     total_amount = subtotal + delivery_charges
 
+    if total_amount < 1.0:
+        return jsonify({'success': False, 'error': 'Minimum order amount is 100 paise (₹1.00)'}), 400
+
     rzp_res = create_razorpay_order(
         amount_in_rupees=total_amount,
         receipt_id=f"rec_ord_{order_id}",
@@ -2965,7 +3015,8 @@ def api_create_payment_order():
     )
 
     if not rzp_res['success']:
-        return jsonify(rzp_res), 500
+        status_code = rzp_res.get('status_code', 500)
+        return jsonify({'success': False, 'error': rzp_res.get('error', 'Order creation failed')}), status_code
 
     rec_res = create_payment_record(
         order_id=order['id'],
@@ -2981,6 +3032,7 @@ def api_create_payment_order():
 
     return jsonify({
         'success': True,
+        'order_id': rzp_res['order_id'],
         'razorpay_order_id': rzp_res['order_id'],
         'key_id': rzp_res['key_id'],
         'amount': rzp_res['amount'],
@@ -2988,67 +3040,79 @@ def api_create_payment_order():
         'currency': rzp_res['currency'],
         'transaction_id': rec_res.get('transaction_id'),
         'is_mock': rzp_res.get('is_mock', False)
-    })
+    }), 200
 
+@app.route('/api/verify-payment', methods=['POST'])
 @app.route('/api/payment/verify', methods=['POST'])
-@login_required
 def api_verify_payment():
     data = request.get_json() or {}
     order_id = data.get('order_id')
     transaction_id = data.get('transaction_id')
-    rzp_order_id = data.get('razorpay_order_id')
-    rzp_payment_id = data.get('razorpay_payment_id')
-    rzp_signature = data.get('razorpay_signature')
+    rzp_order_id = data.get('razorpay_order_id') or data.get('order_id')
+    rzp_payment_id = data.get('razorpay_payment_id') or data.get('payment_id')
+    rzp_signature = data.get('razorpay_signature') or data.get('signature')
     method = data.get('payment_method', 'Razorpay Online')
 
-    if not rzp_order_id or not rzp_payment_id:
-        return jsonify({'success': False, 'error': 'Missing payment credentials'}), 400
+    # Missing fields validation
+    if not rzp_order_id or not rzp_payment_id or not rzp_signature:
+        return jsonify({
+            'success': False,
+            'error': 'Missing required payment fields: razorpay_order_id, razorpay_payment_id, and razorpay_signature are required.'
+        }), 400
 
+    # Signature verification using HMAC-SHA256(order_id + "|" + payment_id, KEY_SECRET)
     is_valid, reason = verify_razorpay_signature(rzp_order_id, rzp_payment_id, rzp_signature)
     if not is_valid:
-        return jsonify({'success': False, 'error': f"Signature verification failed: {reason}"}), 400
+        return jsonify({
+            'success': False,
+            'error': f"Signature verification failed: {reason}"
+        }), 400
 
-    success, txn_or_err = confirm_payment_record(
-        transaction_id=transaction_id or rzp_order_id,
-        razorpay_payment_id=rzp_payment_id,
-        razorpay_signature=rzp_signature,
-        payment_method=method
-    )
-
-    if not success:
-        return jsonify({'success': False, 'error': txn_or_err}), 500
-
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT e.*, l.crop_name, l.farmer_id
-        FROM enquiries e JOIN listings l ON e.listing_id = l.id
-        WHERE e.id = ?
-    """, (order_id,))
-    ord_info = cursor.fetchone()
-    conn.close()
-
-    if ord_info:
-        create_notification(
-            user_id=ord_info['farmer_id'],
-            title="💰 Payment Confirmed for Your Produce!",
-            message=f"Buyer {ord_info['buyer_name']} has completed payment for {ord_info['requested_quantity']} kg of {ord_info['crop_name']}. Please pack for handover.",
-            notif_type='order',
-            link=url_for('farmer_dashboard')
+    # If linked to a marketplace order, update payment record in DB
+    txn_or_err = transaction_id or rzp_order_id
+    if order_id or transaction_id:
+        success, txn_res = confirm_payment_record(
+            transaction_id=transaction_id or rzp_order_id,
+            razorpay_payment_id=rzp_payment_id,
+            razorpay_signature=rzp_signature,
+            payment_method=method
         )
-        create_notification(
-            user_id=ord_info['buyer_id'],
-            title="✓ Payment Successful & Order Confirmed",
-            message=f"Your payment for {ord_info['requested_quantity']} kg of {ord_info['crop_name']} has been cleared. Invoice #{txn_or_err} generated.",
-            notif_type='order',
-            link=url_for('view_invoice', order_id=order_id)
-        )
+        if success:
+            txn_or_err = txn_res
+            conn = get_db()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT e.*, l.crop_name, l.farmer_id
+                FROM enquiries e JOIN listings l ON e.listing_id = l.id
+                WHERE e.id = ?
+            """, (order_id,))
+            ord_info = cursor.fetchone()
+            conn.close()
+
+            if ord_info:
+                create_notification(
+                    user_id=ord_info['farmer_id'],
+                    title="💰 Payment Confirmed for Your Produce!",
+                    message=f"Buyer {ord_info['buyer_name']} has completed payment for {ord_info['requested_quantity']} kg of {ord_info['crop_name']}. Please pack for handover.",
+                    notif_type='order',
+                    link=url_for('farmer_dashboard')
+                )
+                create_notification(
+                    user_id=ord_info['buyer_id'],
+                    title="✓ Payment Successful & Order Confirmed",
+                    message=f"Your payment for {ord_info['requested_quantity']} kg of {ord_info['crop_name']} has been cleared. Invoice #{txn_or_err} generated.",
+                    notif_type='order',
+                    link=url_for('view_invoice', order_id=order_id)
+                )
 
     return jsonify({
         'success': True,
+        'message': 'Payment verified successfully',
+        'razorpay_payment_id': rzp_payment_id,
+        'razorpay_order_id': rzp_order_id,
         'transaction_id': txn_or_err,
-        'redirect_url': url_for('view_invoice', order_id=order_id)
-    })
+        'redirect_url': url_for('view_invoice', order_id=order_id) if order_id else None
+    }), 200
 
 @app.route('/api/payment/cod', methods=['POST'])
 @login_required

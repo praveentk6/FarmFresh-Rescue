@@ -269,10 +269,10 @@
       return;
     }
 
-    // Process Online Payment via Razorpay
-    showLoading("Initiating Payment", "Creating secure Razorpay payment order...");
+    // Process Online Payment via Razorpay Standard Checkout
+    showLoading("Initiating Payment", "Connecting to Razorpay Secure Gateway...");
     try {
-      const orderRes = await fetch('/api/payment/create-order', {
+      const orderRes = await fetch('/api/create-order', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
@@ -289,47 +289,14 @@
         return;
       }
 
-      // If simulated test mode or mock keys
-      if (orderData.is_mock) {
-        const confirmTest = confirm(
-          "Razorpay Test Mode Active:\n\n" +
-          "Order ID: " + orderData.razorpay_order_id + "\n" +
-          "Amount: ₹" + orderData.amount_rupees.toFixed(2) + "\n\n" +
-          "Click OK to simulate verified successful payment (UPI/Card/Netbanking), or Cancel to simulate failed payment."
-        );
-        if (confirmTest) {
-          showLoading("Verifying Payment", "Validating signature and generating digital invoice...");
-          const verifyRes = await fetch('/api/payment/verify', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-              order_id: ORDER_ID,
-              transaction_id: orderData.transaction_id,
-              razorpay_order_id: orderData.razorpay_order_id,
-              razorpay_payment_id: "pay_test_" + Date.now(),
-              razorpay_signature: "mock_sig_verified_2026",
-              payment_method: "UPI (Google Pay / PhonePe)"
-            })
-          });
-          const verifyData = await verifyRes.json();
-          if (verifyData.success) {
-            window.location.href = verifyData.redirect_url;
-          } else {
-            hideLoading();
-            alert("Verification failed: " + verifyData.error);
-          }
-        }
-        return;
-      }
-
-      // Real Razorpay Standard Checkout Popup
+      // Razorpay Standard Web Checkout Modal
       const options = {
         "key": orderData.key_id,
         "amount": orderData.amount,
-        "currency": orderData.currency,
+        "currency": orderData.currency || "INR",
         "name": "FarmFresh Rescue",
         "description": "Payment for " + "{{ listing['crop_name']|escape }}",
-        "order_id": orderData.razorpay_order_id,
+        "order_id": orderData.order_id || orderData.razorpay_order_id,
         "prefill": {
           "name": "{{ current_user['name'] if current_user else '' }}",
           "email": "{{ current_user['email'] if current_user else '' }}",
@@ -341,7 +308,7 @@
         "handler": async function (response) {
           showLoading("Verifying Payment", "Confirming signature with Razorpay servers...");
           try {
-            const verifyRes = await fetch('/api/payment/verify', {
+            const verifyRes = await fetch('/api/verify-payment', {
               method: 'POST',
               headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({
@@ -358,7 +325,7 @@
               window.location.href = verifyData.redirect_url;
             } else {
               hideLoading();
-              alert("Payment verification error: " + verifyData.error);
+              alert("Payment verification error: " + (verifyData.error || "Could not verify signature"));
             }
           } catch (e) {
             hideLoading();
@@ -368,6 +335,7 @@
         "modal": {
           "ondismiss": function() {
             hideLoading();
+            console.log("Razorpay checkout modal closed by user");
           }
         }
       };
@@ -375,7 +343,8 @@
       const rzp = new Razorpay(options);
       rzp.on('payment.failed', function (response) {
         hideLoading();
-        alert("Payment Failed! Reason: " + response.error.description);
+        const errDesc = (response && response.error && response.error.description) ? response.error.description : "Transaction could not be completed";
+        alert("Payment Failed! Reason: " + errDesc);
       });
       rzp.open();
 
