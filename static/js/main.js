@@ -74,6 +74,28 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
+  window.toggleNavUserProfile = function(e) {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    const wrap = document.getElementById('navProfileDropdownWrapper');
+    const sub = document.getElementById('navProfileSubdropdown');
+    const link = document.getElementById('navUserProfileLink');
+    if (wrap && sub) {
+      const isActive = sub.classList.contains('active');
+      if (isActive) {
+        sub.classList.remove('active');
+        wrap.classList.remove('active');
+        if (link) link.setAttribute('aria-expanded', 'false');
+      } else {
+        sub.classList.add('active');
+        wrap.classList.add('active');
+        if (link) link.setAttribute('aria-expanded', 'true');
+      }
+    }
+  };
+
   const userProfileTrigger = document.getElementById('userProfileBtn');
   const userProfilePopover = document.getElementById('userProfilePopover');
 
@@ -166,6 +188,35 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  // Close nav-profile-subdropdown on outside click
+  document.addEventListener('click', (e) => {
+    const wrap = document.getElementById('navProfileDropdownWrapper');
+    const sub = document.getElementById('navProfileSubdropdown');
+    const link = document.getElementById('navUserProfileLink');
+    if (sub && wrap && !wrap.contains(e.target)) {
+      sub.classList.remove('active');
+      wrap.classList.remove('active');
+      if (link) link.setAttribute('aria-expanded', 'false');
+    }
+  });
+
+  // Close nav-profile-subdropdown on Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      const wrap = document.getElementById('navProfileDropdownWrapper');
+      const sub = document.getElementById('navProfileSubdropdown');
+      const link = document.getElementById('navUserProfileLink');
+      if (sub && sub.classList.contains('active')) {
+        sub.classList.remove('active');
+        if (wrap) wrap.classList.remove('active');
+        if (link) {
+          link.setAttribute('aria-expanded', 'false');
+          link.focus();
+        }
+      }
+    }
+  });
 
   // ==========================================
   // 2. Auto-dismiss Flash Alerts after 5 seconds

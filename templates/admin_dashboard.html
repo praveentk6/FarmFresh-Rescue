@@ -5,12 +5,19 @@
 {% block content %}
 <div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
   
-  <div style="margin-bottom: 2rem;">
-    <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">Platform Administration</div>
-    <h1 style="font-size: 2.25rem;">Agricultural Waste Prevention Control Center</h1>
-    <p style="color: var(--text-muted); font-size: 0.95rem;">
-      Monitor registered users, active produce listings, waste rescue KPIs, and platform transactions across Tamil Nadu.
-    </p>
+  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div>
+      <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">Platform Administration</div>
+      <h1 style="font-size: 2.25rem;">Agricultural Waste Prevention Control Center</h1>
+      <p style="color: var(--text-muted); font-size: 0.95rem;">
+        Monitor registered users, active produce listings, waste rescue KPIs, and platform transactions across Tamil Nadu.
+      </p>
+    </div>
+    <div>
+      <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-lg" style="border-color: #ef4444; color: #ef4444; font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem;" id="adminDashboardLogoutBtn">
+        🚪 {{ _t('logout') }}
+      </a>
+    </div>
   </div>
 
   <!-- Admin KPI Counters -->

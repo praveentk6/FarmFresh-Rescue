@@ -25,6 +25,9 @@
       <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="btn btn-secondary btn-lg">
         ⚡ {{ _t('urgent_rescue') }}
       </a>
+      <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-lg" style="border-color: #ef4444; color: #ef4444; font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem;" id="buyerDashboardLogoutBtn">
+        🚪 {{ _t('logout') }}
+      </a>
     </div>
   </div>
 

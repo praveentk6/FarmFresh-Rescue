@@ -84,9 +84,34 @@
               📦 {{ _t('my_orders') }}
             </a>
           </li>
+          <li class="nav-profile-dropdown-wrapper" id="navProfileDropdownWrapper">
+            <a href="javascript:void(0)" class="nav-link" id="navUserProfileLink" onclick="toggleNavUserProfile(event)" aria-haspopup="true" aria-expanded="false" title="{{ _t('user_profile') }}">
+              👤 {{ _t('user_profile') }} <span class="nav-dropdown-caret">▾</span>
+            </a>
+            <div class="nav-profile-subdropdown" id="navProfileSubdropdown">
+              <div class="subdropdown-header">
+                <div class="subdropdown-name">{{ active_user['name'].split()[0]|capitalize if 'praveen' in active_user['name'].lower() else active_user['name'] }}</div>
+                <div class="subdropdown-role role-{{ active_user['role'] }}">{{ _t('role_' ~ active_user['role']) }}</div>
+              </div>
+              <a href="{{ url_for('buyer_dashboard') if active_user['role'] == 'buyer' else (url_for('farmer_dashboard') if active_user['role'] == 'farmer' else url_for('admin_dashboard')) }}" class="subdropdown-item">
+                <span class="subdropdown-icon">📦</span>
+                <span>{{ 'My Orders' if lang == 'en' else _t('my_orders') }}</span>
+              </a>
+              <a href="{{ url_for('notifications_view') }}" class="subdropdown-item">
+                <span class="subdropdown-icon">🔔</span>
+                <span>{{ _t('notifications') }}</span>
+                {% if unread_count > 0 %}<span class="notif-badge-pill">{{ unread_count }}</span>{% endif %}
+              </a>
+              <div class="subdropdown-divider"></div>
+              <a href="{{ url_for('logout') }}" class="subdropdown-item subdropdown-logout" id="navMenuSubLogout">
+                <span class="subdropdown-icon">🚪</span>
+                <span>{{ _t('logout') }}</span>
+              </a>
+            </div>
+          </li>
           <li>
-            <a href="javascript:void(0)" class="nav-link" id="navUserProfileLink" onclick="toggleUserProfileDropdown(event)" title="{{ _t('user_profile') }}">
-              👤 {{ _t('user_profile') }}
+            <a href="{{ url_for('logout') }}" class="nav-link nav-logout-link" id="navLogoutLink" title="{{ _t('logout') }}">
+              🚪 {{ _t('logout') }}
             </a>
           </li>
 
@@ -223,6 +248,7 @@
               <span class="popover-item-text">{{ _t('logout') }}</span>
             </a>
 
+            {% if not current_user %}
             <div class="popover-divider"></div>
             <a href="{{ url_for('login') }}" class="popover-item" id="loginNavBtn" role="menuitem">
               <span class="popover-item-icon">🔑</span>
@@ -232,6 +258,7 @@
               <span class="popover-item-icon">📝</span>
               <span class="popover-item-text">{{ _t('sign_up') }}</span>
             </a>
+            {% endif %}
           </div>
         </div>
 

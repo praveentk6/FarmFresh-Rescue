@@ -28,6 +28,9 @@
       <a href="{{ url_for('export_analytics_csv') }}" class="btn btn-secondary btn-lg" title="Download Sales CSV Report">
         📥 Export CSV
       </a>
+      <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-lg" style="border-color: #ef4444; color: #ef4444; font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem;" id="farmerDashboardLogoutBtn">
+        🚪 {{ _t('logout') }}
+      </a>
     </div>
   </div>
 
