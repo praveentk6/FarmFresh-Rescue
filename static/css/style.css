@@ -116,39 +116,51 @@ a:hover {
 }
 
 .nav-container {
+  width: 100%;
+  max-width: 1720px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 4.5rem;
+  height: 4.25rem;
+  gap: 1rem;
   position: relative;
 }
 
 .nav-brand {
-  order: 1;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 0.65rem;
-  font-size: 1.35rem;
+  font-size: 1.3rem;
   font-weight: 800;
   font-family: 'Outfit', sans-serif;
   color: var(--primary-dark);
   letter-spacing: -0.02em;
   white-space: nowrap;
+  text-decoration: none;
 }
 
 .nav-brand .brand-leaf {
-  width: 38px;
-  height: 38px;
+  width: 36px;
+  height: 36px;
   background: linear-gradient(135deg, #22c55e, #15803d);
   color: white;
-  border-radius: 10px;
+  border-radius: 9px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
+  font-size: 1.2rem;
   box-shadow: 0 4px 10px rgba(21, 128, 61, 0.25);
   flex-shrink: 0;
+}
+
+.brand-text {
+  font-size: 1.25rem;
+  font-weight: 800;
+  white-space: nowrap;
+  color: var(--primary-dark);
 }
 
 .brand-rescue {
@@ -159,42 +171,55 @@ a:hover {
 }
 
 .nav-menu-wrapper {
-  order: 2;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   flex: 1;
-  margin-left: 2rem;
+  margin: 0 0.5rem;
 }
 
 .nav-menu {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
+  gap: 0.85rem;
   list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .nav-link {
-  font-size: 0.95rem;
-  font-weight: 500;
+  font-size: 0.88rem;
+  font-weight: 600;
   color: #334155;
-  padding: 0.5rem 0.25rem;
+  padding: 0.4rem 0.55rem;
+  border-radius: 6px;
   position: relative;
-  transition: color var(--transition-fast);
+  transition: all var(--transition-fast);
   white-space: nowrap;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
 }
 
-.nav-link:hover, .nav-link.active {
-  color: var(--primary);
+.nav-link:hover {
+  color: var(--primary-dark);
+  background-color: var(--primary-soft);
+}
+
+.nav-link.active {
+  color: var(--primary-dark);
+  font-weight: 700;
+  background-color: var(--primary-soft);
 }
 
 .nav-link.active::after {
   content: '';
   position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 2px;
+  bottom: -2px;
+  left: 0.55rem;
+  right: 0.55rem;
+  height: 2.5px;
   background-color: var(--primary);
   border-radius: 2px;
 }
@@ -202,6 +227,176 @@ a:hover {
 .nav-urgent-link {
   color: var(--urgent-red) !important;
   font-weight: 700 !important;
+}
+
+/* Navigation Right Controls & User Profile */
+.nav-right-section {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  flex-shrink: 0;
+}
+
+.user-profile-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.user-profile-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 0.35rem 0.65rem 0.35rem 0.4rem;
+  border-radius: var(--radius-full);
+  font-size: 0.85rem;
+  font-weight: 600;
+  border: 1px solid var(--border-subtle);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.user-profile-btn:hover,
+.user-profile-btn[aria-expanded="true"] {
+  background: var(--primary-soft);
+  border-color: var(--primary-border);
+  color: var(--primary-dark);
+}
+
+.user-avatar-circle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: white;
+  background: var(--primary);
+  flex-shrink: 0;
+}
+
+.user-avatar-circle.role-farmer { background: #15803d; }
+.user-avatar-circle.role-buyer { background: #0284c7; }
+.user-avatar-circle.role-admin { background: #b91c1c; }
+
+.user-name-text {
+  font-weight: 600;
+  color: #1e293b;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.user-role-badge {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-full);
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.user-role-badge.role-farmer { background: #dcfce7; color: #166534; }
+.user-role-badge.role-buyer { background: #e0f2fe; color: #0369a1; }
+.user-role-badge.role-admin { background: #fee2e2; color: #991b1b; }
+
+.dropdown-arrow-icon {
+  font-size: 0.7rem;
+  color: #64748b;
+  transition: transform var(--transition-fast);
+}
+
+.user-profile-btn[aria-expanded="true"] .dropdown-arrow-icon {
+  transform: rotate(180deg);
+}
+
+.user-dropdown-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: 230px;
+  background: #ffffff;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 10px 25px -5px rgba(0,0,0,0.1), 0 8px 10px -6px rgba(0,0,0,0.05);
+  padding: 0.5rem 0;
+  display: none;
+  z-index: 1002;
+  animation: dropdownFadeIn 0.15s ease-out;
+}
+
+.user-dropdown-popover.active {
+  display: block;
+}
+
+@keyframes dropdownFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (min-width: 992px) {
+  .user-profile-menu-wrap:hover .user-dropdown-popover {
+    display: block;
+  }
+}
+
+.user-popover-header {
+  padding: 0.65rem 1rem;
+}
+
+.popover-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #0f172a;
+}
+
+.popover-role {
+  font-size: 0.75rem;
+  color: #64748b;
+  margin-top: 0.15rem;
+}
+
+.popover-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 0.35rem 0;
+}
+
+.popover-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #334155;
+  text-decoration: none;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.popover-item:hover {
+  background: #f8fafc;
+  color: var(--primary-dark);
+}
+
+.popover-item.popover-logout {
+  color: var(--urgent-red);
+}
+.popover-item.popover-logout:hover {
+  background: #fff5f5;
+  color: #b91c1c;
+}
+
+.guest-nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
 
 .nav-actions {
@@ -1724,33 +1919,35 @@ textarea.form-control {
   }
 }
 
-/* --- Navigation Bar Drawer (max-width: 1120px) --- */
-@media (max-width: 1120px) {
+/* --- Navigation Bar Drawer (max-width: 991px - Mobile & Small Tablets) --- */
+@media (max-width: 991px) {
   .menu-toggle {
     display: flex;
   }
 
-  .nav-right-controls {
-    order: 2;
-    margin-left: auto;
+  .user-profile-menu-wrap {
+    display: none !important;
+  }
+
+  .guest-nav-actions {
+    display: none !important;
   }
 
   .nav-menu-wrapper {
-    order: 3;
     position: absolute;
-    top: 4.5rem;
+    top: 4.25rem;
     left: 0;
     right: 0;
     background: #ffffff;
     flex-direction: column;
     padding: 1.25rem 1.25rem 1.75rem;
     gap: 1.25rem;
-    margin-left: 0;
+    margin: 0;
     border-bottom: 2px solid var(--border-subtle);
     box-shadow: 0 16px 32px rgba(15, 23, 42, 0.15);
     display: none;
     z-index: 1000;
-    max-height: calc(100vh - 4.5rem);
+    max-height: calc(100vh - 4.25rem);
     overflow-y: auto;
     animation: mobileNavSlide 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
@@ -1761,6 +1958,17 @@ textarea.form-control {
 
   .mobile-only-nav {
     display: block;
+  }
+
+  .mobile-divider {
+    height: 1px;
+    background: var(--border-subtle);
+    margin: 0.5rem 0;
+    list-style: none;
+  }
+
+  .mobile-user-info {
+    padding: 0.35rem 0;
   }
 
   .nav-menu {
@@ -1776,6 +1984,7 @@ textarea.form-control {
     border-radius: var(--radius-sm);
     display: flex;
     align-items: center;
+    width: 100%;
   }
 
   .nav-link:hover, .nav-link.active {
@@ -2574,79 +2783,117 @@ textarea.form-control {
    7. Small Mobile (360x800)
    =================================================================== */
 
-/* 1. Large Desktop (min-width: 1400px - e.g. 1920x1080) */
-@media (min-width: 1400px) {
-  .container {
-    max-width: 1440px;
+/* 1. Large Desktop (min-width: 1600px - e.g. 1920x1080) */
+@media (min-width: 1600px) {
+  .nav-container {
+    max-width: 1720px;
     padding: 0 2rem;
   }
   .nav-menu {
-    gap: 1.35rem;
+    gap: 1.15rem;
   }
   .nav-link {
-    font-size: 0.95rem;
+    font-size: 0.92rem;
+    padding: 0.45rem 0.65rem;
   }
   .hero-title {
     font-size: 3.25rem;
   }
 }
 
-/* 2 & 3. Laptop Viewports (1121px to 1399px - e.g. 1366x768 and 1280x720) */
-@media (min-width: 1121px) and (max-width: 1399px) {
-  .container {
-    max-width: 1240px;
+/* 2. Standard Desktop / Wide Laptop (1400px to 1599px - e.g. 1440x900) */
+@media (min-width: 1400px) and (max-width: 1599px) {
+  .nav-container {
+    max-width: 100%;
     padding: 0 1.25rem;
   }
-  .nav-container {
-    height: 4.25rem;
-  }
-  .nav-brand {
-    font-size: 1.18rem;
-    gap: 0.45rem;
-  }
-  .nav-brand .brand-leaf {
-    width: 34px;
-    height: 34px;
-    font-size: 1.1rem;
-  }
-  .nav-menu-wrapper {
-    margin-left: 1rem;
-  }
   .nav-menu {
-    gap: 0.65rem;
+    gap: 0.85rem;
   }
   .nav-link {
-    font-size: 0.84rem;
-    padding: 0.35rem 0.2rem;
-  }
-  .nav-actions {
-    gap: 0.35rem;
-  }
-  .nav-actions .btn {
-    padding: 0.35rem 0.65rem;
-    font-size: 0.8rem;
-    min-height: 36px;
-  }
-  .user-badge {
-    font-size: 0.775rem;
-    padding: 0.25rem 0.55rem;
-  }
-  .nav-notif-btn {
-    width: 34px;
-    height: 34px;
-    font-size: 0.95rem;
-  }
-  .lang-switch-wrap {
-    padding: 0.2rem 0.45rem;
-    font-size: 0.775rem;
+    font-size: 0.88rem;
+    padding: 0.35rem 0.5rem;
   }
 }
 
-/* Intermediate Tablet Landscape / Large Tablet (993px to 1120px) */
-@media (min-width: 993px) and (max-width: 1120px) {
-  .container {
+/* 3. Standard Laptop (1281px to 1399px - e.g. 1366x768) */
+@media (min-width: 1281px) and (max-width: 1399px) {
+  .nav-container {
     max-width: 100%;
-    padding: 0 1.5rem;
+    padding: 0 1rem;
+    height: 4.15rem;
+  }
+  .nav-brand .brand-leaf {
+    width: 32px;
+    height: 32px;
+    font-size: 1.1rem;
+  }
+  .brand-text {
+    font-size: 1.15rem;
+  }
+  .nav-menu {
+    gap: 0.55rem;
+  }
+  .nav-link {
+    font-size: 0.83rem;
+    padding: 0.3rem 0.4rem;
+  }
+  .nav-right-section {
+    gap: 0.5rem;
+  }
+}
+
+/* 4. Compact Laptop (992px to 1280px - e.g. 1280x720, or 1366px with 125% DPI scale) */
+@media (min-width: 992px) and (max-width: 1280px) {
+  .nav-container {
+    max-width: 100%;
+    padding: 0 0.65rem;
+    height: 4rem;
+    gap: 0.5rem;
+  }
+  .nav-brand {
+    gap: 0.4rem;
+  }
+  .nav-brand .brand-leaf {
+    width: 28px;
+    height: 28px;
+    font-size: 1rem;
+  }
+  .brand-text {
+    font-size: 1.08rem;
+  }
+  .nav-menu-wrapper {
+    margin: 0 0.25rem;
+  }
+  .nav-menu {
+    gap: 0.35rem;
+  }
+  .nav-link {
+    font-size: 0.78rem;
+    padding: 0.25rem 0.32rem;
+  }
+  .nav-right-section {
+    gap: 0.4rem;
+  }
+  .lang-switch-wrap {
+    padding: 0.15rem 0.35rem;
+    font-size: 0.72rem;
+  }
+  .lang-btn {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.72rem;
+  }
+  .nav-notif-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 0.95rem;
+  }
+  .user-role-badge {
+    display: none;
+  }
+  .user-name-text {
+    max-width: 70px;
+    font-size: 0.8rem;
   }
 }
 

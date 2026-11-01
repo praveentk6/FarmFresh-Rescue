@@ -50,12 +50,40 @@ document.addEventListener('DOMContentLoaded', () => {
     // Close menu after clicking nav links on mobile
     navMenuWrapper.querySelectorAll('a').forEach(link => {
       link.addEventListener('click', () => {
-        if (window.innerWidth <= 1120) {
+        if (window.innerWidth <= 991) {
           navMenuWrapper.classList.remove('active');
           menuToggle.classList.remove('active');
           menuToggle.setAttribute('aria-expanded', 'false');
         }
       });
+    });
+  }
+
+  // ==========================================
+  // 1b. User Profile Dropdown Popover (Desktop & Laptop)
+  // ==========================================
+  const userProfileTrigger = document.getElementById('userProfileBtn');
+  const userProfilePopover = document.getElementById('userProfilePopover');
+  if (userProfileTrigger && userProfilePopover) {
+    userProfileTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = userProfilePopover.classList.contains('active');
+      userProfilePopover.classList.toggle('active', !isOpen);
+      userProfileTrigger.setAttribute('aria-expanded', String(!isOpen));
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!userProfilePopover.contains(e.target) && !userProfileTrigger.contains(e.target)) {
+        userProfilePopover.classList.remove('active');
+        userProfileTrigger.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && userProfilePopover.classList.contains('active')) {
+        userProfilePopover.classList.remove('active');
+        userProfileTrigger.setAttribute('aria-expanded', 'false');
+      }
     });
   }
 

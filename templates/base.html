@@ -31,45 +31,64 @@
 <body class="lang-{{ lang }}">
 
   <!-- Navigation Bar -->
-  <header class="navbar">
-    <div class="container nav-container">
+  <header class="navbar" id="topNavbar">
+    <div class="nav-container">
+      
+      <!-- 1. Left: Brand Logo -->
       <a href="{{ url_for('index') }}" class="nav-brand" id="brandLogo">
         <span class="brand-leaf">🌾</span>
-        <span>FarmFresh <span class="brand-rescue">Rescue</span></span>
+        <span class="brand-text">FarmFresh <span class="brand-rescue">Rescue</span></span>
       </a>
 
-      <!-- Right Controls: Language Selector & Mobile Hamburger -->
-      <div class="nav-right-controls">
-        <div class="lang-switch-wrap" aria-label="Language Selector">
-          <a href="{{ url_for('set_language', lang_code='en') }}" class="lang-btn {% if lang == 'en' %}active{% endif %}" id="langEnBtn" title="English">EN</a>
-          <span class="lang-sep">|</span>
-          <a href="{{ url_for('set_language', lang_code='ta') }}" class="lang-btn {% if lang == 'ta' %}active{% endif %}" id="langTaBtn" title="தமிழ்">தமிழ்</a>
-        </div>
-
-        <button class="menu-toggle" id="menuToggle" aria-label="Toggle Navigation" aria-expanded="false">
-          <span class="menu-icon-bar"></span>
-          <span class="menu-icon-bar"></span>
-          <span class="menu-icon-bar"></span>
-        </button>
-      </div>
-
-      <div class="nav-menu-wrapper" id="navMenuWrapper">
+      <!-- 2. Center: Primary Navigation Links -->
+      <nav class="nav-menu-wrapper" id="navMenuWrapper" aria-label="Main Navigation">
         <ul class="nav-menu" id="navMenu">
-          <li><a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">{{ _t('home') }}</a></li>
-          <li><a href="{{ url_for('browse_listings') }}" class="nav-link {% if request.endpoint == 'browse_listings' and not request.args.get('urgency') %}active{% endif %}">{{ _t('browse_produce') }}</a></li>
+          <li>
+            <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">
+              {{ _t('home') }}
+            </a>
+          </li>
+          <li>
+            <a href="{{ url_for('browse_listings') }}" class="nav-link {% if request.endpoint == 'browse_listings' and not request.args.get('urgency') %}active{% endif %}">
+              {{ _t('browse_produce') }}
+            </a>
+          </li>
           <li>
             <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="nav-link nav-urgent-link {% if request.args.get('urgency') == 'urgent_only' %}active{% endif %}">
               ⚡ {{ _t('urgent_rescue') }}
             </a>
           </li>
-          <li><a href="{{ url_for('live_map_view') }}" class="nav-link {% if request.endpoint == 'live_map_view' %}active{% endif %}">🗺️ {{ 'வரைபடம்' if lang == 'ta' else 'Live Map' }}</a></li>
-          <li><a href="{{ url_for('live_market_prices') }}" class="nav-link {% if request.endpoint == 'live_market_prices' %}active{% endif %}">💹 {{ 'சந்தை விலை' if lang == 'ta' else 'Mandi Rates' }}</a></li>
-          <li><a href="{{ url_for('demand_prediction') }}" class="nav-link {% if request.endpoint == 'demand_prediction' %}active{% endif %}">📈 {{ 'தேவை கணிப்பு' if lang == 'ta' else 'Demand Trends' }}</a></li>
-          <li><a href="{{ url_for('nearby_buyers') }}" class="nav-link {% if request.endpoint == 'nearby_buyers' %}active{% endif %}">{{ _t('nearby_buyers') }}</a></li>
-          <li><a href="{{ url_for('analytics_view') }}" class="nav-link {% if request.endpoint == 'analytics_view' %}active{% endif %}">📊 {{ _t('analytics') }}</a></li>
+          <li>
+            <a href="{{ url_for('live_map_view') }}" class="nav-link {% if request.endpoint == 'live_map_view' %}active{% endif %}">
+              🗺️ {{ 'வரைபடம்' if lang == 'ta' else 'Live Map' }}
+            </a>
+          </li>
+          <li>
+            <a href="{{ url_for('live_market_prices') }}" class="nav-link {% if request.endpoint == 'live_market_prices' %}active{% endif %}">
+              💹 {{ 'சந்தை விலை' if lang == 'ta' else 'Mandi Rates' }}
+            </a>
+          </li>
+          <li>
+            <a href="{{ url_for('demand_prediction') }}" class="nav-link {% if request.endpoint == 'demand_prediction' %}active{% endif %}">
+              📈 {{ 'தேவை கணிப்பு' if lang == 'ta' else 'Demand Trends' }}
+            </a>
+          </li>
+          <li>
+            <a href="{{ url_for('nearby_buyers') }}" class="nav-link {% if request.endpoint == 'nearby_buyers' %}active{% endif %}">
+              {{ _t('nearby_buyers') }}
+            </a>
+          </li>
+          <li>
+            <a href="{{ url_for('analytics_view') }}" class="nav-link {% if request.endpoint == 'analytics_view' %}active{% endif %}">
+              📊 {{ _t('analytics') }}
+            </a>
+          </li>
+
+          <!-- Mobile-Only Drawer Items -->
+          <li class="mobile-only-nav mobile-divider"></li>
           {% if current_user %}
-            <li class="mobile-only-nav">
-              <div class="user-badge role-{{ current_user['role'] }}" style="width: 100%; justify-content: center; margin: 0.5rem 0; font-size: 0.9rem; padding: 0.55rem 1rem;">
+            <li class="mobile-only-nav mobile-user-info">
+              <div class="user-badge role-{{ current_user['role'] }}" style="width: 100%; justify-content: center; margin: 0.25rem 0;">
                 <span>●</span>
                 <span>{{ current_user['name'].split()[0] }} ({{ _t('role_' ~ current_user['role']) }})</span>
               </div>
@@ -107,38 +126,74 @@
             </li>
           {% endif %}
         </ul>
+      </nav>
 
-        <div class="nav-actions">
-          {% if current_user %}
-            <!-- Notifications Bell -->
-            <a href="{{ url_for('notifications_view') }}" class="nav-notif-btn" title="{{ _t('notifications') }}" id="navNotifBtn" aria-label="Notifications">
-              🔔
-              {% if unread_count > 0 %}
-                <span class="notif-badge" id="notifBadge">{{ unread_count }}</span>
-              {% endif %}
-            </a>
+      <!-- 3. Right: Controls, Notifications & User Profile -->
+      <div class="nav-right-section" id="navRightSection">
+        <!-- Language Switcher -->
+        <div class="lang-switch-wrap" aria-label="Language Selector">
+          <a href="{{ url_for('set_language', lang_code='en') }}" class="lang-btn {% if lang == 'en' %}active{% endif %}" id="langEnBtn" title="English">EN</a>
+          <span class="lang-sep">|</span>
+          <a href="{{ url_for('set_language', lang_code='ta') }}" class="lang-btn {% if lang == 'ta' %}active{% endif %}" id="langTaBtn" title="தமிழ்">தமிழ்</a>
+        </div>
 
-            <div class="user-badge role-{{ current_user['role'] }}">
-              <span>●</span>
-              <span>{{ current_user['name'].split()[0] }} ({{ _t('role_' ~ current_user['role']) }})</span>
-            </div>
-
-            {% if current_user['role'] == 'farmer' %}
-              <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="farmerDashBtn">{{ _t('my_orders') }}</a>
-              <a href="{{ url_for('add_listing') }}" class="btn btn-primary btn-sm" id="addListingNavBtn">+ {{ _t('list_produce') }}</a>
-            {% elif current_user['role'] == 'buyer' %}
-              <a href="{{ url_for('buyer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="buyerDashBtn">{{ _t('my_orders') }}</a>
-            {% elif current_user['role'] == 'admin' %}
-              <a href="{{ url_for('admin_dashboard') }}" class="btn btn-accent btn-sm" id="adminDashBtn">{{ _t('admin_panel') }}</a>
+        {% if current_user %}
+          <!-- Notifications Bell -->
+          <a href="{{ url_for('notifications_view') }}" class="nav-notif-btn" title="{{ _t('notifications') }}" id="navNotifBtn" aria-label="Notifications">
+            🔔
+            {% if unread_count > 0 %}
+              <span class="notif-badge" id="notifBadge">{{ unread_count }}</span>
             {% endif %}
+          </a>
 
-            <a href="{{ url_for('logout') }}" class="btn btn-secondary btn-sm" id="logoutBtn" title="{{ _t('logout') }}">{{ _t('logout') }}</a>
-          {% else %}
+          <!-- User Profile Dropdown Component -->
+          <div class="user-profile-menu-wrap" id="userProfileWrap">
+            <button type="button" class="user-profile-btn" id="userProfileBtn" aria-expanded="false" aria-haspopup="true">
+              <span class="user-avatar-circle role-{{ current_user['role'] }}">
+                {{ current_user['name'][0]|upper }}
+              </span>
+              <span class="user-name-text">{{ current_user['name'].split()[0] }}</span>
+              <span class="user-role-badge role-{{ current_user['role'] }}">{{ _t('role_' ~ current_user['role']) }}</span>
+              <span class="dropdown-arrow-icon">▾</span>
+            </button>
+
+            <!-- Dropdown Popover Menu -->
+            <div class="user-dropdown-popover" id="userProfilePopover">
+              <div class="user-popover-header">
+                <div class="popover-name">{{ current_user['name'] }}</div>
+                <div class="popover-role role-{{ current_user['role'] }}">{{ _t('role_' ~ current_user['role']) }} &bull; {{ current_user['email'] }}</div>
+              </div>
+              <div class="popover-divider"></div>
+              {% if current_user['role'] == 'farmer' %}
+                <a href="{{ url_for('farmer_dashboard') }}" class="popover-item" id="farmerDashBtn">📋 {{ _t('my_orders') }}</a>
+                <a href="{{ url_for('add_listing') }}" class="popover-item" id="addListingNavBtn" style="color: var(--primary); font-weight: 700;">+ {{ _t('list_produce') }}</a>
+              {% elif current_user['role'] == 'buyer' %}
+                <a href="{{ url_for('buyer_dashboard') }}" class="popover-item" id="buyerDashBtn">📋 {{ _t('my_orders') }}</a>
+              {% elif current_user['role'] == 'admin' %}
+                <a href="{{ url_for('admin_dashboard') }}" class="popover-item" id="adminDashBtn">⚡ {{ _t('admin_panel') }}</a>
+              {% endif %}
+              <a href="{{ url_for('notifications_view') }}" class="popover-item">
+                🔔 {{ _t('notifications') }}{% if unread_count > 0 %} <span class="notif-pill">{{ unread_count }}</span>{% endif %}
+              </a>
+              <div class="popover-divider"></div>
+              <a href="{{ url_for('logout') }}" class="popover-item popover-logout" id="logoutBtn">🚪 {{ _t('logout') }}</a>
+            </div>
+          </div>
+        {% else %}
+          <div class="guest-nav-actions">
             <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm" id="loginNavBtn">{{ _t('log_in') }}</a>
             <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm" id="registerNavBtn">{{ _t('sign_up') }}</a>
-          {% endif %}
-        </div>
+          </div>
+        {% endif %}
+
+        <!-- Mobile Hamburger Toggle Button -->
+        <button class="menu-toggle" id="menuToggle" aria-label="Toggle Navigation" aria-expanded="false">
+          <span class="menu-icon-bar"></span>
+          <span class="menu-icon-bar"></span>
+          <span class="menu-icon-bar"></span>
+        </button>
       </div>
+
     </div>
   </header>
 
