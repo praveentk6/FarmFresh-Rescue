@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+
+{% block title %}Live Messages & Negotiation - {{ _t('brand_name') }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 1.5rem; padding-bottom: 3.5rem;">
+
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <h1 style="font-size: 1.85rem; font-weight: 800; color: #0f172a;">💬 Live Farmer & Buyer Messaging</h1>
+      <p style="color: var(--text-muted); font-size: 0.9rem;">
+        Direct communication, batch verification, and price negotiation between farmers and buyers.
+      </p>
+    </div>
+    {% if recipient %}
+      <div style="display: flex; gap: 0.5rem;">
+        {% if recipient['role'] == 'farmer' %}
+          <a href="{{ url_for('browse_listings') }}" class="btn btn-secondary btn-sm">Browse Harvests</a>
+        {% else %}
+          <a href="{{ url_for('nearby_buyers') }}" class="btn btn-secondary btn-sm">Find Buyers</a>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+
+  <div style="display: grid; grid-template-columns: 320px 1fr; gap: 1.5rem; height: calc(100vh - 260px); min-height: 520px;" class="chat-layout-grid">
+
+    <!-- Conversations Sidebar -->
+    <div class="data-table-card" style="display: flex; flex-direction: column; overflow: hidden; padding: 0;">
+      <div style="padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; background: #f8fafc; font-weight: 700; color: #0f172a; font-size: 0.95rem;">
+        Recent Conversations
+      </div>
+
+      <div style="flex: 1; overflow-y: auto;" id="chatThreadsList">
+        {% if threads %}
+          {% for th in threads %}
+            <a href="{{ url_for('chat_conversation', recipient_id=th['other_user_id']) }}" style="display: flex; gap: 0.75rem; padding: 0.85rem 1.15rem; border-bottom: 1px solid #f1f5f9; text-decoration: none; color: inherit; background: {% if recipient and recipient['id'] == th['other_user_id'] %}#f0fdf4{% else %}transparent{% endif %}; transition: background 0.15s ease;" class="chat-thread-item">
+              <div style="width: 40px; height: 40px; border-radius: 50%; background: {% if th['other_user_role'] == 'farmer' %}#dcfce7{% else %}#e0f2fe{% endif %}; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0;">
+                {% if th['other_user_role'] == 'farmer' %}🌾{% else %}🏢{% endif %}
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                  <strong style="font-size: 0.9rem; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ th['other_user_name'] }}</strong>
+                  <span style="font-size: 0.7rem; color: #94a3b8;">{{ th['last_message_at'].split()[1][:5] if th['last_message_at'] else '' }}</span>
+                </div>
+                <div style="font-size: 0.8rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
+                  {{ th['last_message'] }}
+                </div>
+              </div>
+              {% if th['unread_count'] > 0 %}
+                <span style="background: var(--urgent-red); color: white; border-radius: 999px; font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem; align-self: center;">
+                  {{ th['unread_count'] }}
+                </span>
+              {% endif %}
+            </a>
+          {% endfor %}
+        {% else %}
+          <div style="padding: 2rem 1rem; text-align: center; color: #94a3b8; font-size: 0.85rem;">
+            No message history yet. Initiate a chat from any produce listing or buyer enquiry.
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Active Chat Window -->
+    {% if recipient %}
+      <div class="data-table-card" style="display: flex; flex-direction: column; overflow: hidden; padding: 0;">
+        
+        <!-- Chat Header -->
+        <div style="padding: 0.85rem 1.25rem; border-bottom: 1px solid #f1f5f9; background: #ffffff; display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <div style="width: 38px; height: 38px; border-radius: 50%; background: {% if recipient['role'] == 'farmer' %}#dcfce7{% else %}#e0f2fe{% endif %}; display: flex; align-items: center; justify-content: center; font-size: 1.15rem;">
+              {% if recipient['role'] == 'farmer' %}🌾{% else %}🏢{% endif %}
+            </div>
+            <div>
+              <div style="font-weight: 700; color: #0f172a; font-size: 1rem;">
+                {{ recipient['name'] }}
+                <span class="user-badge role-{{ recipient['role'] }}" style="font-size: 0.7rem; padding: 0.1rem 0.45rem; margin-left: 0.35rem;">
+                  {{ _t('role_' ~ recipient['role']) }}
+                </span>
+              </div>
+              <div style="font-size: 0.75rem; color: #64748b;">
+                📍 {{ recipient['location'] or 'Tamil Nadu' }} &bull; 📞 {{ recipient['phone'] }}
+              </div>
+            </div>
+          </div>
+
+          <!-- Negotiation Quick Action Toggle -->
+          <div>
+            <button type="button" class="btn btn-outline-primary btn-sm" onclick="toggleOfferPanel()" id="btnOfferToggle">
+              ⚡ Propose Price / Qty Offer
+            </button>
+          </div>
+        </div>
+
+        <!-- Collapsible Negotiation Card Panel -->
+        <div id="offerPanel" style="display: none; background: #f0fdf4; border-bottom: 1px solid #bbf7d0; padding: 0.85rem 1.25rem;">
+          <div style="font-size: 0.8rem; font-weight: 700; color: #166534; margin-bottom: 0.5rem;">
+            📝 Propose Formal Counter-Offer to {{ recipient['name'] }}
+          </div>
+          <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+            <input type="number" step="any" id="offerPriceInput" class="form-control" style="width: 140px; font-size: 0.85rem;" placeholder="Offered ₹/kg">
+            <input type="number" step="any" id="offerQtyInput" class="form-control" style="width: 140px; font-size: 0.85rem;" placeholder="Quantity (kg)">
+            <button type="button" class="btn btn-primary btn-sm" onclick="sendOfferMessage()">
+              Send Counter Offer
+            </button>
+            <button type="button" class="btn btn-secondary btn-sm" onclick="toggleOfferPanel()">
+              Cancel
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat Message Log (Auto-Scroll) -->
+        <div id="chatMessagesWrap" style="flex: 1; overflow-y: auto; padding: 1.25rem; display: flex; flex-direction: column; gap: 0.85rem; background: #f8fafc;">
+          <!-- Loaded dynamically via poll -->
+        </div>
+
+        <!-- Message Input Bar -->
+        <div style="padding: 0.85rem 1.25rem; border-top: 1px solid #e2e8f0; background: #ffffff;">
+          <form id="chatForm" onsubmit="handleSendMessage(event)" style="display: flex; gap: 0.65rem; align-items: center;">
+            <input type="text" id="chatMsgInput" class="form-control" placeholder="Type message in Tamil or English..." autocomplete="off" required style="font-size: 0.95rem;">
+            <button type="submit" class="btn btn-primary" style="padding: 0.65rem 1.25rem; display: inline-flex; align-items: center; gap: 0.4rem;">
+              <span>Send</span>
+              <span>&rarr;</span>
+            </button>
+          </form>
+        </div>
+      </div>
+    {% else %}
+      <div class="data-table-card" style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 3rem;">
+        <span style="font-size: 3rem; margin-bottom: 1rem;">💬</span>
+        <h3 style="font-size: 1.25rem; font-weight: 700; color: #0f172a;">Select a conversation to start messaging</h3>
+        <p style="color: #64748b; font-size: 0.9rem; max-width: 400px; margin-top: 0.5rem;">
+          Connect directly with farmers holding active produce batches or commercial buyers seeking fresh harvests.
+        </p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+{% if recipient %}
+<script>
+  const RECIPIENT_ID = {{ recipient['id'] }};
+  const CURRENT_USER_ID = {{ current_user['id'] }};
+  const ORDER_ID = {{ order_id if order_id else 'null' }};
+  const LISTING_ID = {{ listing_id if listing_id else 'null' }};
+  let lastMessageCount = 0;
+
+  function toggleOfferPanel() {
+    const p = document.getElementById('offerPanel');
+    p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  }
+
+  async function pollMessages() {
+    try {
+      const res = await fetch(`/api/chat/messages/${RECIPIENT_ID}${ORDER_ID ? '?order_id=' + ORDER_ID : ''}`);
+      const data = await res.json();
+      if (data.messages) {
+        renderMessages(data.messages);
+      }
+    } catch (e) {
+      console.warn("Chat poll error:", e);
+    }
+  }
+
+  function renderMessages(msgs) {
+    const wrap = document.getElementById('chatMessagesWrap');
+    if (!wrap) return;
+
+    if (msgs.length === lastMessageCount) return; // No change
+    lastMessageCount = msgs.length;
+
+    wrap.innerHTML = '';
+    msgs.forEach(m => {
+      const isMine = (m.sender_id === CURRENT_USER_ID);
+      const msgDiv = document.createElement('div');
+      msgDiv.style.display = 'flex';
+      msgDiv.style.flexDirection = 'column';
+      msgDiv.style.alignItems = isMine ? 'flex-end' : 'flex-start';
+
+      let innerContent = `
+        <div style="background: ${isMine ? '#15803d' : '#ffffff'}; color: ${isMine ? '#ffffff' : '#0f172a'}; padding: 0.65rem 0.95rem; border-radius: 12px; max-width: 75%; border: 1px solid ${isMine ? 'transparent' : '#e2e8f0'}; box-shadow: var(--shadow-sm); font-size: 0.9rem; line-height: 1.45; word-break: break-word;">
+          ${m.message}
+          ${m.offer_price ? `
+            <div style="margin-top: 0.5rem; padding: 0.5rem; background: ${isMine ? 'rgba(255,255,255,0.15)' : '#f0fdf4'}; border-radius: 6px; border: 1px dashed ${isMine ? '#ffffff' : '#86efac'}; font-size: 0.8rem;">
+              <strong>Counter-Offer:</strong> ₹${m.offer_price}/kg for ${m.offer_quantity || ''} kg
+            </div>
+          ` : ''}
+        </div>
+        <span style="font-size: 0.675rem; color: #94a3b8; margin-top: 3px; padding: 0 4px;">
+          ${m.created_at ? m.created_at.split(' ')[1] || '' : ''}
+        </span>
+      `;
+      msgDiv.innerHTML = innerContent;
+      wrap.appendChild(msgDiv);
+    });
+
+    wrap.scrollTop = wrap.scrollHeight;
+  }
+
+  async function handleSendMessage(e) {
+    e.preventDefault();
+    const input = document.getElementById('chatMsgInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    input.value = '';
+    try {
+      await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          receiver_id: RECIPIENT_ID,
+          message: msg,
+          order_id: ORDER_ID,
+          listing_id: LISTING_ID
+        })
+      });
+      pollMessages();
+    } catch (err) {
+      alert("Error delivering message. Please try again.");
+    }
+  }
+
+  async function sendOfferMessage() {
+    const price = document.getElementById('offerPriceInput').value;
+    const qty = document.getElementById('offerQtyInput').value;
+    if (!price || !qty) {
+      alert("Please enter both offered price per kg and quantity.");
+      return;
+    }
+
+    const offerMsg = `Counter-Offer Proposal: I propose ₹${price}/kg for ${qty} kg. Please review and confirm.`;
+    try {
+      await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          receiver_id: RECIPIENT_ID,
+          message: offerMsg,
+          offer_price: parseFloat(price),
+          offer_quantity: parseFloat(qty),
+          order_id: ORDER_ID,
+          listing_id: LISTING_ID
+        })
+      });
+      toggleOfferPanel();
+      pollMessages();
+    } catch (e) {
+      alert("Error sending offer.");
+    }
+  }
+
+  // Initial poll and recurring poll every 3 seconds
+  pollMessages();
+  setInterval(pollMessages, 3000);
+</script>
+{% endif %}
+
+<style>
+@media (max-width: 768px) {
+  .chat-layout-grid {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+  }
+}
+</style>
+{% endblock %}

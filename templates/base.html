@@ -62,6 +62,8 @@
               ⚡ {{ _t('urgent_rescue') }}
             </a>
           </li>
+          <li><a href="{{ url_for('live_map_view') }}" class="nav-link {% if request.endpoint == 'live_map_view' %}active{% endif %}">🗺️ {{ 'வரைபடம்' if lang == 'ta' else 'Live Map' }}</a></li>
+          <li><a href="{{ url_for('live_market_prices') }}" class="nav-link {% if request.endpoint == 'live_market_prices' %}active{% endif %}">💹 {{ 'சந்தை விலை' if lang == 'ta' else 'Mandi Rates' }}</a></li>
           <li><a href="{{ url_for('demand_prediction') }}" class="nav-link {% if request.endpoint == 'demand_prediction' %}active{% endif %}">📈 {{ 'தேவை கணிப்பு' if lang == 'ta' else 'Demand Trends' }}</a></li>
           <li><a href="{{ url_for('nearby_buyers') }}" class="nav-link {% if request.endpoint == 'nearby_buyers' %}active{% endif %}">{{ _t('nearby_buyers') }}</a></li>
           <li><a href="{{ url_for('analytics_view') }}" class="nav-link {% if request.endpoint == 'analytics_view' %}active{% endif %}">📊 {{ _t('analytics') }}</a></li>
@@ -169,6 +171,9 @@
             <li><a href="{{ url_for('browse_listings', category='Vegetables') }}">Fresh Vegetables</a></li>
             <li><a href="{{ url_for('browse_listings', category='Fruits') }}">Orchard Fruits</a></li>
             <li><a href="{{ url_for('browse_listings', urgency='urgent_only') }}">⚡ {{ _t('urgent_rescue') }}</a></li>
+            <li><a href="{{ url_for('live_map_view') }}">🗺️ Nearby Producer & Buyer Map</a></li>
+            <li><a href="{{ url_for('live_market_prices') }}">💹 Mandi Wholesale Market Prices</a></li>
+            <li><a href="{{ url_for('weather_alerts_view') }}">🌦️ Agro-Weather Advisories</a></li>
             <li><a href="{{ url_for('nearby_buyers') }}">🔍 {{ _t('nearby_buyers') }}</a></li>
             <li><a href="{{ url_for('ai_assistant') }}">🤖 {{ _t('ai_assistant') }}</a></li>
           </ul>

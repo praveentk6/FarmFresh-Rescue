@@ -280,6 +280,20 @@ TRANSLATIONS = {
         'btn_favorite': 'Favorite Farmer',
         'btn_unfavorite': 'Favorited',
 
+        # Payments & Real-Time Features
+        'checkout_title': 'Secure Produce Checkout',
+        'pay_now': 'Pay Securely Now',
+        'cash_on_delivery': 'Cash on Delivery (COD)',
+        'payment_successful': 'Payment Confirmed',
+        'download_invoice': 'View / Download Invoice',
+        'request_refund': 'Request Refund',
+        'live_market_prices': 'Live APMC Market Prices',
+        'weather_alerts': 'Agro-Weather Alerts',
+        'qr_traceability': 'Produce Traceability Passport',
+        'chat_with_farmer': 'Chat with Farmer',
+        'chat_with_buyer': 'Chat with Buyer',
+        'live_map': 'Live Farmer & Buyer Map',
+
         # Common
         'kg': 'kg',
         'rupees': '₹',
@@ -567,6 +581,20 @@ TRANSLATIONS = {
         'favorite_farmers_title': 'விருப்பமான விவசாயிகள்',
         'btn_favorite': 'விருப்பமானவராகச் சேர்',
         'btn_unfavorite': 'நீக்கு',
+
+        # Payments & Real-Time Features
+        'checkout_title': 'பாதுகாப்பான கட்டண முறை',
+        'pay_now': 'இப்போது பாதுகாப்பாக செலுத்தவும்',
+        'cash_on_delivery': 'பொருளைப் பெற்றபின் பணம் (COD)',
+        'payment_successful': 'கட்டணம் வெற்றிகரமாக செலுத்தப்பட்டது!',
+        'download_invoice': 'விலைப்பட்டியலை பதிவிறக்கு',
+        'request_refund': 'பணம் திரும்பக் கோரு',
+        'live_market_prices': 'நேரடி சந்தை விலை நிலவரம்',
+        'weather_alerts': 'விவசாய வானிலை எச்சரிக்கைகள்',
+        'qr_traceability': 'பண்ணை உண்மைத்தன்மை சான்றிதழ்',
+        'chat_with_farmer': 'விவசாயியுடன் பேச',
+        'chat_with_buyer': 'வாங்குபவருடன் பேச',
+        'live_map': 'நேரடி வரைபடம்',
 
         # Common
         'kg': 'கிலோ',

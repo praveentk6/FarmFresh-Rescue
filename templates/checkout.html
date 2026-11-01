@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+
+{% block title %}{{ _t('checkout_title') }} - {{ _t('brand_name') }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem; max-width: 960px;">
+
+  <!-- Breadcrumbs -->
+  <div style="margin-bottom: 1.5rem; font-size: 0.875rem; color: var(--text-muted);">
+    <a href="{{ url_for('browse_listings') }}">{{ _t('browse_produce') }}</a> &bull;
+    <a href="{{ url_for('listing_detail', listing_id=listing['id']) }}">{{ listing['crop_name'] }}</a> &bull;
+    <span style="color: var(--primary-dark); font-weight: 600;">{{ _t('checkout_title') }}</span>
+  </div>
+
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <span class="badge-available" style="font-size: 0.8rem; font-weight: 700; text-transform: uppercase;">🔒 256-Bit SSL Encrypted Checkout</span>
+      <h1 style="font-size: 2.25rem; font-weight: 800; color: #0f172a; margin-top: 0.35rem;">{{ _t('checkout_title') }}</h1>
+      <p style="color: var(--text-muted); font-size: 0.95rem;">
+        Direct payment from buyer to rescue farm harvest. Funds are securely tracked and settled to the farmer.
+      </p>
+    </div>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <span style="font-size: 0.85rem; color: #166534; background: #ecfdf5; border: 1px solid #bbf7d0; padding: 0.4rem 0.8rem; border-radius: var(--radius-full); font-weight: 600;">
+        ⚡ Instant Order Confirmation
+      </span>
+    </div>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 2rem;" class="checkout-grid">
+
+    <!-- Left Column: Order Review & Payment Selection -->
+    <div>
+
+      <!-- 1. Order Item Card -->
+      <div class="data-table-card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.2rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+          <span>📦</span> Produce Summary
+        </h2>
+        
+        <div style="display: flex; gap: 1.25rem; align-items: flex-start; padding-bottom: 1rem; border-bottom: 1px solid #f1f5f9;">
+          <div style="width: 90px; height: 90px; border-radius: var(--radius-md); overflow: hidden; background: #f8fafc; border: 1px solid #e2e8f0; flex-shrink: 0;">
+            {% if listing['photo'] %}
+              <img src="/static/uploads/{{ listing['photo'] }}" alt="{{ listing['crop_name'] }}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.src='/static/images/produce-placeholder.svg';">
+            {% else %}
+              <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 2rem;">🥦</div>
+            {% endif %}
+          </div>
+          <div style="flex: 1;">
+            <div style="font-size: 0.8rem; font-weight: 700; color: #166534; text-transform: uppercase;">
+              {{ listing['category'] }} &bull; Harvest Date: {{ listing['harvest_date'] }}
+            </div>
+            <h3 style="font-size: 1.25rem; font-weight: 700; color: #0f172a; margin: 0.2rem 0;">{{ listing['crop_name'] }}</h3>
+            <div style="font-size: 0.875rem; color: #64748b;">
+              Farmer: <strong>{{ listing['farmer_name'] }}</strong> &bull; 📍 {{ listing['village_town'] }}, {{ listing['district'] }}
+            </div>
+            <div style="margin-top: 0.5rem; font-size: 0.9rem; color: #15803d; font-weight: 600;">
+              Unit Rate: ₹{{ "%.2f"|format(listing['price_per_unit']) }} / {{ listing['unit'] }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Specifications Breakdown -->
+        <div style="margin-top: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.875rem;">
+          <div style="background: #f8fafc; padding: 0.75rem; border-radius: 8px;">
+            <span style="color: #64748b; font-size: 0.75rem; display: block;">Purchasing Quantity:</span>
+            <strong style="color: #0f172a; font-size: 1.05rem;">{{ "%.1f"|format(order['requested_quantity']) }} {{ listing['unit'] }}</strong>
+          </div>
+          <div style="background: #f8fafc; padding: 0.75rem; border-radius: 8px;">
+            <span style="color: #64748b; font-size: 0.75rem; display: block;">Available Batch Stock:</span>
+            <strong style="color: #166534; font-size: 1.05rem;">{{ "%.1f"|format(available_stock) }} {{ listing['unit'] }}</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Delivery Options -->
+      <div class="data-table-card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
+        <h2 style="font-size: 1.2rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+          <span>🚚</span> Delivery & Handover Method
+        </h2>
+
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem; border: 1.5px solid {% if delivery_mode == 'pickup' %}var(--primary){% else %}#e2e8f0{% endif %}; border-radius: var(--radius-md); background: {% if delivery_mode == 'pickup' %}#f0fdf4{% else %}#ffffff{% endif %}; cursor: pointer;">
+            <input type="radio" name="deliveryOption" value="pickup" {% if delivery_mode == 'pickup' %}checked{% endif %} onchange="updateDeliveryCharge('pickup')" style="margin-top: 0.25rem;">
+            <div>
+              <div style="font-weight: 700; color: #0f172a;">Direct Farmgate / Hub Collection (Free - ₹0)</div>
+              <div style="font-size: 0.8rem; color: #64748b;">Buyer collects directly from farmer's collection point in {{ listing['district'] }}.</div>
+            </div>
+          </label>
+
+          <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.85rem; border: 1.5px solid {% if delivery_mode == 'delivery' %}var(--primary){% else %}#e2e8f0{% endif %}; border-radius: var(--radius-md); background: {% if delivery_mode == 'delivery' %}#f0fdf4{% else %}#ffffff{% endif %}; cursor: pointer;">
+            <input type="radio" name="deliveryOption" value="delivery" {% if delivery_mode == 'delivery' %}checked{% endif %} onchange="updateDeliveryCharge('delivery')" style="margin-top: 0.25rem;">
+            <div>
+              <div style="font-weight: 700; color: #0f172a;">Regional Agri-Logistics Transport (+₹{{ "%.0f"|format(delivery_charges) }})</div>
+              <div style="font-size: 0.8rem; color: #64748b;">Transport arranged via regional tempo / van directly to buyer delivery address.</div>
+            </div>
+          </label>
+        </div>
+
+        <div style="margin-top: 1rem;">
+          <label class="form-label">Delivery Address / Handover Instructions</label>
+          <input type="text" id="deliveryAddressInput" class="form-control" value="{{ order['delivery_address'] or (current_user['location'] ~ ', ' ~ current_user['district'] if current_user else '') }}" placeholder="Enter receiving address or hub location">
+        </div>
+      </div>
+
+      <!-- 3. Payment Method Selection -->
+      <div class="data-table-card" style="padding: 1.5rem;">
+        <h2 style="font-size: 1.2rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+          <span>💳</span> Select Payment Method
+        </h2>
+
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          
+          <!-- Method 1: Razorpay Online (UPI, Cards, Net Banking) -->
+          <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem; border: 2px solid var(--primary); border-radius: var(--radius-md); background: #f0fdf4; cursor: pointer;">
+            <input type="radio" name="paymentMethod" value="Online" checked id="payOnlineRadio" style="margin-top: 0.25rem;">
+            <div style="flex: 1;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+                <span style="font-weight: 700; color: #166534; font-size: 1rem;">Razorpay Online Payment Gateway</span>
+                <span class="badge-available" style="font-size: 0.75rem;">Recommended</span>
+              </div>
+              <div style="font-size: 0.825rem; color: #15803d; margin: 0.25rem 0;">
+                Support for <strong>UPI (Google Pay, PhonePe, Paytm, BHIM)</strong>, Credit & Debit Cards (Visa, Mastercard, RuPay), and Net Banking.
+              </div>
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
+                <span style="background: white; border: 1px solid #bbf7d0; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">📱 UPI / GPay / PhonePe</span>
+                <span style="background: white; border: 1px solid #bbf7d0; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">💳 Cards</span>
+                <span style="background: white; border: 1px solid #bbf7d0; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">🏦 Net Banking</span>
+              </div>
+            </div>
+          </label>
+
+          <!-- Method 2: Cash on Delivery (COD) -->
+          <label style="display: flex; align-items: flex-start; gap: 0.75rem; padding: 1rem; border: 1.5px solid #e2e8f0; border-radius: var(--radius-md); background: #ffffff; cursor: pointer;">
+            <input type="radio" name="paymentMethod" value="COD" id="payCodRadio" style="margin-top: 0.25rem;">
+            <div>
+              <div style="font-weight: 700; color: #0f172a; font-size: 1rem;">Cash on Delivery (COD)</div>
+              <div style="font-size: 0.825rem; color: #64748b; margin-top: 0.25rem;">
+                Pay cash directly to the farmer or logistics partner upon physical inspection and collection of produce batch.
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Cost Breakdown & Checkout CTA -->
+    <div>
+      <div class="data-table-card" style="padding: 1.5rem; position: sticky; top: 5.5rem;">
+        <h2 style="font-size: 1.25rem; font-weight: 700; color: #0f172a; margin-bottom: 1.25rem;">
+          Payment Breakdown
+        </h2>
+
+        <div style="display: flex; flex-direction: column; gap: 0.85rem; font-size: 0.95rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 1.25rem;">
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #64748b;">Subtotal ({{ "%.1f"|format(order['requested_quantity']) }} {{ listing['unit'] }} &times; ₹{{ "%.2f"|format(listing['price_per_unit']) }}):</span>
+            <strong style="color: #0f172a;">₹<span id="subtotalDisplay">{{ "%.2f"|format(subtotal) }}</span></strong>
+          </div>
+
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: #64748b;">Delivery & Handover Charges:</span>
+            <strong style="color: #0f172a;" id="deliveryDisplay">₹{{ "%.2f"|format(delivery_charges) }}</strong>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; color: #16a34a;">
+            <span>Waste Prevention Discount:</span>
+            <strong>-₹0.00</strong>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin: 1.25rem 0;">
+          <span style="font-size: 1.15rem; font-weight: 700; color: #0f172a;">Total Payable:</span>
+          <span style="font-size: 1.85rem; font-weight: 800; color: var(--primary);">₹<span id="totalDisplay">{{ "%.2f"|format(total_amount) }}</span></span>
+        </div>
+
+        <!-- Checkout Buttons -->
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          <button type="button" class="btn btn-primary btn-lg" id="btnTriggerPayment" style="width: 100%; font-size: 1.05rem; padding: 0.85rem;" onclick="handleCheckoutSubmission()">
+            🔒 {{ _t('pay_now') }} (₹<span id="btnPayAmount">{{ "%.2f"|format(total_amount) }}</span>)
+          </button>
+
+          <a href="{{ url_for('buyer_dashboard') }}" class="btn btn-secondary" style="width: 100%; text-align: center;">
+            Cancel & Return to Dashboard
+          </a>
+        </div>
+
+        <!-- Security Notice -->
+        <div style="margin-top: 1.25rem; padding: 0.85rem; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: var(--radius-sm); font-size: 0.75rem; color: #64748b; line-height: 1.4;">
+          🛡️ <strong>Buyer Protection:</strong> Payments are held securely under our Escrow settlement system. Funds are released to the farmer after verified delivery. Full refunds available if produce quality deviates from Grade specifications.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Hidden Processing Modal -->
+<div id="paymentLoadingOverlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 99999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+  <div style="background: white; padding: 2.5rem; border-radius: var(--radius-lg); text-align: center; max-width: 400px; width: 90%; box-shadow: var(--shadow-xl);">
+    <div style="font-size: 3rem; margin-bottom: 1rem; animation: pulse 1.5s infinite;">🌾</div>
+    <h3 style="font-size: 1.35rem; font-weight: 700; color: #0f172a; margin-bottom: 0.5rem;" id="loadingTitle">Processing Payment</h3>
+    <p style="color: #64748b; font-size: 0.9rem;" id="loadingDesc">Communicating with Razorpay Secure Gateway... Please do not close or refresh this page.</p>
+  </div>
+</div>
+
+<!-- Razorpay Checkout Library -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+<script>
+  const ORDER_ID = {{ order['id'] }};
+  const LISTING_ID = {{ listing['id'] }};
+  let subtotalAmount = {{ subtotal }};
+  let deliveryFee = {{ delivery_charges }};
+  let currentTotal = subtotalAmount + deliveryFee;
+
+  function updateDeliveryCharge(mode) {
+    if (mode === 'pickup') {
+      deliveryFee = 0;
+    } else {
+      deliveryFee = 60.0;
+    }
+    currentTotal = subtotalAmount + deliveryFee;
+    document.getElementById('deliveryDisplay').textContent = '₹' + deliveryFee.toFixed(2);
+    document.getElementById('totalDisplay').textContent = currentTotal.toFixed(2);
+    document.getElementById('btnPayAmount').textContent = currentTotal.toFixed(2);
+  }
+
+  function showLoading(title, desc) {
+    const overlay = document.getElementById('paymentLoadingOverlay');
+    document.getElementById('loadingTitle').textContent = title;
+    document.getElementById('loadingDesc').textContent = desc;
+    overlay.style.display = 'flex';
+  }
+
+  function hideLoading() {
+    document.getElementById('paymentLoadingOverlay').style.display = 'none';
+  }
+
+  async function handleCheckoutSubmission() {
+    const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
+    const deliveryAddress = document.getElementById('deliveryAddressInput').value.trim();
+
+    if (paymentMethod === 'COD') {
+      // Process Cash on Delivery Order
+      if (!confirm("Confirm placement of Cash on Delivery (COD) order for ₹" + currentTotal.toFixed(2) + "?")) {
+        return;
+      }
+      showLoading("Confirming COD Order", "Reserving produce stock and notifying farmer...");
+      try {
+        const res = await fetch('/api/payment/cod', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            order_id: ORDER_ID,
+            delivery_charges: deliveryFee,
+            delivery_address: deliveryAddress
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          window.location.href = data.redirect_url;
+        } else {
+          hideLoading();
+          alert("COD Order Error: " + (data.error || "Could not confirm order"));
+        }
+      } catch (err) {
+        hideLoading();
+        alert("Network error confirming COD order. Please try again.");
+      }
+      return;
+    }
+
+    // Process Online Payment via Razorpay
+    showLoading("Initiating Payment", "Creating secure Razorpay payment order...");
+    try {
+      const orderRes = await fetch('/api/payment/create-order', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          order_id: ORDER_ID,
+          delivery_charges: deliveryFee,
+          delivery_address: deliveryAddress
+        })
+      });
+      const orderData = await orderRes.json();
+      hideLoading();
+
+      if (!orderData.success) {
+        alert("Payment initialization failed: " + (orderData.error || "Please try again"));
+        return;
+      }
+
+      // If simulated test mode or mock keys
+      if (orderData.is_mock) {
+        const confirmTest = confirm(
+          "Razorpay Test Mode Active:\n\n" +
+          "Order ID: " + orderData.razorpay_order_id + "\n" +
+          "Amount: ₹" + orderData.amount_rupees.toFixed(2) + "\n\n" +
+          "Click OK to simulate verified successful payment (UPI/Card/Netbanking), or Cancel to simulate failed payment."
+        );
+        if (confirmTest) {
+          showLoading("Verifying Payment", "Validating signature and generating digital invoice...");
+          const verifyRes = await fetch('/api/payment/verify', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+              order_id: ORDER_ID,
+              transaction_id: orderData.transaction_id,
+              razorpay_order_id: orderData.razorpay_order_id,
+              razorpay_payment_id: "pay_test_" + Date.now(),
+              razorpay_signature: "mock_sig_verified_2026",
+              payment_method: "UPI (Google Pay / PhonePe)"
+            })
+          });
+          const verifyData = await verifyRes.json();
+          if (verifyData.success) {
+            window.location.href = verifyData.redirect_url;
+          } else {
+            hideLoading();
+            alert("Verification failed: " + verifyData.error);
+          }
+        }
+        return;
+      }
+
+      // Real Razorpay Standard Checkout Popup
+      const options = {
+        "key": orderData.key_id,
+        "amount": orderData.amount,
+        "currency": orderData.currency,
+        "name": "FarmFresh Rescue",
+        "description": "Payment for " + "{{ listing['crop_name']|escape }}",
+        "order_id": orderData.razorpay_order_id,
+        "prefill": {
+          "name": "{{ current_user['name'] if current_user else '' }}",
+          "email": "{{ current_user['email'] if current_user else '' }}",
+          "contact": "{{ current_user['phone'] if current_user else '' }}"
+        },
+        "theme": {
+          "color": "#15803d"
+        },
+        "handler": async function (response) {
+          showLoading("Verifying Payment", "Confirming signature with Razorpay servers...");
+          try {
+            const verifyRes = await fetch('/api/payment/verify', {
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
+              body: JSON.stringify({
+                order_id: ORDER_ID,
+                transaction_id: orderData.transaction_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature,
+                payment_method: "Razorpay Online"
+              })
+            });
+            const verifyData = await verifyRes.json();
+            if (verifyData.success) {
+              window.location.href = verifyData.redirect_url;
+            } else {
+              hideLoading();
+              alert("Payment verification error: " + verifyData.error);
+            }
+          } catch (e) {
+            hideLoading();
+            alert("Error confirming payment. Please contact support with Payment ID: " + response.razorpay_payment_id);
+          }
+        },
+        "modal": {
+          "ondismiss": function() {
+            hideLoading();
+          }
+        }
+      };
+
+      const rzp = new Razorpay(options);
+      rzp.on('payment.failed', function (response) {
+        hideLoading();
+        alert("Payment Failed! Reason: " + response.error.description);
+      });
+      rzp.open();
+
+    } catch (err) {
+      hideLoading();
+      alert("Error initiating payment. Please try again.");
+    }
+  }
+</script>
+{% endblock %}

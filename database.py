@@ -1,6 +1,8 @@
 import sqlite3
 import os
 from datetime import datetime, timedelta
+import time
+import uuid
 from werkzeug.security import generate_password_hash
 
 DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
@@ -182,6 +184,95 @@ def init_db():
     )
     ''')
 
+    # Payments & Transactions Table (Razorpay & COD)
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER NOT NULL,
+        listing_id INTEGER NOT NULL,
+        buyer_id INTEGER NOT NULL,
+        farmer_id INTEGER NOT NULL,
+        transaction_id TEXT UNIQUE NOT NULL,
+        razorpay_order_id TEXT,
+        razorpay_payment_id TEXT,
+        razorpay_signature TEXT,
+        payment_method TEXT NOT NULL DEFAULT 'Online',
+        amount REAL NOT NULL,
+        currency TEXT DEFAULT 'INR',
+        subtotal REAL NOT NULL,
+        delivery_charges REAL DEFAULT 0,
+        payment_status TEXT NOT NULL DEFAULT 'Pending' CHECK(payment_status IN ('Pending', 'Paid', 'Failed', 'Cancelled', 'Refunded', 'COD Pending')),
+        payout_status TEXT NOT NULL DEFAULT 'Unsettled' CHECK(payout_status IN ('Unsettled', 'Processing', 'Settled')),
+        payout_date TIMESTAMP,
+        refund_status TEXT DEFAULT 'None' CHECK(refund_status IN ('None', 'Requested', 'Approved', 'Rejected', 'Processed')),
+        refund_reason TEXT,
+        refund_amount REAL DEFAULT 0,
+        refund_tx_id TEXT,
+        idempotency_key TEXT UNIQUE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (order_id) REFERENCES enquiries(id) ON DELETE CASCADE,
+        FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE,
+        FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (farmer_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    ''')
+
+    # Live Market Prices Benchmark Table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS market_prices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        crop_name TEXT NOT NULL,
+        category TEXT DEFAULT 'Vegetables',
+        market_name TEXT NOT NULL,
+        district TEXT NOT NULL,
+        modal_price REAL NOT NULL,
+        min_price REAL NOT NULL,
+        max_price REAL NOT NULL,
+        price_date DATE NOT NULL,
+        trend TEXT DEFAULT 'stable' CHECK(trend IN ('up', 'down', 'stable')),
+        unit TEXT DEFAULT 'kg',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+
+    # Farmer-Buyer Live Chat Messages
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS chat_messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sender_id INTEGER NOT NULL,
+        receiver_id INTEGER NOT NULL,
+        order_id INTEGER,
+        listing_id INTEGER,
+        message TEXT NOT NULL,
+        image_filename TEXT,
+        offer_price REAL,
+        offer_quantity REAL,
+        offer_status TEXT DEFAULT 'None' CHECK(offer_status IN ('None', 'Pending', 'Accepted', 'Declined')),
+        is_read INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (receiver_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    ''')
+
+    # Weather Alerts Table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS weather_alerts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        district TEXT NOT NULL,
+        severity TEXT NOT NULL CHECK(severity IN ('Info', 'Advisory', 'Warning', 'Critical')),
+        condition TEXT NOT NULL,
+        temperature REAL,
+        rainfall_prob INTEGER,
+        title TEXT NOT NULL,
+        advice TEXT NOT NULL,
+        affected_crops TEXT,
+        valid_until DATE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )
+    ''')
+
     # Safe Schema Migrations for existing database
     # 1. users migrations
     cursor.execute("PRAGMA table_info(users)")
@@ -224,6 +315,12 @@ def init_db():
         cursor.execute("ALTER TABLE listings ADD COLUMN latitude REAL")
     if 'longitude' not in listing_cols:
         cursor.execute("ALTER TABLE listings ADD COLUMN longitude REAL")
+    if 'reserved_quantity' not in listing_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN reserved_quantity REAL DEFAULT 0")
+    if 'shelf_life_days' not in listing_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN shelf_life_days INTEGER DEFAULT 7")
+    if 'qr_code_token' not in listing_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN qr_code_token TEXT")
 
     # 3. enquiries migrations (ensure new columns & status compatibility)
     cursor.execute("PRAGMA table_info(enquiries)")
@@ -232,6 +329,12 @@ def init_db():
         cursor.execute("ALTER TABLE enquiries ADD COLUMN delivery_preference TEXT DEFAULT 'Direct Pickup / Collection'")
     if 'total_price' not in enquiry_cols:
         cursor.execute("ALTER TABLE enquiries ADD COLUMN total_price REAL DEFAULT 0")
+    if 'payment_method' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN payment_method TEXT DEFAULT 'COD'")
+    if 'payment_status' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN payment_status TEXT DEFAULT 'Unpaid'")
+    if 'delivery_charges' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN delivery_charges REAL DEFAULT 0")
     if 'updated_at' not in enquiry_cols:
         cursor.execute("ALTER TABLE enquiries ADD COLUMN updated_at TIMESTAMP DEFAULT NULL")
     if 'cancelled_reason' not in enquiry_cols:
@@ -302,6 +405,12 @@ def init_db():
             cursor.execute("PRAGMA foreign_keys = ON")
     except Exception as e:
         print(f"Enquiries migration note: {e}")
+
+    try:
+        seed_market_prices(conn)
+        seed_weather_alerts(conn)
+    except Exception as _e:
+        pass
 
     conn.commit()
     conn.close()
@@ -1036,7 +1145,610 @@ def seed_buyer_requirements(conn):
             VALUES (?, 'Vanakkam to FarmFresh Rescue!', 'Post your farm harvests or discover nearby hotels, shops, and food processors in Tamil Nadu to sell before spoilage.', 'info', '/farmer/dashboard')
         ''', (f['id'],))
 
+    seed_market_prices(conn)
+    seed_weather_alerts(conn)
+
     conn.commit()
+
+def seed_market_prices(conn):
+    """Seed benchmark market prices for Tamil Nadu APMC mandis."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM market_prices")
+    if cursor.fetchone()[0] > 0:
+        return
+
+    today = datetime.now().strftime('%Y-%m-%d')
+    prices = [
+        # Koyambedu Wholesale Market (Chennai)
+        ("Tomatoes", "Vegetables", "Koyambedu Wholesale Market", "Chennai", 24.0, 20.0, 28.0, today, "stable", "kg"),
+        ("Country Tomatoes (Nattu Thakkali)", "Vegetables", "Koyambedu Wholesale Market", "Chennai", 22.0, 18.0, 26.0, today, "down", "kg"),
+        ("Small Onions (Chinna Vengayam)", "Vegetables", "Koyambedu Wholesale Market", "Chennai", 55.0, 48.0, 62.0, today, "up", "kg"),
+        ("Bellary Onions (Periya Vengayam)", "Vegetables", "Koyambedu Wholesale Market", "Chennai", 32.0, 28.0, 36.0, today, "stable", "kg"),
+        ("Potatoes", "Vegetables", "Koyambedu Wholesale Market", "Chennai", 30.0, 26.0, 34.0, today, "stable", "kg"),
+        ("Ooty Carrots", "Vegetables", "Koyambedu Wholesale Market", "Chennai", 48.0, 42.0, 55.0, today, "up", "kg"),
+        ("Brinjal (Kathirikai)", "Vegetables", "Koyambedu Wholesale Market", "Chennai", 28.0, 22.0, 35.0, today, "down", "kg"),
+        ("Green Chillies (Pachai Milagai)", "Spices & Herbs", "Koyambedu Wholesale Market", "Chennai", 65.0, 55.0, 75.0, today, "up", "kg"),
+        ("Drumsticks (Murungakkai)", "Vegetables", "Koyambedu Wholesale Market", "Chennai", 40.0, 32.0, 50.0, today, "down", "kg"),
+        ("Ladies Finger (Bhendi / Vendakkai)", "Vegetables", "Koyambedu Wholesale Market", "Chennai", 32.0, 26.0, 38.0, today, "stable", "kg"),
+        ("Cabbage (Muttakose)", "Vegetables", "Koyambedu Wholesale Market", "Chennai", 20.0, 16.0, 24.0, today, "stable", "kg"),
+        ("Cauliflower", "Vegetables", "Koyambedu Wholesale Market", "Chennai", 35.0, 28.0, 42.0, today, "down", "kg"),
+        ("Beans", "Vegetables", "Koyambedu Wholesale Market", "Chennai", 52.0, 45.0, 60.0, today, "up", "kg"),
+        # Ottanchathiram Vegetable Market (Dindigul)
+        ("Tomatoes", "Vegetables", "Ottanchathiram Market", "Dindigul", 19.0, 16.0, 22.0, today, "down", "kg"),
+        ("Small Onions (Chinna Vengayam)", "Vegetables", "Ottanchathiram Market", "Dindigul", 48.0, 42.0, 54.0, today, "stable", "kg"),
+        ("Drumsticks (Murungakkai)", "Vegetables", "Ottanchathiram Market", "Dindigul", 35.0, 28.0, 42.0, today, "stable", "kg"),
+        # Pollachi Coconut Market (Coimbatore)
+        ("Tender Coconuts (Elaneer)", "Fruits", "Pollachi Regulated Market", "Coimbatore", 35.0, 30.0, 40.0, today, "stable", "piece"),
+        # Madurai Flower Market
+        ("Madurai Jasmine (Malli)", "Flowers", "Mattuthavani Flower Market", "Madurai", 420.0, 350.0, 500.0, today, "up", "kg"),
+    ]
+    cursor.executemany('''
+        INSERT INTO market_prices (crop_name, category, market_name, district, modal_price, min_price, max_price, price_date, trend, unit)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', prices)
+    conn.commit()
+
+def seed_weather_alerts(conn):
+    """Seed real-time agro-climatic advisories for Tamil Nadu."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM weather_alerts")
+    if cursor.fetchone()[0] > 0:
+        return
+
+    today = datetime.now().date()
+    valid_until = (today + timedelta(days=5)).strftime('%Y-%m-%d')
+    alerts = [
+        ("Krishnagiri", "Warning", "Moderate to Heavy Rainfall", 28.5, 75,
+         "Rainfall Alert for Tomato & Vegetable Farmers",
+         "Forecast of 45-60mm precipitation over next 48 hours. Harvest ripe tomatoes immediately to prevent fruit cracking, fungal rot, and waterlogged soil damage.",
+         "Tomatoes, Chillies, Beans", valid_until),
+        ("Dindigul", "Advisory", "High Humidity & Intermittent Showers", 31.0, 60,
+         "Shallot & Onion Curing Advisory",
+         "High humidity may trigger fungal neck rot in harvested shallots. Shift all drying small onions to elevated ventilated crates under covered sheds.",
+         "Small Onions, Drumsticks", valid_until),
+        ("Nilgiris", "Info", "Cool Mountain Mist", 16.0, 25,
+         "Favorable Hill Crop Conditions",
+         "Crisp cool weather ideal for carrot, cabbage and beetroot harvesting. Root vegetables can be harvested in early morning hours for crisp shelf life.",
+         "Carrots, Potatoes, Cabbage", valid_until),
+        ("Coimbatore", "Advisory", "Breezy & Warm", 33.0, 20,
+         "Coconut Orchard Hydration Advisory",
+         "Dry warm weather with moderate wind speeds. Tender coconuts in high demand across urban retail chains.",
+         "Tender Coconuts, Bananas", valid_until),
+        ("Thanjavur", "Info", "Sunny Kaveri Basin", 34.0, 15,
+         "Grain Storage Weather",
+         "Dry sunny conditions ideal for grain sun-drying and direct warehouse dispatch.",
+         "Paddy, Pulses", valid_until),
+    ]
+    cursor.executemany('''
+        INSERT INTO weather_alerts (district, severity, condition, temperature, rainfall_prob, title, advice, affected_crops, valid_until)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', alerts)
+    conn.commit()
+
+# ==========================================
+# Real-Time Payments, Transactions & Invoices
+# ==========================================
+
+def create_payment_record(order_id, listing_id, buyer_id, farmer_id, amount, subtotal,
+                          delivery_charges=0, payment_method='Online', razorpay_order_id=None,
+                          idempotency_key=None):
+    """Create a new payment transaction record."""
+    txn_id = f"TXN-FFR-{int(time.time())}-{uuid.uuid4().hex[:6].upper()}"
+    status = 'COD Pending' if payment_method == 'COD' else 'Pending'
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO payments (
+                order_id, listing_id, buyer_id, farmer_id, transaction_id,
+                razorpay_order_id, payment_method, amount, subtotal, delivery_charges,
+                payment_status, idempotency_key
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (order_id, listing_id, buyer_id, farmer_id, txn_id, razorpay_order_id,
+              payment_method, amount, subtotal, delivery_charges, status, idempotency_key))
+        payment_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return {'success': True, 'payment_id': payment_id, 'transaction_id': txn_id, 'status': status}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+def confirm_payment_record(transaction_id, razorpay_payment_id=None, razorpay_signature=None, payment_method=None):
+    """Mark payment as Paid and update associated order & stock."""
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM payments WHERE transaction_id = ? OR razorpay_order_id = ?", (transaction_id, transaction_id))
+        payment = cursor.fetchone()
+        if not payment:
+            conn.close()
+            return False, "Payment record not found"
+        
+        # Idempotency check: if already paid, return success without double decrementing stock
+        if payment['payment_status'] == 'Paid':
+            conn.close()
+            return True, payment['transaction_id']
+
+        method = payment_method or payment['payment_method']
+        cursor.execute('''
+            UPDATE payments
+            SET payment_status = 'Paid',
+                razorpay_payment_id = COALESCE(?, razorpay_payment_id),
+                razorpay_signature = COALESCE(?, razorpay_signature),
+                payment_method = ?,
+                updated_at = ?
+            WHERE id = ?
+        ''', (razorpay_payment_id, razorpay_signature, method, now_str, payment['id']))
+
+        # Update order status to Accepted
+        cursor.execute('''
+            UPDATE enquiries
+            SET payment_status = 'Paid',
+                payment_method = ?,
+                status = 'Accepted',
+                updated_at = ?
+            WHERE id = ?
+        ''', (method, now_str, payment['order_id']))
+
+        # Deduct stock from listing
+        cursor.execute("SELECT requested_quantity FROM enquiries WHERE id = ?", (payment['order_id'],))
+        enq = cursor.fetchone()
+        qty = enq['requested_quantity'] if enq else 0
+
+        cursor.execute("SELECT quantity, reserved_quantity FROM listings WHERE id = ?", (payment['listing_id'],))
+        listing = cursor.fetchone()
+        if listing:
+            new_qty = max(0.0, float(listing['quantity']) - float(qty))
+            new_res = max(0.0, float(listing['reserved_quantity'] or 0) - float(qty))
+            new_status = 'Sold' if new_qty <= 0 else 'Available'
+            cursor.execute('''
+                UPDATE listings
+                SET quantity = ?,
+                    reserved_quantity = ?,
+                    status = ?,
+                    rescued_from_waste = CASE WHEN ? <= 0 THEN 1 ELSE rescued_from_waste END,
+                    updated_at = ?
+                WHERE id = ?
+            ''', (new_qty, new_res, new_status, new_qty, now_str, payment['listing_id']))
+
+        conn.commit()
+        conn.close()
+        return True, payment['transaction_id']
+    except Exception as e:
+        return False, str(e)
+
+def confirm_cod_order(order_id, delivery_charges=0):
+    """Confirm a Cash on Delivery order: marks COD Pending, updates stock, creates payment record."""
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM enquiries WHERE id = ?", (order_id,))
+        order = cursor.fetchone()
+        if not order:
+            conn.close()
+            return False, "Order not found"
+        
+        cursor.execute("SELECT * FROM listings WHERE id = ?", (order['listing_id'],))
+        listing = cursor.fetchone()
+        if not listing:
+            conn.close()
+            return False, "Listing not found"
+
+        subtotal = float(order['total_price'] or (order['requested_quantity'] * order['offered_price']))
+        total_amount = subtotal + float(delivery_charges)
+        txn_id = f"COD-FFR-{int(time.time())}-{uuid.uuid4().hex[:6].upper()}"
+
+        cursor.execute('''
+            INSERT INTO payments (
+                order_id, listing_id, buyer_id, farmer_id, transaction_id,
+                payment_method, amount, subtotal, delivery_charges,
+                payment_status, payout_status
+            ) VALUES (?, ?, ?, ?, ?, 'COD', ?, ?, ?, 'COD Pending', 'Unsettled')
+        ''', (order['id'], listing['id'], order['buyer_id'], listing['farmer_id'], txn_id, total_amount, subtotal, delivery_charges))
+
+        cursor.execute('''
+            UPDATE enquiries
+            SET payment_status = 'COD Pending',
+                payment_method = 'COD',
+                status = 'Accepted',
+                delivery_charges = ?,
+                updated_at = ?
+            WHERE id = ?
+        ''', (delivery_charges, now_str, order['id']))
+
+        # Deduct / reserve stock
+        qty = float(order['requested_quantity'])
+        new_qty = max(0.0, float(listing['quantity']) - qty)
+        new_status = 'Sold' if new_qty <= 0 else 'Available'
+        cursor.execute('''
+            UPDATE listings
+            SET quantity = ?,
+                status = ?,
+                updated_at = ?
+            WHERE id = ?
+        ''', (new_qty, new_status, now_str, listing['id']))
+
+        conn.commit()
+        conn.close()
+        return True, txn_id
+    except Exception as e:
+        return False, str(e)
+
+def request_payment_refund(payment_id, buyer_id, reason):
+    """Buyer submits a refund request for an eligible transaction."""
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM payments WHERE id = ? AND buyer_id = ?", (payment_id, buyer_id))
+        payment = cursor.fetchone()
+        if not payment:
+            conn.close()
+            return False, "Payment record not found"
+        if payment['payment_status'] != 'Paid':
+            conn.close()
+            return False, "Only completed paid orders are eligible for refunds"
+        if payment['refund_status'] in ('Requested', 'Approved', 'Processed'):
+            conn.close()
+            return False, "Refund has already been requested or processed"
+
+        cursor.execute('''
+            UPDATE payments
+            SET refund_status = 'Requested',
+                refund_reason = ?,
+                updated_at = ?
+            WHERE id = ?
+        ''', (reason, now_str, payment_id))
+        conn.commit()
+        conn.close()
+        return True, "Refund request submitted for administrator review"
+    except Exception as e:
+        return False, str(e)
+
+def process_admin_refund(payment_id, decision, notes=None):
+    """Admin approves or rejects refund."""
+    now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM payments WHERE id = ?", (payment_id,))
+        payment = cursor.fetchone()
+        if not payment:
+            conn.close()
+            return False, "Payment not found"
+
+        if decision == 'Approved':
+            ref_tx = f"REF-FFR-{int(time.time())}-{uuid.uuid4().hex[:6].upper()}"
+            cursor.execute('''
+                UPDATE payments
+                SET refund_status = 'Processed',
+                    payment_status = 'Refunded',
+                    refund_amount = amount,
+                    refund_tx_id = ?,
+                    updated_at = ?
+                WHERE id = ?
+            ''', (ref_tx, now_str, payment_id))
+            # Restore stock if order was cancelled
+            cursor.execute("SELECT listing_id, requested_quantity FROM enquiries WHERE id = ?", (payment['order_id'],))
+            enq = cursor.fetchone()
+            if enq:
+                cursor.execute('''
+                    UPDATE listings
+                    SET quantity = quantity + ?,
+                        status = 'Available',
+                        updated_at = ?
+                    WHERE id = ?
+                ''', (enq['requested_quantity'], now_str, enq['listing_id']))
+                cursor.execute("UPDATE enquiries SET status = 'Cancelled', cancelled_reason = 'Refunded by Admin' WHERE id = ?", (payment['order_id'],))
+        else:
+            cursor.execute('''
+                UPDATE payments
+                SET refund_status = 'Rejected',
+                    updated_at = ?
+                WHERE id = ?
+            ''', (now_str, payment_id))
+
+        conn.commit()
+        conn.close()
+        return True, f"Refund {decision.lower()} successfully"
+    except Exception as e:
+        return False, str(e)
+
+def get_buyer_payments(buyer_id):
+    """Get all payments for buyer with order details."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT p.*, e.requested_quantity, e.status AS order_status,
+                   l.crop_name, l.unit, l.photo, u.name AS farmer_name, u.phone AS farmer_phone
+            FROM payments p
+            JOIN enquiries e ON p.order_id = e.id
+            JOIN listings l ON p.listing_id = l.id
+            JOIN users u ON p.farmer_id = u.id
+            WHERE p.buyer_id = ?
+            ORDER BY p.created_at DESC
+        ''', (buyer_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
+def get_farmer_payments(farmer_id):
+    """Get payment transaction history and earnings summary for farmer."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT p.*, e.requested_quantity, e.status AS order_status,
+                   l.crop_name, l.unit, u.name AS buyer_name, u.phone AS buyer_phone
+            FROM payments p
+            JOIN enquiries e ON p.order_id = e.id
+            JOIN listings l ON p.listing_id = l.id
+            JOIN users u ON p.buyer_id = u.id
+            WHERE p.farmer_id = ?
+            ORDER BY p.created_at DESC
+        ''', (farmer_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
+def get_admin_payments(limit=100):
+    """Get all transactions for Admin control center."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT p.*, l.crop_name,
+                   b.name AS buyer_name, b.email AS buyer_email,
+                   f.name AS farmer_name, f.email AS farmer_email
+            FROM payments p
+            JOIN listings l ON p.listing_id = l.id
+            JOIN users b ON p.buyer_id = b.id
+            JOIN users f ON p.farmer_id = f.id
+            ORDER BY p.created_at DESC
+            LIMIT ?
+        ''', (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
+def get_payment_by_order_id(order_id):
+    """Retrieve payment record for an order."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT p.*, l.crop_name, l.unit, l.price_per_unit, l.photo, l.village_town, l.district,
+                   b.name AS buyer_name, b.phone AS buyer_phone, b.email AS buyer_email,
+                   f.name AS farmer_name, f.phone AS farmer_phone, f.email AS farmer_email,
+                   e.requested_quantity, e.status AS order_status, e.delivery_address, e.delivery_preference,
+                   e.created_at AS order_created_at
+            FROM payments p
+            JOIN listings l ON p.listing_id = l.id
+            JOIN users b ON p.buyer_id = b.id
+            JOIN users f ON p.farmer_id = f.id
+            JOIN enquiries e ON p.order_id = e.id
+            WHERE p.order_id = ?
+            ORDER BY p.id DESC LIMIT 1
+        ''', (order_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return row
+    except Exception:
+        return None
+
+# ==========================================
+# Real-Time Stock Availability
+# ==========================================
+
+def get_available_stock(listing_id):
+    """Return available quantity (quantity - reserved_quantity)."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT quantity, reserved_quantity, status FROM listings WHERE id = ?", (listing_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if not row or row['status'] != 'Available':
+            return 0.0
+        avail = max(0.0, float(row['quantity']) - float(row['reserved_quantity'] or 0))
+        return avail
+    except Exception:
+        return 0.0
+
+def reserve_listing_stock(listing_id, requested_qty):
+    """Safely reserve stock for pending checkout."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT quantity, reserved_quantity FROM listings WHERE id = ?", (listing_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return False, "Produce not found"
+        avail = float(row['quantity']) - float(row['reserved_quantity'] or 0)
+        if requested_qty > avail:
+            conn.close()
+            return False, f"Only {avail:.1f} kg available in stock"
+        cursor.execute('''
+            UPDATE listings
+            SET reserved_quantity = COALESCE(reserved_quantity, 0) + ?
+            WHERE id = ?
+        ''', (requested_qty, listing_id))
+        conn.commit()
+        conn.close()
+        return True, "Stock reserved"
+    except Exception as e:
+        return False, str(e)
+
+# ==========================================
+# Live Market Prices & Trends
+# ==========================================
+
+def get_market_prices(crop_name=None, district=None, limit=30):
+    """Fetch live agricultural market benchmark rates in Tamil Nadu."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        query = "SELECT * FROM market_prices WHERE 1=1"
+        params = []
+        if crop_name:
+            query += " AND crop_name LIKE ?"
+            params.append(f"%{crop_name}%")
+        if district:
+            query += " AND district = ?"
+            params.append(district)
+        query += " ORDER BY price_date DESC, crop_name ASC LIMIT ?"
+        params.append(limit)
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
+def get_crop_benchmark_price(crop_name, district=None):
+    """Find closest benchmark price for a crop."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        base = crop_name.split()[0].replace(',', '').strip()
+        if district:
+            cursor.execute('''
+                SELECT * FROM market_prices
+                WHERE crop_name LIKE ? AND district = ?
+                ORDER BY price_date DESC LIMIT 1
+            ''', (f"%{base}%", district))
+            row = cursor.fetchone()
+            if row:
+                conn.close()
+                return row
+        cursor.execute('''
+            SELECT * FROM market_prices
+            WHERE crop_name LIKE ?
+            ORDER BY price_date DESC LIMIT 1
+        ''', (f"%{base}%",))
+        row = cursor.fetchone()
+        conn.close()
+        return row
+    except Exception:
+        return None
+
+# ==========================================
+# Farmer-Buyer Live Chat & Messaging
+# ==========================================
+
+def save_chat_message(sender_id, receiver_id, message, order_id=None, listing_id=None,
+                      image_filename=None, offer_price=None, offer_quantity=None):
+    """Store real-time chat message between buyer and farmer."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO chat_messages (
+                sender_id, receiver_id, order_id, listing_id,
+                message, image_filename, offer_price, offer_quantity,
+                offer_status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            sender_id, receiver_id, order_id, listing_id,
+            message, image_filename, offer_price, offer_quantity,
+            'Pending' if offer_price else 'None'
+        ))
+        msg_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return {'success': True, 'message_id': msg_id}
+    except Exception as e:
+        return {'success': False, 'error': str(e)}
+
+def get_conversation_messages(user_1_id, user_2_id, order_id=None, limit=60):
+    """Fetch chronological message exchange between two users."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        query = '''
+            SELECT cm.*,
+                   s.name AS sender_name, s.role AS sender_role,
+                   r.name AS receiver_name, r.role AS receiver_role
+            FROM chat_messages cm
+            JOIN users s ON cm.sender_id = s.id
+            JOIN users r ON cm.receiver_id = r.id
+            WHERE ((cm.sender_id = ? AND cm.receiver_id = ?)
+                OR (cm.sender_id = ? AND cm.receiver_id = ?))
+        '''
+        params = [user_1_id, user_2_id, user_2_id, user_1_id]
+        if order_id:
+            query += " AND (cm.order_id = ? OR cm.order_id IS NULL)"
+            params.append(order_id)
+        query += " ORDER BY cm.created_at ASC LIMIT ?"
+        params.append(limit)
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+
+        cursor.execute('''
+            UPDATE chat_messages SET is_read = 1
+            WHERE sender_id = ? AND receiver_id = ? AND is_read = 0
+        ''', (user_2_id, user_1_id))
+        conn.commit()
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
+def get_user_chat_threads(user_id):
+    """Retrieve all active conversations for a user."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT 
+                CASE WHEN cm.sender_id = ? THEN cm.receiver_id ELSE cm.sender_id END AS other_user_id,
+                u.name AS other_user_name, u.role AS other_user_role, u.phone AS other_user_phone,
+                cm.message AS last_message, cm.created_at AS last_message_at,
+                cm.order_id,
+                SUM(CASE WHEN cm.receiver_id = ? AND cm.is_read = 0 THEN 1 ELSE 0 END) AS unread_count
+            FROM chat_messages cm
+            JOIN users u ON u.id = (CASE WHEN cm.sender_id = ? THEN cm.receiver_id ELSE cm.sender_id END)
+            WHERE cm.sender_id = ? OR cm.receiver_id = ?
+            GROUP BY other_user_id
+            ORDER BY last_message_at DESC
+        ''', (user_id, user_id, user_id, user_id, user_id))
+        rows = cursor.fetchall()
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
+# ==========================================
+# Agro-Climatic Weather Alerts
+# ==========================================
+
+def get_weather_alerts(district=None):
+    """Fetch active agro-climatic advisories."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        if district:
+            cursor.execute("SELECT * FROM weather_alerts WHERE district = ? ORDER BY id DESC", (district,))
+            rows = cursor.fetchall()
+            if rows:
+                conn.close()
+                return rows
+        cursor.execute("SELECT * FROM weather_alerts ORDER BY id DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        return rows
+    except Exception:
+        return []
 
 if __name__ == '__main__':
     init_db()

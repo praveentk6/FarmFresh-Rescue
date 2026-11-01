@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice #{{ payment['transaction_id'] }} - {{ _t('brand_name') }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem; max-width: 850px;">
+
+  <!-- Print Actions Bar -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;" class="no-print">
+    <div>
+      <a href="{{ url_for('buyer_dashboard') }}" class="btn btn-secondary btn-sm">&larr; Back to Dashboard</a>
+    </div>
+    <div style="display: flex; gap: 0.5rem;">
+      <a href="{{ url_for('chat_conversation', recipient_id=payment['farmer_id'], order_id=payment['order_id']) }}" class="btn btn-outline-primary btn-sm">
+        💬 Chat with Farmer
+      </a>
+      <a href="{{ url_for('trace_passport', listing_id=payment['listing_id']) }}" class="btn btn-outline-primary btn-sm">
+        🔍 Farm Provenance
+      </a>
+      <button type="button" class="btn btn-primary btn-sm" onclick="window.print()">
+        🖨️ Print / Save as PDF
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Digital Invoice Document -->
+  <div class="data-table-card" style="padding: 2.5rem; background: #ffffff; border: 1px solid #e2e8f0; box-shadow: var(--shadow-md); border-radius: var(--radius-lg); position: relative;" id="printableInvoice">
+    
+    <!-- Status Stamp Banner -->
+    <div style="position: absolute; top: 2rem; right: 2rem; text-align: right;">
+      {% if payment['payment_status'] == 'Paid' %}
+        <div style="display: inline-block; padding: 0.4rem 1rem; border: 2px solid #16a34a; color: #16a34a; font-weight: 800; font-size: 1.1rem; border-radius: 8px; text-transform: uppercase; transform: rotate(-3deg); background: #f0fdf4;">
+          ✓ PAID & CONFIRMED
+        </div>
+      {% elif payment['payment_status'] == 'COD Pending' %}
+        <div style="display: inline-block; padding: 0.4rem 1rem; border: 2px solid #ea580c; color: #ea580c; font-weight: 800; font-size: 1.05rem; border-radius: 8px; text-transform: uppercase; background: #fff7ed;">
+          ⏳ CASH ON DELIVERY PENDING
+        </div>
+      {% elif payment['payment_status'] == 'Refunded' %}
+        <div style="display: inline-block; padding: 0.4rem 1rem; border: 2px solid #dc2626; color: #dc2626; font-weight: 800; font-size: 1.05rem; border-radius: 8px; text-transform: uppercase; background: #fee2e2;">
+          ↩️ REFUNDED
+        </div>
+      {% else %}
+        <div style="display: inline-block; padding: 0.4rem 1rem; border: 2px solid #64748b; color: #64748b; font-weight: 800; font-size: 1rem; border-radius: 8px; text-transform: uppercase;">
+          {{ payment['payment_status'] }}
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Header & Brand -->
+    <div style="border-bottom: 2px solid #f1f5f9; padding-bottom: 1.75rem; margin-bottom: 2rem;">
+      <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+        <span style="font-size: 2rem; background: linear-gradient(135deg, #22c55e, #15803d); color: white; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px;">🌾</span>
+        <div>
+          <h1 style="font-size: 1.6rem; font-weight: 800; margin: 0; color: #14532d;">FarmFresh <span style="color: #ea580c;">Rescue</span></h1>
+          <span style="font-size: 0.8rem; color: #64748b; font-weight: 600;">Direct Agricultural Marketplace & Zero-Waste Produce Platform &bull; Tamil Nadu</span>
+        </div>
+      </div>
+      <div style="font-size: 0.85rem; color: #475569; margin-top: 0.5rem;">
+        <strong>Official Payment Receipt & Tax Invoice</strong> &bull; Generated digitally under FarmFresh Rescue Fair Trade Protocol
+      </div>
+    </div>
+
+    <!-- Metadata Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; background: #f8fafc; padding: 1.25rem; border-radius: var(--radius-md); margin-bottom: 2rem; font-size: 0.875rem;">
+      <div>
+        <span style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; display: block;">Transaction ID:</span>
+        <strong style="color: #0f172a; font-family: monospace; font-size: 0.95rem;">{{ payment['transaction_id'] }}</strong>
+      </div>
+      <div>
+        <span style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; display: block;">Order Reference:</span>
+        <strong style="color: #0f172a;">#ORD-{{ payment['order_id'] }}</strong>
+      </div>
+      <div>
+        <span style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; display: block;">Payment Date & Time:</span>
+        <strong style="color: #0f172a;">{{ payment['created_at'] }}</strong>
+      </div>
+      <div>
+        <span style="color: #64748b; font-size: 0.75rem; text-transform: uppercase; font-weight: 700; display: block;">Payment Channel:</span>
+        <strong style="color: #166534;">{{ payment['payment_method'] }}</strong>
+      </div>
+    </div>
+
+    <!-- Parties Involved: Buyer & Seller -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem; font-size: 0.9rem;">
+      <div style="border-left: 3px solid #16a34a; padding-left: 1rem;">
+        <span style="font-size: 0.75rem; color: #166534; font-weight: 700; text-transform: uppercase;">PRODUCED & SOLD BY (FARMER)</span>
+        <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0.25rem 0; color: #0f172a;">{{ payment['farmer_name'] }}</h3>
+        <div style="color: #475569;">📍 {{ payment['village_town'] }}, {{ payment['district'] }}, Tamil Nadu</div>
+        <div style="color: #475569;">📞 {{ payment['farmer_phone'] }}</div>
+        <div style="color: #64748b; font-size: 0.8rem;">✉️ {{ payment['farmer_email'] }}</div>
+      </div>
+
+      <div style="border-left: 3px solid #0284c7; padding-left: 1rem;">
+        <span style="font-size: 0.75rem; color: #0284c7; font-weight: 700; text-transform: uppercase;">BILLED & DELIVERED TO (BUYER)</span>
+        <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0.25rem 0; color: #0f172a;">{{ payment['buyer_name'] }}</h3>
+        <div style="color: #475569;">📍 {{ payment['delivery_address'] or 'Direct Farm Collection Point' }}</div>
+        <div style="color: #475569;">📞 {{ payment['buyer_phone'] }}</div>
+        <div style="color: #64748b; font-size: 0.8rem;">✉️ {{ payment['buyer_email'] }}</div>
+      </div>
+    </div>
+
+    <!-- Items Table -->
+    <div class="table-responsive" style="margin-bottom: 2rem;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+        <thead>
+          <tr style="background: #f1f5f9; text-align: left; color: #475569; font-size: 0.8rem; text-transform: uppercase;">
+            <th style="padding: 0.75rem 1rem;">#</th>
+            <th style="padding: 0.75rem 1rem;">Produce Description</th>
+            <th style="padding: 0.75rem 1rem; text-align: right;">Quantity</th>
+            <th style="padding: 0.75rem 1rem; text-align: right;">Unit Rate</th>
+            <th style="padding: 0.75rem 1rem; text-align: right;">Amount (INR)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid #e2e8f0;">
+            <td style="padding: 1rem;">1</td>
+            <td style="padding: 1rem;">
+              <strong style="color: #0f172a;">{{ payment['crop_name'] }}</strong>
+              <div style="font-size: 0.75rem; color: #64748b;">
+                Handover Mode: {{ payment['delivery_preference'] or 'Direct Collection' }}
+              </div>
+            </td>
+            <td style="padding: 1rem; text-align: right; font-weight: 600;">
+              {{ "%.1f"|format(payment['requested_quantity']) }} {{ payment['unit'] }}
+            </td>
+            <td style="padding: 1rem; text-align: right;">
+              ₹{{ "%.2f"|format(payment['price_per_unit']) }}
+            </td>
+            <td style="padding: 1rem; text-align: right; font-weight: 700; color: #0f172a;">
+              ₹{{ "%.2f"|format(payment['subtotal']) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Totals & QR Code Verification -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: flex-start; padding-top: 1rem; border-top: 2px solid #f1f5f9;">
+      
+      <!-- QR Verification Code -->
+      <div style="display: flex; gap: 1rem; align-items: center; background: #f8fafc; padding: 1rem; border-radius: var(--radius-md); border: 1px dashed #cbd5e1;">
+        <img src="{{ url_for('generate_qr_code', listing_id=payment['listing_id']) }}" alt="QR Code" style="width: 80px; height: 80px; border-radius: 6px; background: white; padding: 2px; border: 1px solid #e2e8f0;">
+        <div>
+          <div style="font-weight: 700; font-size: 0.85rem; color: #166534;">Scan for Provenance</div>
+          <div style="font-size: 0.75rem; color: #64748b; line-height: 1.35; margin-top: 0.2rem;">
+            Scan to view farm traceability certificate, harvest date, and handover history on blockchain-ready registry.
+          </div>
+        </div>
+      </div>
+
+      <!-- Financial Calculation -->
+      <div style="display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.95rem;">
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #64748b;">Subtotal Amount:</span>
+          <strong>₹{{ "%.2f"|format(payment['subtotal']) }}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="color: #64748b;">Agri-Logistics / Delivery:</span>
+          <strong>₹{{ "%.2f"|format(payment['delivery_charges']) }}</strong>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding-top: 0.75rem; border-top: 1px solid #e2e8f0; font-size: 1.25rem;">
+          <strong style="color: #0f172a;">Total Paid / Due:</strong>
+          <strong style="color: var(--primary);">₹{{ "%.2f"|format(payment['amount']) }}</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Guarantee -->
+    <div style="margin-top: 2.5rem; padding-top: 1.5rem; border-top: 1px solid #f1f5f9; text-align: center; font-size: 0.75rem; color: #94a3b8;">
+      Thank you for rescuing agricultural produce and reducing food wastage across Tamil Nadu. &bull; FarmFresh Rescue Escrow Guarantee &bull; Support: support@farmfresh.org
+    </div>
+  </div>
+</div>
+
+<style>
+@media print {
+  body {
+    background: white !important;
+  }
+  .navbar, .footer, .no-print, .chatbot-container {
+    display: none !important;
+  }
+  .container {
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+  #printableInvoice {
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+  }
+}
+</style>
+{% endblock %}

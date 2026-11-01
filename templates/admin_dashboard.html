@@ -373,6 +373,179 @@
     </div>
   </div>
 
+  <!-- Section: Payments, Escrow & Gateway Audit Center -->
+  <div class="data-table-card" style="margin-bottom: 2rem; border-top: 4px solid #16a34a;">
+    <div class="data-table-header">
+      <div>
+        <h2 style="font-size: 1.35rem; color: #0f172a;">💳 Razorpay Payments & Gateway Escrow Audit</h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">
+          Monitor marketplace payment volume, online gateway collections, Cash on Delivery handovers, and process refund requests
+        </span>
+      </div>
+      <div>
+        {% if refund_requests and refund_requests|length > 0 %}
+          <span style="background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; font-weight: 700; font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 999px;">
+            ⚠️ {{ refund_requests|length }} Pending Refund Request(s)
+          </span>
+        {% else %}
+          <span style="background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; font-weight: 700; font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 999px;">
+            ✓ All Gateway Settlements Healthy
+          </span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Payment KPI Grid -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; padding: 1.25rem 1.25rem 0.5rem;">
+      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 1rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #166534; text-transform: uppercase;">Total Payment Volume</div>
+        <div style="font-size: 1.5rem; font-weight: 800; color: #166534; margin-top: 0.25rem;">
+          ₹{{ "{:,.2f}".format(total_payment_volume or 0) }}
+        </div>
+        <div style="font-size: 0.72rem; color: #166534;">Cumulative trade throughput</div>
+      </div>
+
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #0f172a; text-transform: uppercase;">Paid Online Orders</div>
+        <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a; margin-top: 0.25rem;">
+          {{ paid_payments_count }}
+        </div>
+        <div style="font-size: 0.72rem; color: #64748b;">UPI, Cards & Net Banking</div>
+      </div>
+
+      <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 1rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #1e40af; text-transform: uppercase;">Pending COD Orders</div>
+        <div style="font-size: 1.5rem; font-weight: 800; color: #1e40af; margin-top: 0.25rem;">
+          {{ pending_payments_count }}
+        </div>
+        <div style="font-size: 0.72rem; color: #1e40af;">Cash collected at delivery</div>
+      </div>
+
+      <div style="background: {% if refund_requests and refund_requests|length > 0 %}#fef2f2; border: 1px solid #fecaca;{% else %}#f8fafc; border: 1px solid #e2e8f0;{% endif %} border-radius: 8px; padding: 1rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; color: {% if refund_requests and refund_requests|length > 0 %}#991b1b{% else %}#64748b{% endif %}; text-transform: uppercase;">Refund Requests</div>
+        <div style="font-size: 1.5rem; font-weight: 800; color: {% if refund_requests and refund_requests|length > 0 %}#991b1b{% else %}#0f172a{% endif %}; margin-top: 0.25rem;">
+          {{ refund_requests|length if refund_requests else 0 }}
+        </div>
+        <div style="font-size: 0.72rem; color: #64748b;">Buyer escrow disputes</div>
+      </div>
+    </div>
+
+    <!-- Payments Audit Table -->
+    {% if payments %}
+      <div class="table-responsive" style="margin-top: 1rem;">
+        <table class="custom-table" style="font-size: 0.85rem;">
+          <thead>
+            <tr>
+              <th>Txn / Order #</th>
+              <th>Produce</th>
+              <th>Buyer & Farmer</th>
+              <th>Amount</th>
+              <th>Method</th>
+              <th>Gateway Status</th>
+              <th>Refund Review</th>
+              <th style="text-align: right;">Audit Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in payments %}
+              <tr>
+                <td>
+                  <strong>#{{ p['order_id'] }}</strong>
+                  {% if p['razorpay_payment_id'] %}
+                    <div style="font-size: 0.7rem; color: #64748b; font-family: monospace;">{{ p['razorpay_payment_id'] }}</div>
+                  {% endif %}
+                </td>
+                <td>
+                  <div style="font-weight: 700;">{{ p['crop_name'] }}</div>
+                  <div style="font-size: 0.75rem; color: #64748b;">{{ p['quantity'] }} {{ p['unit'] }}</div>
+                </td>
+                <td>
+                  <div>Buyer: <strong>{{ p['buyer_name'] }}</strong></div>
+                  <div style="font-size: 0.75rem; color: #64748b;">Farmer: {{ p['farmer_name'] }}</div>
+                </td>
+                <td>
+                  <strong style="color: #166534; font-size: 0.95rem;">₹{{ "{:,.2f}".format(p['amount']) }}</strong>
+                </td>
+                <td>
+                  <span style="font-size: 0.75rem; background: #f1f5f9; padding: 0.2rem 0.45rem; border-radius: 4px; font-weight: 600;">
+                    {% if 'COD' in (p['payment_method'] or '') %}💵 COD{% else %}💳 Razorpay ({{ p['payment_method'] or 'Online' }}){% endif %}
+                  </span>
+                </td>
+                <td>
+                  {% if p['payment_status'] == 'Paid' %}
+                    <span style="background: #dcfce7; color: #166534; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+                      ✓ Paid
+                    </span>
+                  {% elif p['payment_status'] == 'Pending COD' %}
+                    <span style="background: #e0f2fe; color: #0369a1; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+                      💵 COD Pending
+                    </span>
+                  {% elif p['payment_status'] == 'Refunded' %}
+                    <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+                      ↩️ Refunded
+                    </span>
+                  {% else %}
+                    <span style="background: #fee2e2; color: #991b1b; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+                      {{ p['payment_status'] }}
+                    </span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if p['refund_status'] == 'Refund Requested' %}
+                    <span style="background: #fef3c7; color: #b45309; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;">
+                      ⚠️ Requested
+                    </span>
+                  {% elif p['refund_status'] == 'Refunded' %}
+                    <span style="background: #f1f5f9; color: #64748b; font-size: 0.75rem; font-weight: 600;">
+                      Approved
+                    </span>
+                  {% elif p['refund_status'] == 'Refund Rejected' %}
+                    <span style="background: #fee2e2; color: #991b1b; font-size: 0.75rem; font-weight: 600;">
+                      Rejected
+                    </span>
+                  {% else %}
+                    <span style="color: #94a3b8; font-size: 0.75rem;">None</span>
+                  {% endif %}
+                </td>
+                <td style="text-align: right;">
+                  <div style="display: flex; gap: 0.35rem; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+                    <a href="{{ url_for('view_invoice', order_id=p['order_id']) }}" class="btn btn-outline-primary btn-sm" target="_blank" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                      🧾 Invoice
+                    </a>
+
+                    {% if p['refund_status'] == 'Refund Requested' %}
+                      <!-- Approve Refund -->
+                      <form action="{{ url_for('admin_process_refund', payment_id=p['id']) }}" method="POST" style="display: inline;" onsubmit="return confirm('Approve refund of ₹{{ p['amount'] }} for Order #{{ p['order_id'] }}?');">
+                        <input type="hidden" name="action" value="approve">
+                        <button type="submit" class="btn btn-sm btn-success" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background: #16a34a; border-color: #16a34a; color: white;">
+                          ✓ Approve
+                        </button>
+                      </form>
+
+                      <!-- Reject Refund -->
+                      <form action="{{ url_for('admin_process_refund', payment_id=p['id']) }}" method="POST" style="display: inline;" onsubmit="return confirm('Reject refund request for Order #{{ p['order_id'] }}?');">
+                        <input type="hidden" name="action" value="reject">
+                        <button type="submit" class="btn btn-sm btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                          ✕ Reject
+                        </button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="padding: 2.5rem 1.5rem; text-align: center; color: #64748b;">
+        <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">💳</span>
+        <div style="font-weight: 700; color: #0f172a; margin-bottom: 0.25rem;">No Payment Records Found</div>
+        <p style="font-size: 0.85rem; margin: 0;">Online orders and Cash on Delivery handovers will be logged here for gateway reconciliation.</p>
+      </div>
+    {% endif %}
+  </div>
+
   <!-- Section 3: Platform Audit & Activity Logs -->
   <div class="data-table-card">
     <div class="data-table-header">

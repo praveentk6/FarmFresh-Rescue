@@ -31,6 +31,33 @@
     </div>
   </div>
 
+  <!-- Agro-Meteorological Weather Early Warning Banner -->
+  {% if weather_alerts %}
+    <div style="background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); border-left: 5px solid #ea580c; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(234,88,12,0.1);">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+        <div style="display: flex; align-items: flex-start; gap: 0.85rem;">
+          <span style="font-size: 2rem;">🌦️</span>
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+              <span style="font-weight: 800; color: #9a3412; font-size: 1.05rem;">
+                Agro-Weather Advisory for {{ current_user['district'] or 'Tamil Nadu' }}: {{ weather_alerts[0]['alert_type'] }}
+              </span>
+              <span style="background: #ea580c; color: white; font-size: 0.7rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 999px;">
+                {{ weather_alerts[0]['severity'] }}
+              </span>
+            </div>
+            <p style="color: #7c2d12; font-size: 0.875rem; margin: 0.35rem 0 0 0; line-height: 1.45;">
+              {{ weather_alerts[0]['advisory'] }}
+            </p>
+          </div>
+        </div>
+        <a href="{{ url_for('weather_alerts_view') }}" class="btn btn-secondary btn-sm" style="border-color: #fdba74; color: #9a3412; background: white; white-space: nowrap;">
+          View All Regional Alerts &rarr;
+        </a>
+      </div>
+    </div>
+  {% endif %}
+
   <!-- Primary 6 Calculated KPI Summary Cards (Preserved) -->
   <div class="dashboard-grid-kpis" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 2rem;">
     
@@ -446,6 +473,11 @@
                       🔍
                     </a>
 
+                    <!-- QR Provenance Passport -->
+                    <a href="{{ url_for('trace_produce', listing_id=item['id']) }}" class="btn btn-outline-primary btn-sm" title="QR Provenance Passport" target="_blank">
+                      🏷️ QR
+                    </a>
+
                     <!-- Delete -->
                     <form action="{{ url_for('delete_listing', listing_id=item['id']) }}" method="POST" class="confirm-delete">
                       <button type="submit" class="btn btn-danger btn-sm" title="Delete listing">
@@ -467,6 +499,121 @@
           Post your bumper harvests or vegetables holding unsold stock to connect with nearby wholesale buyers.
         </p>
         <a href="{{ url_for('add_listing') }}" class="btn btn-primary">+ {{ _t('btn_post_listing') }}</a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Sales, Payments & Escrow Settlement Section -->
+  <div class="data-table-card" style="margin-bottom: 2.5rem; border-top: 4px solid #16a34a;">
+    <div class="data-table-header">
+      <div>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: #0f172a;">
+          💰 {{ _t('farmer_payouts_title') or 'Produce Sales, Payments & Settlement' }}
+        </h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">
+          Real-time transaction log, online payment settlements (UPI/Cards), and Cash-on-Delivery receipts
+        </span>
+      </div>
+    </div>
+
+    <!-- Settlement KPI Cards -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; padding: 1.25rem 1.25rem 0.5rem;">
+      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 1rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #166534; text-transform: uppercase;">Paid Online (Razorpay)</div>
+        <div style="font-size: 1.5rem; font-weight: 800; color: #166534; margin-top: 0.25rem;">
+          ₹{{ "{:,.2f}".format(paid_orders_revenue or 0) }}
+        </div>
+        <div style="font-size: 0.72rem; color: #166534;">Direct digital bank settlement</div>
+      </div>
+
+      <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 1rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #1e40af; text-transform: uppercase;">Payable on Delivery (COD)</div>
+        <div style="font-size: 1.5rem; font-weight: 800; color: #1e40af; margin-top: 0.25rem;">
+          ₹{{ "{:,.2f}".format(cod_pending_revenue or 0) }}
+        </div>
+        <div style="font-size: 0.72rem; color: #1e40af;">Direct cash collection upon handover</div>
+      </div>
+
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #475569; text-transform: uppercase;">Total Sales Volume</div>
+        <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a; margin-top: 0.25rem;">
+          ₹{{ "{:,.2f}".format((paid_orders_revenue or 0) + (cod_pending_revenue or 0)) }}
+        </div>
+        <div style="font-size: 0.72rem; color: #64748b;">{{ payments|length }} recorded transactions</div>
+      </div>
+    </div>
+
+    {% if payments %}
+      <div class="table-responsive" style="margin-top: 1rem;">
+        <table class="custom-table" style="font-size: 0.875rem;">
+          <thead>
+            <tr>
+              <th>Order #</th>
+              <th>Buyer</th>
+              <th>Produce & Qty</th>
+              <th>Amount (₹)</th>
+              <th>Payment Mode</th>
+              <th>Payment Status</th>
+              <th>Date</th>
+              <th style="text-align: right;">Invoice & Chat</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for p in payments %}
+              <tr>
+                <td><strong>#{{ p['order_id'] }}</strong></td>
+                <td>
+                  <div style="font-weight: 700;">{{ p['buyer_name'] }}</div>
+                </td>
+                <td>{{ p['crop_name'] }} ({{ p['quantity'] }} {{ p['unit'] }})</td>
+                <td><strong style="color: #166534;">₹{{ "{:,.2f}".format(p['amount']) }}</strong></td>
+                <td>
+                  <span style="font-size: 0.75rem; background: #f1f5f9; padding: 0.2rem 0.45rem; border-radius: 4px; font-weight: 600;">
+                    {% if 'COD' in (p['payment_method'] or '') %}💵 Cash on Delivery{% else %}💳 Online ({{ p['payment_method'] or 'Razorpay' }}){% endif %}
+                  </span>
+                </td>
+                <td>
+                  {% if p['payment_status'] == 'Paid' %}
+                    <span style="background: #dcfce7; color: #166534; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+                      ✓ Paid
+                    </span>
+                  {% elif p['payment_status'] == 'Pending COD' %}
+                    <span style="background: #e0f2fe; color: #0369a1; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+                      💵 COD Pending
+                    </span>
+                  {% elif p['payment_status'] == 'Refunded' %}
+                    <span style="background: #fee2e2; color: #991b1b; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+                      ↩️ Refunded
+                    </span>
+                  {% else %}
+                    <span style="background: #f1f5f9; color: #64748b; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+                      {{ p['payment_status'] }}
+                    </span>
+                  {% endif %}
+                </td>
+                <td style="font-size: 0.8rem; color: #64748b;">
+                  {{ p['created_at'].split()[0] if ' ' in p['created_at'] else p['created_at'] }}
+                </td>
+                <td style="text-align: right;">
+                  <div style="display: flex; gap: 0.35rem; justify-content: flex-end;">
+                    <a href="{{ url_for('view_invoice', order_id=p['order_id']) }}" class="btn btn-outline-primary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                      🧾 Receipt
+                    </a>
+                    <a href="{{ url_for('chat_conversation', recipient_id=p['buyer_id']) }}?order_id={{ p['order_id'] }}" class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                      💬 Chat
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="padding: 2rem 1.5rem; text-align: center; color: #64748b;">
+        <span style="font-size: 2rem; display: block; margin-bottom: 0.5rem;">💳</span>
+        <div style="font-weight: 600; color: #0f172a; margin-bottom: 0.25rem;">No Payment Records Yet</div>
+        <p style="font-size: 0.85rem; margin: 0;">Online buyer payments and cash-on-delivery settlements will appear in this log.</p>
       </div>
     {% endif %}
   </div>
@@ -555,6 +702,18 @@
                   {% else %}
                     <span style="background: #f1f5f9; color: #64748b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ o['status'] }}</span>
                   {% endif %}
+
+                  <div style="margin-top: 0.35rem;">
+                    {% if o['payment_status'] == 'Paid' %}
+                      <span style="background: #dcfce7; color: #166534; font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.2rem;">
+                        💳 Paid
+                      </span>
+                    {% elif o['payment_status'] == 'Pending COD' %}
+                      <span style="background: #e0f2fe; color: #0369a1; font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.2rem;">
+                        💵 COD Pending
+                      </span>
+                    {% endif %}
+                  </div>
                 </td>
                 <td>
                   <a href="{{ url_for('track_order', order_id=o['id']) }}" class="btn btn-outline-primary btn-sm" style="white-space: nowrap;">
@@ -576,15 +735,23 @@
                       <button type="submit" class="btn btn-secondary btn-sm" style="padding: 0.3rem 0.6rem;">Update</button>
                     </form>
 
-                    <!-- Quick Call / WhatsApp -->
-                    <div style="display: flex; gap: 0.35rem;">
+                    <!-- Quick Actions -->
+                    <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end;">
+                      <a href="{{ url_for('chat_conversation', recipient_id=o['buyer_id']) }}?order_id={{ o['id'] }}" class="btn btn-primary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                        💬 Chat
+                      </a>
+                      {% if o['payment_status'] == 'Paid' %}
+                        <a href="{{ url_for('view_invoice', order_id=o['id']) }}" class="btn btn-outline-primary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                          🧾 Receipt
+                        </a>
+                      {% endif %}
                       <a href="tel:{{ o['buyer_phone'] }}" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
                         📞 Call
                       </a>
                       {% set clean_bphone = o['buyer_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
                       <a href="https://wa.me/91{{ clean_bphone }}?text=Vanakkam%20{{ o['buyer_name'] }}%2C%20regarding%20your%20purchase%20order%20%23{{ o['id'] }}%20for%20{{ o['crop_name'] }}%20on%20FarmFresh%20Rescue." 
                          target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
-                        💬 WhatsApp
+                        💬 WA
                       </a>
                     </div>
                   </div>

@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Produce Traceability Passport #{{ listing['id'] }} - {{ _t('brand_name') }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 4rem; max-width: 860px;">
+
+  <!-- Breadcrumbs -->
+  <div style="margin-bottom: 1.5rem; font-size: 0.875rem; color: var(--text-muted);">
+    <a href="{{ url_for('browse_listings') }}">{{ _t('browse_produce') }}</a> &bull;
+    <a href="{{ url_for('listing_detail', listing_id=listing['id']) }}">{{ listing['crop_name'] }}</a> &bull;
+    <span style="color: var(--primary-dark); font-weight: 600;">Traceability Passport</span>
+  </div>
+
+  <div class="data-table-card" style="padding: 2.5rem; border-top: 5px solid #16a34a; box-shadow: var(--shadow-md);">
+    
+    <!-- Top Verification Banner -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; border-bottom: 2px solid #f1f5f9; padding-bottom: 1.5rem;">
+      <div style="display: flex; gap: 1rem; align-items: center;">
+        <span style="font-size: 2.5rem; background: #dcfce7; width: 54px; height: 54px; display: inline-flex; align-items: center; justify-content: center; border-radius: 12px;">🛡️</span>
+        <div>
+          <span style="font-size: 0.8rem; font-weight: 700; color: #166534; text-transform: uppercase;">
+            Digital Harvest Provenance Passport &bull; Certificate #TRC-TN-{{ listing['id'] }}
+          </span>
+          <h1 style="font-size: 1.85rem; font-weight: 800; color: #0f172a; margin-top: 0.2rem;">
+            {{ listing['crop_name'] }}
+          </h1>
+        </div>
+      </div>
+      <div>
+        <span class="badge-available" style="font-size: 0.85rem; font-weight: 700;">
+          ✓ Verified Direct-from-Farmer
+        </span>
+      </div>
+    </div>
+
+    <!-- Product & Provenance Split Grid -->
+    <div style="display: grid; grid-template-columns: 240px 1fr; gap: 2rem; margin-bottom: 2rem;">
+      
+      <!-- Photo & QR Code -->
+      <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <div style="width: 100%; height: 200px; border-radius: var(--radius-md); overflow: hidden; background: #f8fafc; border: 1px solid #e2e8f0;">
+          {% if listing['photo'] %}
+            <img src="/static/uploads/{{ listing['photo'] }}" alt="{{ listing['crop_name'] }}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.onerror=null; this.src='/static/images/produce-placeholder.svg';">
+          {% else %}
+            <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem;">🥦</div>
+          {% endif %}
+        </div>
+
+        <div style="background: #f8fafc; padding: 1rem; border-radius: var(--radius-md); border: 1px dashed #cbd5e1; text-align: center;">
+          <img src="{{ url_for('generate_qr_code', listing_id=listing['id']) }}" alt="QR Passport" style="width: 110px; height: 110px; border-radius: 6px; background: white; padding: 4px; border: 1px solid #e2e8f0;">
+          <div style="font-size: 0.75rem; color: #64748b; font-weight: 600; margin-top: 0.5rem;">
+            Official QR Code Verification
+          </div>
+        </div>
+      </div>
+
+      <!-- Provenance Specifications -->
+      <div>
+        <h3 style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin-bottom: 1rem;">
+          Farm & Harvest Specifications
+        </h3>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.9rem;">
+          <div style="background: #f8fafc; padding: 0.85rem; border-radius: 8px;">
+            <span style="font-size: 0.75rem; color: #64748b; display: block;">Farmer / Grower:</span>
+            <strong style="color: #0f172a; font-size: 1rem;">{{ listing['farmer_name'] }}</strong>
+            <div style="font-size: 0.75rem; color: #166534; font-weight: 600; margin-top: 2px;">Verified Producer &bull; Tamil Nadu</div>
+          </div>
+
+          <div style="background: #f8fafc; padding: 0.85rem; border-radius: 8px;">
+            <span style="font-size: 0.75rem; color: #64748b; display: block;">Origin Farmgate Location:</span>
+            <strong style="color: #0f172a; font-size: 1rem;">{{ listing['village_town'] }}, {{ listing['district'] }}</strong>
+            <div style="font-size: 0.75rem; color: #64748b;">PIN: {{ listing['pin_code'] }}</div>
+          </div>
+
+          <div style="background: #f8fafc; padding: 0.85rem; border-radius: 8px;">
+            <span style="font-size: 0.75rem; color: #64748b; display: block;">Harvest Date:</span>
+            <strong style="color: #0f172a; font-size: 1rem;">{{ listing['harvest_date'] }}</strong>
+          </div>
+
+          <div style="background: #f8fafc; padding: 0.85rem; border-radius: 8px;">
+            <span style="font-size: 0.75rem; color: #64748b; display: block;">Storage Condition:</span>
+            <strong style="color: #0f172a; font-size: 1rem;">{{ listing['storage_condition'] or 'Ambient Temperature' }}</strong>
+          </div>
+
+          <div style="background: #f8fafc; padding: 0.85rem; border-radius: 8px;">
+            <span style="font-size: 0.75rem; color: #64748b; display: block;">Freshness Score:</span>
+            <strong style="color: #15803d; font-size: 1rem;">{{ "%.0f"|format(listing['freshness_score'] or 85) }}% ({{ listing['freshness_grade'] or 'Fresh' }})</strong>
+          </div>
+
+          <div style="background: #f8fafc; padding: 0.85rem; border-radius: 8px;">
+            <span style="font-size: 0.75rem; color: #64748b; display: block;">Quality Grade:</span>
+            <strong style="color: #0369a1; font-size: 1rem;">{{ listing['quality_grade'] or 'Grade A' }}</strong>
+          </div>
+        </div>
+
+        <!-- Description Note -->
+        {% if listing['description'] %}
+          <div style="margin-top: 1.25rem; padding: 0.85rem; background: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; font-size: 0.85rem; color: #166534;">
+            <strong>Farmer Field Notes:</strong> {{ listing['description'] }}
+          </div>
+        {% endif %}
+
+        <div style="margin-top: 1.5rem; display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <a href="{{ url_for('listing_detail', listing_id=listing['id']) }}" class="btn btn-primary">
+            View Marketplace Listing &rarr;
+          </a>
+          <a href="{{ url_for('chat_conversation', recipient_id=listing['farmer_id'], listing_id=listing['id']) }}" class="btn btn-outline-primary">
+            💬 Message Farmer
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

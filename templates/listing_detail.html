@@ -125,10 +125,19 @@
           {% endif %}
         </div>
         <div style="text-align: right;">
-          <div style="font-size: 0.8rem; font-weight: 600; color: #64748b;">TOTAL STOCK</div>
-          <div style="font-size: 1.5rem; font-weight: 800; color: #065f46;">
-            {{ listing['quantity'] }} {{ listing['unit'] }}
+          <div style="font-size: 0.8rem; font-weight: 600; color: #64748b;">STOCK AVAILABILITY</div>
+          <div style="font-size: 1.4rem; font-weight: 800; color: {% if available_stock > 0 %}#065f46{% else %}#dc2626{% endif %};">
+            {{ available_stock }} <span style="font-size: 0.95rem; font-weight: 500;">/ {{ listing['quantity'] }} {{ listing['unit'] }}</span>
           </div>
+          {% if available_stock <= 0 %}
+            <span style="background: #fee2e2; color: #991b1b; font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700;">
+              Sold Out / Reserved
+            </span>
+          {% else %}
+            <span style="background: #dcfce7; color: #166534; font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700;">
+              ✓ Available Now
+            </span>
+          {% endif %}
         </div>
       </div>
 
@@ -238,12 +247,22 @@
           {% endif %}
         </div>
 
-        {% if listing['status'] == 'Available' %}
+        {% if listing['status'] == 'Available' and available_stock > 0 %}
           <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <!-- Direct Buy Now & Instant Checkout Button -->
+            <a href="{{ url_for('checkout_direct', listing_id=listing['id']) }}" class="btn btn-primary btn-lg btn-block" style="background: #16a34a; border-color: #16a34a; font-weight: 800; font-size: 1.05rem; box-shadow: 0 4px 6px -1px rgba(22, 163, 74, 0.3); text-align: center;">
+              💳 Instant Buy Now & Secure Checkout
+            </a>
+
             <!-- Send Formal Enquiry Button (opens modal) -->
             <button type="button" class="btn btn-accent btn-lg btn-block" id="openEnquiryModalBtn">
               ✉️ Send Purchase Enquiry / Counter-Offer
             </button>
+
+            <!-- Real-Time Chat with Farmer -->
+            <a href="{{ url_for('chat_conversation', recipient_id=listing['farmer_id']) }}?listing_id={{ listing['id'] }}" class="btn btn-outline-primary btn-block" style="font-weight: 700; text-align: center; display: block; padding: 0.65rem 1rem;">
+              💬 Live Chat & Price Negotiation
+            </a>
 
             <div class="farmer-quick-actions">
               <!-- Direct Phone Call Link -->
@@ -256,9 +275,18 @@
               {% set clean_wa = wa_num.replace(' ', '').replace('-', '').replace('+91', '') %}
               <a href="https://wa.me/91{{ clean_wa }}?text=Hello%20{{ listing['farmer_name'] }}%2C%20I%20saw%20your%20listing%20for%20{{ listing['crop_name'] }}%20on%20FarmFresh%20Rescue." 
                  target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp">
-                💬 WhatsApp Chat
+                💬 WhatsApp
+              </a>
+
+              <!-- Traceability QR Passport Link -->
+              <a href="{{ url_for('trace_produce', listing_id=listing['id']) }}" class="btn btn-secondary" target="_blank" title="View provenance passport and QR stamp">
+                🏷️ QR Passport
               </a>
             </div>
+          </div>
+        {% elif listing['status'] == 'Available' and available_stock <= 0 %}
+          <div style="background: #fff7ed; padding: 1rem; border-radius: var(--radius-md); text-align: center; color: #c2410c; font-weight: 600;">
+            ⚠️ This harvest is currently fully reserved by active buyer orders.
           </div>
         {% else %}
           <div style="background: #f1f5f9; padding: 1rem; border-radius: var(--radius-md); text-align: center; color: #64748b; font-weight: 600;">

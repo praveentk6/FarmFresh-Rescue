@@ -5,8 +5,9 @@ from datetime import datetime, date, timedelta
 from functools import wraps
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
-    session, g, abort, jsonify, make_response
+    session, g, abort, jsonify, make_response, send_file
 )
+import io
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from PIL import Image
@@ -17,8 +18,19 @@ from database import (
     mark_notification_read, mark_all_notifications_read,
     toggle_favorite_farmer, is_farmer_favorited, get_buyer_favorites,
     save_quality_inspection, get_farmer_quality_inspections,
-    log_ai_chat, update_order_lifecycle, get_order_timeline
+    log_ai_chat, update_order_lifecycle, get_order_timeline,
+    create_payment_record, confirm_payment_record, confirm_cod_order,
+    request_payment_refund, process_admin_refund, get_buyer_payments,
+    get_farmer_payments, get_admin_payments, get_payment_by_order_id,
+    get_available_stock, reserve_listing_stock, get_market_prices,
+    get_crop_benchmark_price, save_chat_message, get_conversation_messages,
+    get_user_chat_threads, get_weather_alerts
 )
+from razorpay_gateway import (
+    create_razorpay_order, verify_razorpay_signature,
+    verify_webhook_signature, RAZORPAY_KEY_ID
+)
+from qr_generator import generate_qr_bytes
 from translations import t, TRANSLATIONS
 from ai_engine import (
     get_ai_rescue_advice, predict_freshness, recommend_smart_price,
@@ -634,6 +646,8 @@ def listing_detail(listing_id):
 
     days_old, age_text = calculate_listing_age(listing['created_at'])
     urgency_info = get_listing_urgency_info(listing)
+    available_stock = get_available_stock(listing_id)
+    benchmark_price = get_crop_benchmark_price(listing['crop_name'], listing['district'])
 
     return render_template(
         'listing_detail.html',
@@ -647,7 +661,9 @@ def listing_detail(listing_id):
         freshness=freshness,
         price_rec=price_rec,
         buyer_distance_km=buyer_distance_km,
-        is_favorited=is_favorited
+        is_favorited=is_favorited,
+        available_stock=available_stock,
+        benchmark_price=benchmark_price
     )
 
 # ==========================================
@@ -2298,6 +2314,12 @@ def farmer_dashboard():
 
     conn.close()
 
+    # Farmer payments and transaction history
+    farmer_payments = get_farmer_payments(farmer_id)
+    farmer_weather_alerts = get_weather_alerts()
+    paid_orders_revenue = sum(float(p['amount']) for p in farmer_payments if p['payment_status'] == 'Paid')
+    cod_pending_revenue = sum(float(p['amount']) for p in farmer_payments if p['payment_status'] == 'COD Pending')
+
     return render_template(
         'farmer_dashboard.html',
         listings=my_listings,
@@ -2320,7 +2342,11 @@ def farmer_dashboard():
         co2_saved_kg=co2_saved_kg,
         water_saved_liters=water_saved_liters,
         freshness_queue=freshness_queue,
-        recommended_buyers=recommended_buyers[:6]
+        recommended_buyers=recommended_buyers[:6],
+        payments=farmer_payments,
+        weather_alerts=farmer_weather_alerts[:3],
+        paid_orders_revenue=paid_orders_revenue,
+        cod_pending_revenue=cod_pending_revenue
     )
 
 @app.route('/buyer/dashboard')
@@ -2332,7 +2358,7 @@ def buyer_dashboard():
 
     # Enquiries sent by this buyer
     cursor.execute("""
-        SELECT e.*, l.crop_name, l.unit, l.price_per_unit, l.village_town, l.district, 
+        SELECT e.*, l.farmer_id, l.crop_name, l.unit, l.price_per_unit, l.village_town, l.district, 
                l.farmer_name, l.farmer_phone, l.whatsapp_number, l.status as listing_status, l.photo,
                l.freshness_grade, l.quality_grade
         FROM enquiries e
@@ -2402,6 +2428,9 @@ def buyer_dashboard():
     # Active Orders needing live tracking
     active_orders = [o for o in my_orders if o['status'] in ['Pending', 'Accepted', 'Packed', 'Shipped', 'Ready for Collection']]
 
+    # Buyer payments and transaction history
+    buyer_payments = get_buyer_payments(g.user['id'])
+
     conn.close()
 
     return render_template(
@@ -2412,7 +2441,8 @@ def buyer_dashboard():
         my_favorites=my_favorites,
         nearby_produce=nearby_produce[:8],
         recommended_produce=recommended_produce[:6],
-        active_orders=active_orders
+        active_orders=active_orders,
+        payments=buyer_payments
     )
 
 @app.route('/admin/dashboard')
@@ -2499,6 +2529,14 @@ def admin_dashboard():
     # AI Demand Prediction data
     demand_summary = predict_market_demand(conn)
 
+    # Payments & Transactions Audit
+    admin_payments = get_admin_payments(limit=100)
+    paid_payments_count = len([p for p in admin_payments if p['payment_status'] == 'Paid'])
+    pending_payments_count = len([p for p in admin_payments if p['payment_status'] in ('Pending', 'COD Pending')])
+    failed_payments_count = len([p for p in admin_payments if p['payment_status'] in ('Failed', 'Cancelled')])
+    total_payment_volume = sum(float(p['amount']) for p in admin_payments if p['payment_status'] == 'Paid')
+    refund_requests = [p for p in admin_payments if p['refund_status'] == 'Requested']
+
     conn.close()
 
     return render_template(
@@ -2518,7 +2556,13 @@ def admin_dashboard():
         listings=all_listings,
         enquiries=all_enquiries,
         logs=recent_logs,
-        demand_summary=demand_summary
+        demand_summary=demand_summary,
+        payments=admin_payments,
+        paid_payments_count=paid_payments_count,
+        pending_payments_count=pending_payments_count,
+        failed_payments_count=failed_payments_count,
+        total_payment_volume=total_payment_volume,
+        refund_requests=refund_requests
     )
 
 @app.route('/admin/toggle-user-status/<int:user_id>', methods=['POST'])
@@ -2615,6 +2659,591 @@ def my_orders_enquiries():
 @app.route('/add-listing')
 def add_listing_redirect():
     return redirect(url_for('add_listing'))
+
+# ==========================================
+# Real-Time Payments & Checkout Workflows
+# ==========================================
+
+@app.route('/checkout/<int:order_id>')
+@login_required
+def checkout_order(order_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT e.*, l.crop_name, l.category, l.unit, l.price_per_unit, l.photo,
+               l.village_town, l.district, l.harvest_date, l.farmer_name, l.farmer_id,
+               l.quantity as listing_qty
+        FROM enquiries e
+        JOIN listings l ON e.listing_id = l.id
+        WHERE e.id = ?
+    """, (order_id,))
+    order = cursor.fetchone()
+    conn.close()
+
+    if not order:
+        flash("Order not found.", "danger")
+        return redirect(url_for('buyer_dashboard'))
+
+    # Security check: only buyer or admin can checkout
+    if g.user['role'] != 'admin' and order['buyer_id'] != g.user['id']:
+        flash("Unauthorized access to checkout.", "danger")
+        return redirect(url_for('buyer_dashboard'))
+
+    available_stock = get_available_stock(order['listing_id'])
+    subtotal = float(order['total_price'] or (order['requested_quantity'] * order['price_per_unit']))
+    delivery_mode = 'delivery' if order['delivery_preference'] and 'Delivery' in order['delivery_preference'] else 'pickup'
+    delivery_charges = float(order['delivery_charges'] or (60.0 if delivery_mode == 'delivery' else 0.0))
+    total_amount = subtotal + delivery_charges
+
+    return render_template(
+        'checkout.html',
+        order=order,
+        listing=order,
+        available_stock=available_stock,
+        subtotal=subtotal,
+        delivery_charges=delivery_charges,
+        delivery_mode=delivery_mode,
+        total_amount=total_amount
+    )
+
+@app.route('/checkout/direct/<int:listing_id>', methods=['GET', 'POST'])
+@login_required
+@role_required(['buyer', 'admin'])
+def checkout_direct(listing_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM listings WHERE id = ?", (listing_id,))
+    listing = cursor.fetchone()
+    if not listing:
+        conn.close()
+        flash("Produce listing not found.", "danger")
+        return redirect(url_for('browse_listings'))
+
+    available_stock = get_available_stock(listing_id)
+    if available_stock <= 0:
+        conn.close()
+        flash("This produce is currently sold out.", "warning")
+        return redirect(url_for('listing_detail', listing_id=listing_id))
+
+    qty = float(request.values.get('quantity') or min(50.0, available_stock))
+    if qty > available_stock:
+        qty = available_stock
+
+    subtotal = qty * float(listing['price_per_unit'])
+    delivery_pref = request.values.get('delivery_preference', 'Agri-Logistics Delivery')
+    delivery_charges = 60.0 if 'Delivery' in delivery_pref else 0.0
+    delivery_addr = request.values.get('delivery_address', g.user['location'] or '')
+
+    cursor.execute("""
+        INSERT INTO enquiries (
+            listing_id, buyer_id, buyer_name, buyer_phone, buyer_email,
+            offered_price, requested_quantity, delivery_preference,
+            total_price, delivery_charges, delivery_address, message,
+            status, payment_status, payment_method
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', 'Unpaid', 'Online')
+    """, (
+        listing['id'], g.user['id'], g.user['name'], g.user['phone'], g.user['email'],
+        listing['price_per_unit'], qty, delivery_pref,
+        subtotal, delivery_charges, delivery_addr,
+        f"Direct purchase initiated for {qty} {listing['unit']} of {listing['crop_name']}."
+    ))
+    order_id = cursor.lastrowid
+    conn.commit()
+    conn.close()
+
+    return redirect(url_for('checkout_order', order_id=order_id))
+
+@app.route('/api/payment/create-order', methods=['POST'])
+@login_required
+def api_create_payment_order():
+    data = request.get_json() or {}
+    order_id = data.get('order_id')
+    if not order_id:
+        return jsonify({'success': False, 'error': 'Missing order_id'}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT e.*, l.price_per_unit, l.farmer_id, l.quantity as listing_qty
+        FROM enquiries e
+        JOIN listings l ON e.listing_id = l.id
+        WHERE e.id = ?
+    """, (order_id,))
+    order = cursor.fetchone()
+    conn.close()
+
+    if not order:
+        return jsonify({'success': False, 'error': 'Order not found'}), 404
+
+    if g.user['role'] != 'admin' and order['buyer_id'] != g.user['id']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    avail = get_available_stock(order['listing_id'])
+    if float(order['requested_quantity']) > avail:
+        return jsonify({'success': False, 'error': f"Only {avail:.1f} kg available in stock"}), 400
+
+    delivery_charges = float(data.get('delivery_charges', order['delivery_charges'] or 0))
+    subtotal = float(order['total_price'] or (order['requested_quantity'] * order['price_per_unit']))
+    total_amount = subtotal + delivery_charges
+
+    rzp_res = create_razorpay_order(
+        amount_in_rupees=total_amount,
+        receipt_id=f"rec_ord_{order_id}",
+        notes={'order_id': order_id, 'buyer_id': order['buyer_id']}
+    )
+
+    if not rzp_res['success']:
+        return jsonify(rzp_res), 500
+
+    rec_res = create_payment_record(
+        order_id=order['id'],
+        listing_id=order['listing_id'],
+        buyer_id=order['buyer_id'],
+        farmer_id=order['farmer_id'],
+        amount=total_amount,
+        subtotal=subtotal,
+        delivery_charges=delivery_charges,
+        payment_method='Online',
+        razorpay_order_id=rzp_res['order_id']
+    )
+
+    return jsonify({
+        'success': True,
+        'razorpay_order_id': rzp_res['order_id'],
+        'key_id': rzp_res['key_id'],
+        'amount': rzp_res['amount'],
+        'amount_rupees': total_amount,
+        'currency': rzp_res['currency'],
+        'transaction_id': rec_res.get('transaction_id'),
+        'is_mock': rzp_res.get('is_mock', False)
+    })
+
+@app.route('/api/payment/verify', methods=['POST'])
+@login_required
+def api_verify_payment():
+    data = request.get_json() or {}
+    order_id = data.get('order_id')
+    transaction_id = data.get('transaction_id')
+    rzp_order_id = data.get('razorpay_order_id')
+    rzp_payment_id = data.get('razorpay_payment_id')
+    rzp_signature = data.get('razorpay_signature')
+    method = data.get('payment_method', 'Razorpay Online')
+
+    if not rzp_order_id or not rzp_payment_id:
+        return jsonify({'success': False, 'error': 'Missing payment credentials'}), 400
+
+    is_valid, reason = verify_razorpay_signature(rzp_order_id, rzp_payment_id, rzp_signature)
+    if not is_valid:
+        return jsonify({'success': False, 'error': f"Signature verification failed: {reason}"}), 400
+
+    success, txn_or_err = confirm_payment_record(
+        transaction_id=transaction_id or rzp_order_id,
+        razorpay_payment_id=rzp_payment_id,
+        razorpay_signature=rzp_signature,
+        payment_method=method
+    )
+
+    if not success:
+        return jsonify({'success': False, 'error': txn_or_err}), 500
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT e.*, l.crop_name, l.farmer_id
+        FROM enquiries e JOIN listings l ON e.listing_id = l.id
+        WHERE e.id = ?
+    """, (order_id,))
+    ord_info = cursor.fetchone()
+    conn.close()
+
+    if ord_info:
+        create_notification(
+            user_id=ord_info['farmer_id'],
+            title="💰 Payment Confirmed for Your Produce!",
+            message=f"Buyer {ord_info['buyer_name']} has completed payment for {ord_info['requested_quantity']} kg of {ord_info['crop_name']}. Please pack for handover.",
+            notif_type='order',
+            link=url_for('farmer_dashboard')
+        )
+        create_notification(
+            user_id=ord_info['buyer_id'],
+            title="✓ Payment Successful & Order Confirmed",
+            message=f"Your payment for {ord_info['requested_quantity']} kg of {ord_info['crop_name']} has been cleared. Invoice #{txn_or_err} generated.",
+            notif_type='order',
+            link=url_for('view_invoice', order_id=order_id)
+        )
+
+    return jsonify({
+        'success': True,
+        'transaction_id': txn_or_err,
+        'redirect_url': url_for('view_invoice', order_id=order_id)
+    })
+
+@app.route('/api/payment/cod', methods=['POST'])
+@login_required
+def api_confirm_cod():
+    data = request.get_json() or {}
+    order_id = data.get('order_id')
+    delivery_charges = float(data.get('delivery_charges', 0))
+    delivery_address = data.get('delivery_address')
+
+    if not order_id:
+        return jsonify({'success': False, 'error': 'Missing order_id'}), 400
+
+    if delivery_address:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE enquiries SET delivery_address = ? WHERE id = ?", (delivery_address, order_id))
+        conn.commit()
+        conn.close()
+
+    success, txn_or_err = confirm_cod_order(order_id, delivery_charges)
+    if not success:
+        return jsonify({'success': False, 'error': txn_or_err}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT e.*, l.crop_name, l.farmer_id
+        FROM enquiries e JOIN listings l ON e.listing_id = l.id
+        WHERE e.id = ?
+    """, (order_id,))
+    ord_info = cursor.fetchone()
+    conn.close()
+
+    if ord_info:
+        create_notification(
+            user_id=ord_info['farmer_id'],
+            title="📦 New Cash on Delivery (COD) Order Placed",
+            message=f"Buyer {ord_info['buyer_name']} has placed a COD order for {ord_info['requested_quantity']} kg of {ord_info['crop_name']}. Collect cash upon delivery.",
+            notif_type='order',
+            link=url_for('farmer_dashboard')
+        )
+        create_notification(
+            user_id=ord_info['buyer_id'],
+            title="✓ COD Order Confirmed",
+            message=f"Your COD order for {ord_info['crop_name']} is confirmed. Pay cash upon physical handover.",
+            notif_type='order',
+            link=url_for('view_invoice', order_id=order_id)
+        )
+
+    return jsonify({
+        'success': True,
+        'transaction_id': txn_or_err,
+        'redirect_url': url_for('view_invoice', order_id=order_id)
+    })
+
+@app.route('/order/<int:order_id>/invoice')
+@login_required
+def view_invoice(order_id):
+    payment = get_payment_by_order_id(order_id)
+    if not payment:
+        flash("No invoice or payment record found for this order.", "warning")
+        return redirect(url_for('buyer_dashboard'))
+
+    if g.user['role'] != 'admin' and g.user['id'] not in (payment['buyer_id'], payment['farmer_id']):
+        flash("Unauthorized invoice access.", "danger")
+        return redirect(url_for('index'))
+
+    return render_template('invoice.html', payment=payment)
+
+@app.route('/api/payment/refund-request', methods=['POST'])
+@login_required
+def api_request_refund():
+    data = request.get_json() or {}
+    payment_id = data.get('payment_id')
+    if not payment_id and data.get('order_id'):
+        p_row = get_payment_by_order_id(data.get('order_id'))
+        if p_row:
+            payment_id = p_row['id']
+    reason = data.get('reason', 'Quality deviation or delivery failure')
+
+    if not payment_id:
+        return jsonify({'success': False, 'error': 'Missing payment_id'}), 400
+
+    success, msg = request_payment_refund(payment_id, g.user['id'], reason)
+    if not success:
+        return jsonify({'success': False, 'error': msg}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM users WHERE role = 'admin'")
+    admins = cursor.fetchall()
+    conn.close()
+    for a in admins:
+        create_notification(
+            user_id=a['id'],
+            title="⚠️ Refund Request Submitted",
+            message=f"Buyer #{g.user['name']} has requested a refund for Payment #{payment_id}. Reason: {reason}",
+            notif_type='alert',
+            link=url_for('admin_dashboard') + '#payments-section'
+        )
+
+    return jsonify({'success': True, 'message': msg})
+
+@app.route('/api/admin/refund/<int:payment_id>', methods=['POST'])
+@login_required
+@role_required('admin')
+def api_admin_process_refund(payment_id):
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+    else:
+        data = request.form or {}
+
+    action = (data.get('decision') or data.get('action') or 'Approved').strip()
+    if action.lower() in ['approve', 'approved']:
+        decision = 'Approved'
+    else:
+        decision = 'Rejected'
+    notes = data.get('notes', '')
+
+    success, msg = process_admin_refund(payment_id, decision, notes)
+    if not request.is_json:
+        if success:
+            flash(f"Refund {decision.lower()} successfully.", "success")
+        else:
+            flash(f"Error processing refund: {msg}", "danger")
+        return redirect(url_for('admin_dashboard'))
+
+    if not success:
+        return jsonify({'success': False, 'error': msg}), 400
+
+    return jsonify({'success': True, 'message': msg})
+
+# ==========================================
+# Live Market Prices & Interactive Map Routes
+# ==========================================
+
+@app.route('/market-prices')
+def live_market_prices():
+    crop_name = request.args.get('crop_name', '').strip()
+    district = request.args.get('district', '').strip()
+    prices = get_market_prices(crop_name=crop_name, district=district, limit=50)
+
+    districts = sorted(list(set(TN_DISTRICT_COORDINATES.keys())))
+
+    return render_template(
+        'market_prices.html',
+        market_prices=prices,
+        districts=districts
+    )
+
+@app.route('/live-map')
+def live_map_view():
+    conn = get_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT l.id, l.farmer_id, l.crop_name, l.category, l.quantity, l.unit,
+               l.price_per_unit, l.urgency_level, l.village_town, l.district,
+               l.farmer_name
+        FROM listings l
+        WHERE l.status = 'Available'
+        ORDER BY l.created_at DESC
+        LIMIT 60
+    """)
+    listings = cursor.fetchall()
+
+    farmer_markers = []
+    for item in listings:
+        f_dict = dict(item)
+        lat, lng, _ = get_coordinates_for_location(item['village_town'], item['district'])
+        f_dict['lat'] = lat
+        f_dict['lng'] = lng
+        farmer_markers.append(f_dict)
+
+    cursor.execute("""
+        SELECT u.id, u.name, u.role, u.location, u.district, u.user_type,
+               (SELECT crop_name FROM buyer_requirements WHERE buyer_id = u.id AND status = 'Active' LIMIT 1) AS requirement_crop,
+               (SELECT required_quantity || ' ' || unit FROM buyer_requirements WHERE buyer_id = u.id AND status = 'Active' LIMIT 1) AS requirement_qty
+        FROM users u
+        WHERE u.role = 'buyer' AND u.is_active = 1
+        LIMIT 40
+    """)
+    buyers = cursor.fetchall()
+    conn.close()
+
+    buyer_markers = []
+    for b in buyers:
+        b_dict = dict(b)
+        b_lat, b_lng, _ = get_coordinates_for_location(b['location'], b['district'])
+        b_dict['lat'] = b_lat
+        b_dict['lng'] = b_lng
+        buyer_markers.append(b_dict)
+
+    map_data = {
+        'farmers': farmer_markers,
+        'buyers': buyer_markers
+    }
+
+    districts = sorted(list(set(TN_DISTRICT_COORDINATES.keys())))
+
+    return render_template(
+        'live_map.html',
+        map_data_json=json.dumps(map_data),
+        districts=districts
+    )
+
+# ==========================================
+# Farmer & Buyer Live Chat Routes
+# ==========================================
+
+@app.route('/chat')
+@app.route('/chat/<int:recipient_id>')
+@login_required
+def chat_conversation(recipient_id=None):
+    threads = get_user_chat_threads(g.user['id'])
+    recipient = None
+
+    if recipient_id:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, role, phone, email, location FROM users WHERE id = ?", (recipient_id,))
+        recipient = cursor.fetchone()
+        conn.close()
+
+    order_id = request.args.get('order_id', type=int)
+    listing_id = request.args.get('listing_id', type=int)
+
+    return render_template(
+        'chat.html',
+        threads=threads,
+        recipient=recipient,
+        order_id=order_id,
+        listing_id=listing_id
+    )
+
+@app.route('/api/chat/messages/<int:recipient_id>')
+@login_required
+def api_chat_messages(recipient_id):
+    order_id = request.args.get('order_id', type=int)
+    msgs = get_conversation_messages(g.user['id'], recipient_id, order_id=order_id, limit=60)
+    msg_list = [dict(m) for m in msgs]
+    return jsonify({'success': True, 'messages': msg_list})
+
+@app.route('/api/chat/send', methods=['POST'])
+@login_required
+def api_chat_send():
+    data = request.get_json() or {}
+    receiver_id = data.get('receiver_id') or data.get('recipient_id')
+    message = (data.get('message') or data.get('message_text') or '').strip()
+    order_id = data.get('order_id')
+    listing_id = data.get('listing_id')
+    offer_price = data.get('offer_price')
+    offer_qty = data.get('offer_quantity')
+
+    if not receiver_id or not message:
+        return jsonify({'success': False, 'error': 'Missing receiver or message'}), 400
+
+    res = save_chat_message(
+        sender_id=g.user['id'],
+        receiver_id=receiver_id,
+        message=message,
+        order_id=order_id,
+        listing_id=listing_id,
+        offer_price=offer_price,
+        offer_quantity=offer_qty
+    )
+
+    if res['success']:
+        create_notification(
+            user_id=receiver_id,
+            title=f"💬 New message from {g.user['name']}",
+            message=message[:80] + ("..." if len(message) > 80 else ""),
+            notif_type='info',
+            link=url_for('chat_conversation', recipient_id=g.user['id'])
+        )
+
+    return jsonify(res)
+
+# ==========================================
+# Agro-Weather Alerts & Traceability QR
+# ==========================================
+
+@app.route('/weather-alerts')
+def weather_alerts_view():
+    alerts = get_weather_alerts()
+    return render_template('weather_alerts.html', weather_alerts=alerts)
+
+@app.route('/trace/<int:listing_id>', endpoint='trace_produce')
+@app.route('/trace/<int:listing_id>', endpoint='trace_passport')
+def trace_passport(listing_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT l.*, u.name as grower_name, u.phone as grower_phone, u.location as grower_loc
+        FROM listings l
+        JOIN users u ON l.farmer_id = u.id
+        WHERE l.id = ?
+    """, (listing_id,))
+    listing = cursor.fetchone()
+    conn.close()
+
+    if not listing:
+        flash("Traceability certificate not found.", "warning")
+        return redirect(url_for('browse_listings'))
+
+    return render_template('trace_passport.html', listing=listing)
+
+@app.route('/qr/<int:listing_id>')
+def generate_qr_code(listing_id):
+    trace_url = url_for('trace_passport', listing_id=listing_id, _external=True)
+    img_bytes = generate_qr_bytes(trace_url)
+    return send_file(io.BytesIO(img_bytes), mimetype='image/png')
+
+@app.route('/api/notifications/poll')
+@login_required
+def api_notifications_poll():
+    unread_count = get_unread_notifications_count(g.user['id'])
+    notifs = get_user_notifications(g.user['id'], limit=5)
+    return jsonify({
+        'unread_count': unread_count,
+        'notifications': [dict(n) for n in notifs]
+    })
+
+@app.route('/api/order/<int:order_id>/status', methods=['POST'])
+@login_required
+def api_update_order_status(order_id):
+    data = request.get_json() or {}
+    new_status = data.get('status')
+    note = data.get('note')
+
+    if not new_status:
+        return jsonify({'success': False, 'error': 'Missing status'}), 400
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT e.*, l.farmer_id, l.crop_name FROM enquiries e JOIN listings l ON e.listing_id = l.id WHERE e.id = ?", (order_id,))
+    order = cursor.fetchone()
+    conn.close()
+
+    if not order:
+        return jsonify({'success': False, 'error': 'Order not found'}), 404
+
+    # Farmer or admin permission
+    if g.user['role'] != 'admin' and order['farmer_id'] != g.user['id']:
+        return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+    success, msg = update_order_lifecycle(order_id, new_status, note=note)
+    if not success:
+        return jsonify({'success': False, 'error': msg}), 500
+
+    # If status is delivered on COD, mark payment as Paid
+    if new_status in ('Delivered', 'Completed'):
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE payments SET payment_status = 'Paid', payout_status = 'Processing' WHERE order_id = ? AND payment_status = 'COD Pending'", (order_id,))
+        conn.commit()
+        conn.close()
+
+    create_notification(
+        user_id=order['buyer_id'],
+        title=f"🚚 Order Status Updated: {new_status}",
+        message=f"Your order for {order['requested_quantity']} kg of {order['crop_name']} is now: {new_status}.",
+        notif_type='order',
+        link=url_for('buyer_dashboard') + '#ordersTable'
+    )
+
+    return jsonify({'success': True, 'message': f"Order status updated to {new_status}"})
 
 # ==========================================
 # Error Handlers
