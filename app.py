@@ -610,22 +610,25 @@ def listing_detail(listing_id):
     is_favorited = False
     if g.user and g.user['role'] == 'buyer':
         is_favorited = is_farmer_favorited(g.user['id'], listing['farmer_id'], conn)
-        buyer_lat = g.user.get('latitude')
-        buyer_lng = g.user.get('longitude')
-        if not buyer_lat and g.user.get('location'):
-            b_coords = get_coordinates_for_location(g.user['location'], g.user.get('district', ''))
+        user_keys = g.user.keys()
+        buyer_lat = g.user['latitude'] if 'latitude' in user_keys else None
+        buyer_lng = g.user['longitude'] if 'longitude' in user_keys else None
+        if not buyer_lat and g.user['location']:
+            user_dist = g.user['district'] if 'district' in user_keys else ''
+            b_coords = get_coordinates_for_location(g.user['location'], user_dist or '')
             if b_coords:
-                buyer_lat, buyer_lng = b_coords
+                buyer_lat, buyer_lng = b_coords[0], b_coords[1]
         
         listing_lat = listing['latitude']
         listing_lng = listing['longitude']
         if not listing_lat:
             l_coords = get_coordinates_for_location(listing['village_town'], listing['district'])
             if l_coords:
-                listing_lat, listing_lng = l_coords
+                listing_lat, listing_lng = l_coords[0], l_coords[1]
 
         if buyer_lat and listing_lat:
-            buyer_distance_km = calculate_haversine_distance(buyer_lat, buyer_lng, listing_lat, listing_lng)
+            dist_res = calculate_haversine_distance(buyer_lat, buyer_lng, listing_lat, listing_lng)
+            buyer_distance_km = dist_res['distance_km'] if isinstance(dist_res, dict) else dist_res
 
     conn.close()
 
@@ -1915,13 +1918,17 @@ def add_buyer_requirement():
         flash("Only registered buyers can post procurement requirements.", "warning")
         return redirect(url_for('index'))
 
+    user_keys = g.user.keys()
+    default_btype = g.user['user_type'] if 'user_type' in user_keys and g.user['user_type'] else 'Supermarkets'
+    default_loc = g.user['location'] if 'location' in user_keys and g.user['location'] else ''
+
     crop_name = request.form.get('crop_name', '').strip()
     category = request.form.get('category', 'Vegetables').strip()
-    business_type = request.form.get('business_type', g.user.get('user_type') or 'Supermarkets').strip()
+    business_type = request.form.get('business_type', default_btype).strip()
     required_quantity = request.form.get('required_quantity', '').strip()
     unit = request.form.get('unit', 'kg').strip()
     target_price = request.form.get('target_price', '').strip()
-    village_town = request.form.get('village_town', g.user.get('location') or '').strip()
+    village_town = request.form.get('village_town', default_loc).strip()
     district = request.form.get('district', '').strip()
     contact_phone = request.form.get('contact_phone', g.user['phone']).strip()
     notes = request.form.get('notes', '').strip()
@@ -2381,7 +2388,7 @@ def buyer_dashboard():
             if any(k in crop_low for k in ['tomato', 'shallot', 'onion', 'chilli', 'potato', 'rice', 'ginger', 'brinjal']):
                 recommended_produce.append(item)
         elif 'supermarket' in user_type:
-            if item.get('quality_grade') in ['Grade A', 'Grade B']:
+            if 'quality_grade' in item.keys() and item['quality_grade'] in ['Grade A', 'Grade B']:
                 recommended_produce.append(item)
         elif 'processing' in user_type:
             if any(k in crop_low for k in ['tomato', 'mango', 'chilli', 'onion']):
@@ -2589,6 +2596,25 @@ def admin_reset_sample_data():
     except Exception as e:
         flash(f"Error refreshing sample data: {e}", "danger")
     return redirect(url_for('admin_dashboard'))
+
+# Convenience routes for direct navigation
+@app.route('/my-orders')
+@app.route('/my-enquiries')
+def my_orders_enquiries():
+    if not g.user:
+        return redirect(url_for('login', next=request.path))
+    user_role = g.user['role'] if 'role' in g.user.keys() else None
+    if user_role == 'farmer':
+        return redirect(url_for('farmer_dashboard') + '#enquiriesTable')
+    elif user_role == 'buyer':
+        return redirect(url_for('buyer_dashboard') + '#ordersTable')
+    elif user_role == 'admin':
+        return redirect(url_for('admin_dashboard') + '#enquiries-section')
+    return redirect(url_for('index'))
+
+@app.route('/add-listing')
+def add_listing_redirect():
+    return redirect(url_for('add_listing'))
 
 # ==========================================
 # Error Handlers

@@ -54,6 +54,13 @@
   padding: 0;
 }
 
+html {
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background-color: var(--bg-page);
@@ -62,6 +69,10 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
+  position: relative;
 }
 
 h1, h2, h3, h4, h5, h6 {
@@ -226,6 +237,103 @@ a:hover {
   background: #fef2f2;
   color: #991b1b;
   border-color: #fecaca;
+}
+
+/* Navigation Right Controls & Language Switcher */
+.nav-right-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.lang-switch-wrap {
+  display: inline-flex;
+  align-items: center;
+  background: #f1f5f9;
+  padding: 0.25rem 0.55rem;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-subtle);
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lang-btn {
+  color: #64748b;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  text-decoration: none;
+  font-size: 0.8rem;
+  transition: all var(--transition-fast);
+}
+
+.lang-btn:hover {
+  color: var(--primary);
+}
+
+.lang-btn.active {
+  background: #ffffff;
+  color: var(--primary-dark);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.lang-sep {
+  color: #cbd5e1;
+  margin: 0 0.1rem;
+}
+
+.nav-notif-btn {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: #f8fafc;
+  border: 1px solid var(--border-subtle);
+  font-size: 1.1rem;
+  color: #334155;
+  transition: all var(--transition-fast);
+  text-decoration: none;
+  flex-shrink: 0;
+}
+
+.nav-notif-btn:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  transform: scale(1.05);
+}
+
+.notif-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  background: var(--urgent-red);
+  color: white;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 0.1rem 0.35rem;
+  border-radius: 9999px;
+  min-width: 17px;
+  text-align: center;
+  line-height: 1.1;
+  border: 2px solid #ffffff;
+}
+
+.notif-pill {
+  background: var(--urgent-red);
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 0.1rem 0.45rem;
+  border-radius: 9999px;
+  margin-left: 0.35rem;
+}
+
+.mobile-only-nav {
+  display: none;
 }
 
 .menu-toggle {
@@ -1611,9 +1719,8 @@ textarea.form-control {
   }
 }
 
-/* --- Mobile Landscape & Large Smartphones (max-width: 768px) --- */
-@media (max-width: 768px) {
-  /* Navigation Bar Drawer */
+/* --- Navigation Bar Drawer (max-width: 1080px) --- */
+@media (max-width: 1080px) {
   .menu-toggle {
     display: flex;
   }
@@ -1639,6 +1746,10 @@ textarea.form-control {
 
   .nav-menu-wrapper.active {
     display: flex;
+  }
+
+  .mobile-only-nav {
+    display: block;
   }
 
   .nav-menu {
@@ -1686,7 +1797,10 @@ textarea.form-control {
     justify-content: center;
     padding: 0.6rem 1rem;
   }
+}
 
+/* --- Tablets & Mobile Landscape (max-width: 768px) --- */
+@media (max-width: 768px) {
   /* Hero Section */
   .hero {
     padding: 3rem 0 2.5rem;
@@ -2308,5 +2422,141 @@ textarea.form-control {
   border: 1px solid #cbd5e1;
   overflow: hidden;
   z-index: 1;
+}
+
+/* ===================================================================
+   Viewport Optimizations for Target Devices:
+   - Desktop (1920x1080)
+   - Laptop (1366x768)
+   - Tablet (768x1024)
+   - Mobile (390x844)
+   - Small Mobile (360x800)
+   =================================================================== */
+
+/* 1. Large Desktop (min-width: 1400px - e.g. 1920x1080) */
+@media (min-width: 1400px) {
+  .container {
+    max-width: 1360px;
+  }
+  .hero-title {
+    font-size: 3.25rem;
+  }
+}
+
+/* 2. Standard Laptop (max-width: 1366px - e.g. 1366x768) */
+@media (max-width: 1366px) {
+  .container {
+    max-width: 1200px;
+  }
+  .nav-menu {
+    gap: 1rem;
+  }
+  .nav-link {
+    font-size: 0.9rem;
+  }
+}
+
+/* 3. Tablet Portrait & Small Screens (max-width: 768px - e.g. 768x1024) */
+@media (max-width: 768px) {
+  .container {
+    padding: 0 1rem;
+  }
+  .dashboard-grid-kpis {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .card-grid {
+    grid-template-columns: 1fr;
+  }
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+}
+
+/* 4. Mobile Viewports (max-width: 480px - including 390x844) */
+@media (max-width: 480px) {
+  .container {
+    padding: 0 0.85rem;
+  }
+  .nav-brand {
+    font-size: 1.15rem;
+  }
+  .nav-brand .brand-leaf {
+    width: 32px;
+    height: 32px;
+    font-size: 1.1rem;
+  }
+  .dashboard-grid-kpis {
+    grid-template-columns: 1fr !important;
+  }
+  .dashboard-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .dashboard-header > div:last-child {
+    flex-direction: column;
+    width: 100%;
+  }
+  .dashboard-header .btn {
+    width: 100%;
+  }
+  .form-row, .form-row-3 {
+    grid-template-columns: 1fr !important;
+  }
+  .btn-lg {
+    padding: 0.75rem 1.25rem;
+    font-size: 0.95rem;
+  }
+  .chatbot-container {
+    bottom: 12px;
+    right: 12px;
+  }
+  .chatbot-window {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100vw;
+    max-width: 100vw;
+    height: 85vh;
+    max-height: 85vh;
+    border-radius: 16px 16px 0 0;
+  }
+}
+
+/* 5. Small Mobile Viewports (max-width: 360px - 360x800) */
+@media (max-width: 360px) {
+  .container {
+    padding: 0 0.65rem;
+  }
+  .nav-brand {
+    font-size: 1.05rem;
+    gap: 0.35rem;
+  }
+  .nav-brand .brand-leaf {
+    width: 28px;
+    height: 28px;
+    font-size: 0.95rem;
+  }
+  .lang-switch-wrap {
+    padding: 0.2rem 0.4rem;
+    font-size: 0.75rem;
+  }
+  .menu-toggle {
+    width: 38px;
+    height: 38px;
+    padding: 8px 6px;
+  }
+  .hero-title {
+    font-size: 1.6rem;
+  }
+  .btn {
+    padding: 0.55rem 0.75rem;
+    font-size: 0.85rem;
+  }
+  .kpi-num {
+    font-size: 1.5rem !important;
+  }
 }
 

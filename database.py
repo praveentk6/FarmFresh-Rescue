@@ -407,16 +407,20 @@ def toggle_favorite_farmer(buyer_id, farmer_id):
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
-def is_farmer_favorited(buyer_id, farmer_id):
+def is_farmer_favorited(buyer_id, farmer_id, conn=None):
     """Check if farmer is favorited by buyer."""
     if not buyer_id or not farmer_id:
         return False
+    close_conn = False
     try:
-        conn = get_db()
+        if conn is None:
+            conn = get_db()
+            close_conn = True
         cursor = conn.cursor()
         cursor.execute("SELECT id FROM favorite_farmers WHERE buyer_id = ? AND farmer_id = ?", (buyer_id, farmer_id))
         fav = cursor.fetchone() is not None
-        conn.close()
+        if close_conn:
+            conn.close()
         return fav
     except Exception:
         return False

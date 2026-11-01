@@ -38,18 +38,20 @@
         <span>FarmFresh <span class="brand-rescue">Rescue</span></span>
       </a>
 
-      <!-- Language Selector -->
-      <div class="lang-switch-wrap" aria-label="Language Selector">
-        <a href="{{ url_for('set_language', lang_code='en') }}" class="lang-btn {% if lang == 'en' %}active{% endif %}" id="langEnBtn" title="English">EN</a>
-        <span class="lang-sep">|</span>
-        <a href="{{ url_for('set_language', lang_code='ta') }}" class="lang-btn {% if lang == 'ta' %}active{% endif %}" id="langTaBtn" title="தமிழ்">தமிழ்</a>
-      </div>
+      <!-- Right Controls: Language Selector & Mobile Hamburger -->
+      <div class="nav-right-controls">
+        <div class="lang-switch-wrap" aria-label="Language Selector">
+          <a href="{{ url_for('set_language', lang_code='en') }}" class="lang-btn {% if lang == 'en' %}active{% endif %}" id="langEnBtn" title="English">EN</a>
+          <span class="lang-sep">|</span>
+          <a href="{{ url_for('set_language', lang_code='ta') }}" class="lang-btn {% if lang == 'ta' %}active{% endif %}" id="langTaBtn" title="தமிழ்">தமிழ்</a>
+        </div>
 
-      <button class="menu-toggle" id="menuToggle" aria-label="Toggle Navigation" aria-expanded="false">
-        <span class="menu-icon-bar"></span>
-        <span class="menu-icon-bar"></span>
-        <span class="menu-icon-bar"></span>
-      </button>
+        <button class="menu-toggle" id="menuToggle" aria-label="Toggle Navigation" aria-expanded="false">
+          <span class="menu-icon-bar"></span>
+          <span class="menu-icon-bar"></span>
+          <span class="menu-icon-bar"></span>
+        </button>
+      </div>
 
       <div class="nav-menu-wrapper" id="navMenuWrapper">
         <ul class="nav-menu" id="navMenu">
@@ -60,11 +62,35 @@
               ⚡ {{ _t('urgent_rescue') }}
             </a>
           </li>
-          <li><a href="{{ url_for('voice_assistant') }}" class="nav-link {% if request.endpoint == 'voice_assistant' %}active{% endif %}">🎤 {{ 'குரல் AI' if lang == 'ta' else 'Voice AI' }}</a></li>
-          <li><a href="{{ url_for('quality_grading') }}" class="nav-link {% if request.endpoint == 'quality_grading' %}active{% endif %}">🔍 {{ 'தர மதிப்பீடு' if lang == 'ta' else 'Quality AI' }}</a></li>
           <li><a href="{{ url_for('demand_prediction') }}" class="nav-link {% if request.endpoint == 'demand_prediction' %}active{% endif %}">📈 {{ 'தேவை கணிப்பு' if lang == 'ta' else 'Demand Trends' }}</a></li>
           <li><a href="{{ url_for('nearby_buyers') }}" class="nav-link {% if request.endpoint == 'nearby_buyers' %}active{% endif %}">{{ _t('nearby_buyers') }}</a></li>
           <li><a href="{{ url_for('analytics_view') }}" class="nav-link {% if request.endpoint == 'analytics_view' %}active{% endif %}">📊 {{ _t('analytics') }}</a></li>
+          <li class="mobile-only-nav">
+            <a href="{{ url_for('notifications_view') }}" class="nav-link {% if request.endpoint == 'notifications_view' %}active{% endif %}">
+              🔔 {{ _t('notifications') }}{% if unread_count > 0 %} <span class="notif-pill">{{ unread_count }}</span>{% endif %}
+            </a>
+          </li>
+          {% if current_user %}
+            <li class="mobile-only-nav">
+              {% if current_user['role'] == 'farmer' %}
+                <a href="{{ url_for('farmer_dashboard') }}" class="nav-link {% if request.endpoint == 'farmer_dashboard' %}active{% endif %}">📋 {{ _t('my_orders') }}</a>
+              {% elif current_user['role'] == 'buyer' %}
+                <a href="{{ url_for('buyer_dashboard') }}" class="nav-link {% if request.endpoint == 'buyer_dashboard' %}active{% endif %}">📋 {{ _t('my_orders') }}</a>
+              {% elif current_user['role'] == 'admin' %}
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}">⚡ {{ _t('admin_panel') }}</a>
+              {% endif %}
+            </li>
+            <li class="mobile-only-nav">
+              <a href="{{ url_for('logout') }}" class="nav-link" style="color: var(--urgent-red);">🚪 {{ _t('logout') }}</a>
+            </li>
+          {% else %}
+            <li class="mobile-only-nav">
+              <a href="{{ url_for('login') }}" class="nav-link">🔑 {{ _t('log_in') }}</a>
+            </li>
+            <li class="mobile-only-nav">
+              <a href="{{ url_for('register') }}" class="nav-link">📝 {{ _t('sign_up') }}</a>
+            </li>
+          {% endif %}
         </ul>
 
         <div class="nav-actions">
@@ -83,8 +109,8 @@
             </div>
 
             {% if current_user['role'] == 'farmer' %}
-              <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="farmerDashBtn">{{ _t('my_dashboard') }}</a>
-              <a href="{{ url_for('add_listing') }}" class="btn btn-primary btn-sm" id="addListingNavBtn">{{ _t('list_produce') }}</a>
+              <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="farmerDashBtn">{{ _t('my_orders') }}</a>
+              <a href="{{ url_for('add_listing') }}" class="btn btn-primary btn-sm" id="addListingNavBtn">+ {{ _t('list_produce') }}</a>
             {% elif current_user['role'] == 'buyer' %}
               <a href="{{ url_for('buyer_dashboard') }}" class="btn btn-outline-primary btn-sm" id="buyerDashBtn">{{ _t('my_orders') }}</a>
             {% elif current_user['role'] == 'admin' %}
