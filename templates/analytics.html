@@ -43,6 +43,168 @@
     </div>
   </div>
 
+  <!-- Role-Specific Personalized Analytics Overview -->
+  {% if is_farmer and farmer_metrics %}
+    <div class="data-table-card" style="margin-bottom: 2rem; border-left: 5px solid #16a34a; background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <span style="font-size: 0.8rem; font-weight: 700; color: #166534; text-transform: uppercase;">🧑‍🌾 Farmgate Waste Prevention & Revenue</span>
+          <h2 style="font-size: 1.35rem; font-weight: 800; color: #0f172a; margin: 0.15rem 0 0 0;">{{ current_user['name'] }}'s Farm Summary</h2>
+        </div>
+        <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-outline-primary btn-sm">Farmer Portal &rarr;</a>
+      </div>
+      <div class="dashboard-grid-kpis" style="margin-bottom: 0;">
+        <div class="kpi-card" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Your Produce Listed</div>
+            <div class="kpi-num" style="color: #0f172a;">{{ "%.0f"|format(farmer_metrics['total_listed']) }} <span style="font-size: 0.9rem;">kg</span></div>
+          </div>
+          <div class="kpi-icon">📋</div>
+        </div>
+        <div class="kpi-card" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #0284c7; text-transform: uppercase;">Total Produce Sold</div>
+            <div class="kpi-num" style="color: #0284c7;">{{ "%.0f"|format(farmer_metrics['total_sold']) }} <span style="font-size: 0.9rem;">kg</span></div>
+          </div>
+          <div class="kpi-icon">🤝</div>
+        </div>
+        <div class="kpi-card" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #16a34a; text-transform: uppercase;">Unsold / Available Stock</div>
+            <div class="kpi-num" style="color: #16a34a;">{{ "%.0f"|format(farmer_metrics['remaining_stock']) }} <span style="font-size: 0.9rem;">kg</span></div>
+          </div>
+          <div class="kpi-icon">🥦</div>
+        </div>
+        <div class="kpi-card highlight" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #15803d; text-transform: uppercase;">Total Earnings</div>
+            <div class="kpi-num" style="color: #15803d;">₹{{ "{:,.0f}".format(farmer_metrics['total_earnings']) }}</div>
+          </div>
+          <div class="kpi-icon">💰</div>
+        </div>
+        <div class="kpi-card urgent" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #ea580c; text-transform: uppercase;">Rescued from Loss</div>
+            <div class="kpi-num" style="color: #ea580c;">{{ "%.0f"|format(farmer_metrics['rescued_kg']) }} <span style="font-size: 0.9rem;">kg</span></div>
+            <div style="font-size: 0.75rem; color: #ea580c; font-weight: 600; margin-top: 2px;">{{ "%.1f"|format(farmer_metrics['waste_reduction_pct']) }}% cleared</div>
+          </div>
+          <div class="kpi-icon">🛡️</div>
+        </div>
+      </div>
+    </div>
+  {% elif is_buyer and buyer_metrics %}
+    <div class="data-table-card" style="margin-bottom: 2rem; border-left: 5px solid #0284c7; background: linear-gradient(135deg, #f0f9ff 0%, #ffffff 100%);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <span style="font-size: 0.8rem; font-weight: 700; color: #0284c7; text-transform: uppercase;">🛒 Commercial Buyer Procurement & Rescue Impact</span>
+          <h2 style="font-size: 1.35rem; font-weight: 800; color: #0f172a; margin: 0.15rem 0 0 0;">{{ current_user['name'] }}'s Rescue Contribution</h2>
+        </div>
+        <a href="{{ url_for('buyer_dashboard') }}" class="btn btn-outline-primary btn-sm">Buyer Dashboard &rarr;</a>
+      </div>
+      <div class="dashboard-grid-kpis" style="margin-bottom: 0;">
+        <div class="kpi-card" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #0284c7; text-transform: uppercase;">Total Orders Placed</div>
+            <div class="kpi-num" style="color: #0284c7;">{{ buyer_metrics['orders_count'] }}</div>
+          </div>
+          <div class="kpi-icon">📦</div>
+        </div>
+        <div class="kpi-card" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #16a34a; text-transform: uppercase;">Produce Purchased</div>
+            <div class="kpi-num" style="color: #16a34a;">{{ "%.0f"|format(buyer_metrics['purchased_qty']) }} <span style="font-size: 0.9rem;">kg</span></div>
+          </div>
+          <div class="kpi-icon">🥦</div>
+        </div>
+        <div class="kpi-card highlight" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #15803d; text-transform: uppercase;">Total Spending</div>
+            <div class="kpi-num" style="color: #15803d;">₹{{ "{:,.0f}".format(buyer_metrics['total_spending']) }}</div>
+          </div>
+          <div class="kpi-icon">💳</div>
+        </div>
+        <div class="kpi-card" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #059669; text-transform: uppercase;">Estimated Money Saved</div>
+            <div class="kpi-num" style="color: #059669;">₹{{ "{:,.0f}".format(buyer_metrics['money_saved']) }}</div>
+            <div style="font-size: 0.75rem; color: #059669; margin-top: 2px;">vs standard retail mandi</div>
+          </div>
+          <div class="kpi-icon">✨</div>
+        </div>
+        <div class="kpi-card urgent" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #ea580c; text-transform: uppercase;">Waste Rescued</div>
+            <div class="kpi-num" style="color: #ea580c;">{{ "%.0f"|format(buyer_metrics['rescued_kg']) }} <span style="font-size: 0.9rem;">kg</span></div>
+            <div style="font-size: 0.75rem; color: #ea580c; margin-top: 2px;">Diverted from waste</div>
+          </div>
+          <div class="kpi-icon">🛡️</div>
+        </div>
+      </div>
+    </div>
+  {% elif is_admin and admin_metrics %}
+    <div class="data-table-card" style="margin-bottom: 2rem; border-left: 5px solid #6366f1; background: linear-gradient(135deg, #eef2ff 0%, #ffffff 100%);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+        <div>
+          <span style="font-size: 0.8rem; font-weight: 700; color: #4338ca; text-transform: uppercase;">🛡️ Platform Administration & Control Center</span>
+          <h2 style="font-size: 1.35rem; font-weight: 800; color: #0f172a; margin: 0.15rem 0 0 0;">Tamil Nadu State-Wide Waste Control</h2>
+        </div>
+        <a href="{{ url_for('admin_dashboard') }}" class="btn btn-outline-primary btn-sm">Admin Control Center &rarr;</a>
+      </div>
+      <div class="dashboard-grid-kpis" style="margin-bottom: 0;">
+        <div class="kpi-card" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #4338ca; text-transform: uppercase;">Registered Farmers</div>
+            <div class="kpi-num" style="color: #4338ca;">{{ admin_metrics['total_farmers'] }}</div>
+          </div>
+          <div class="kpi-icon">🧑‍🌾</div>
+        </div>
+        <div class="kpi-card" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #0284c7; text-transform: uppercase;">Registered Buyers</div>
+            <div class="kpi-num" style="color: #0284c7;">{{ admin_metrics['total_buyers'] }}</div>
+          </div>
+          <div class="kpi-icon">🏢</div>
+        </div>
+        <div class="kpi-card" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #0f172a; text-transform: uppercase;">Total Platform Listings</div>
+            <div class="kpi-num" style="color: #0f172a;">{{ admin_metrics['total_listings'] }}</div>
+          </div>
+          <div class="kpi-icon">📋</div>
+        </div>
+        <div class="kpi-card" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #16a34a; text-transform: uppercase;">Completed Orders</div>
+            <div class="kpi-num" style="color: #16a34a;">{{ admin_metrics['completed_orders'] }}</div>
+          </div>
+          <div class="kpi-icon">🤝</div>
+        </div>
+        <div class="kpi-card urgent" style="background: white;">
+          <div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #ea580c; text-transform: uppercase;">Rescued Volume</div>
+            <div class="kpi-num" style="color: #ea580c;">{{ "%.0f"|format(admin_metrics['total_rescued_kg']) }} <span style="font-size: 0.9rem;">kg</span></div>
+          </div>
+          <div class="kpi-icon">♻️</div>
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <!-- Public Visitor Waste Prevention Callout -->
+    <div style="background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); border: 1px solid #86efac; border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <div style="font-size: 0.8rem; font-weight: 700; color: #166534; text-transform: uppercase;">🌱 Open Public Agricultural Transparency</div>
+        <h2 style="font-size: 1.25rem; font-weight: 800; color: #14532d; margin-top: 0.2rem;">Authentic Tamil Nadu Food Waste Prevention Metrics</h2>
+        <p style="font-size: 0.875rem; color: #166534; margin: 0.25rem 0 0 0;">
+          All data below reflects real farmgate produce catalogued and verified rescued across 38 districts of Tamil Nadu.
+        </p>
+      </div>
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+        <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm">Join as Farmer or Buyer</a>
+        <a href="{{ url_for('browse_listings') }}" class="btn btn-secondary btn-sm">Browse Fresh Produce</a>
+      </div>
+    </div>
+  {% endif %}
+
   <!-- Primary Metric Summary Cards -->
   <div class="dashboard-grid-kpis" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); margin-bottom: 2.5rem;">
     

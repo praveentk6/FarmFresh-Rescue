@@ -2968,11 +2968,12 @@ textarea.form-control {
     font-size: 1.15rem;
   }
   .nav-menu {
-    gap: 0.55rem;
+    gap: 0.45rem;
   }
   .nav-link {
-    font-size: 0.83rem;
-    padding: 0.3rem 0.4rem;
+    font-size: 0.81rem;
+    padding: 0.28rem 0.36rem;
+    white-space: nowrap;
   }
   .nav-right-section {
     gap: 0.5rem;
@@ -3002,11 +3003,12 @@ textarea.form-control {
     margin: 0 0.25rem;
   }
   .nav-menu {
-    gap: 0.35rem;
+    gap: 0.22rem;
   }
   .nav-link {
-    font-size: 0.78rem;
-    padding: 0.25rem 0.32rem;
+    font-size: 0.74rem;
+    padding: 0.2rem 0.24rem;
+    white-space: nowrap;
   }
   .nav-right-section {
     gap: 0.4rem;

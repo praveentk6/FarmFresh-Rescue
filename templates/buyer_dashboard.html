@@ -28,6 +28,73 @@
     </div>
   </div>
 
+  <!-- Primary Calculated KPI Summary Cards for Buyer -->
+  <div class="dashboard-grid-kpis" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 2rem;">
+    <!-- 1. Total Orders -->
+    <div class="kpi-card" style="border-top: 4px solid #0284c7;">
+      <div>
+        <div style="font-size: 0.775rem; font-weight: 700; color: #0284c7; text-transform: uppercase;">
+          Total Orders Placed
+        </div>
+        <div class="kpi-num" style="color: #0284c7;" id="kpiBuyerOrders">
+          {{ total_orders }}
+        </div>
+        <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.2rem;">
+          Procurement requests
+        </div>
+      </div>
+      <div class="kpi-icon">📦</div>
+    </div>
+
+    <!-- 2. Purchased Quantity -->
+    <div class="kpi-card highlight" style="border-top: 4px solid #16a34a;">
+      <div>
+        <div style="font-size: 0.775rem; font-weight: 700; color: #16a34a; text-transform: uppercase;">
+          Purchased Produce
+        </div>
+        <div class="kpi-num" style="color: #16a34a;" id="kpiBuyerQty">
+          {{ "%.0f"|format(total_purchased_qty) }} <span style="font-size: 1rem; font-weight: 600;">kg</span>
+        </div>
+        <div style="font-size: 0.75rem; color: #166534; margin-top: 0.2rem;">
+          Confirmed fresh harvest
+        </div>
+      </div>
+      <div class="kpi-icon">🥦</div>
+    </div>
+
+    <!-- 3. Total Spending -->
+    <div class="kpi-card" style="border-top: 4px solid #15803d;">
+      <div>
+        <div style="font-size: 0.775rem; font-weight: 700; color: #15803d; text-transform: uppercase;">
+          Total Spending
+        </div>
+        <div class="kpi-num" style="color: #15803d;" id="kpiBuyerSpending">
+          ₹{{ "{:,.0f}".format(total_spending) }}
+        </div>
+        <div style="font-size: 0.75rem; color: #15803d; font-weight: 600; margin-top: 0.2rem;">
+          Direct farm payments
+        </div>
+      </div>
+      <div class="kpi-icon">💳</div>
+    </div>
+
+    <!-- 4. Rescued Produce -->
+    <div class="kpi-card urgent" style="border-top: 4px solid #ea580c;">
+      <div>
+        <div style="font-size: 0.775rem; font-weight: 700; color: #ea580c; text-transform: uppercase;">
+          Produce Rescued
+        </div>
+        <div class="kpi-num" style="color: #ea580c;" id="kpiBuyerRescued">
+          {{ "%.0f"|format(buyer_rescued_kg) }} <span style="font-size: 1rem; font-weight: 600;">kg</span>
+        </div>
+        <div style="font-size: 0.75rem; color: #ea580c; font-weight: 600; margin-top: 0.2rem;">
+          Saved from food loss
+        </div>
+      </div>
+      <div class="kpi-icon">🛡️</div>
+    </div>
+  </div>
+
   <!-- Active Order Tracking Banner (if any orders are in progress) -->
   {% if active_orders %}
     <div class="data-table-card" style="margin-bottom: 2.5rem; border-top: 4px solid #0284c7; background: #f0f9ff;">

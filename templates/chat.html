@@ -117,8 +117,16 @@
 
         <!-- Message Input Bar -->
         <div style="padding: 0.85rem 1.25rem; border-top: 1px solid #e2e8f0; background: #ffffff;">
+          <div id="attachedPhotoBadge" style="display: none; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; background: #f0fdf4; border: 1px solid #86efac; border-radius: 6px; padding: 0.35rem 0.65rem; font-size: 0.8rem; color: #166534;">
+            <span>📷 Produce Photo Attached: <strong id="attachedPhotoName">image.jpg</strong></span>
+            <button type="button" onclick="clearAttachedPhoto()" style="background: none; border: none; cursor: pointer; color: #dc2626; font-weight: 700; margin-left: 0.5rem;">✕ Remove</button>
+          </div>
           <form id="chatForm" onsubmit="handleSendMessage(event)" style="display: flex; gap: 0.65rem; align-items: center;">
-            <input type="text" id="chatMsgInput" class="form-control" placeholder="Type message in Tamil or English..." autocomplete="off" required style="font-size: 0.95rem;">
+            <label for="chatPhotoInput" class="btn btn-secondary" style="padding: 0.65rem 0.95rem; cursor: pointer; margin: 0; display: inline-flex; align-items: center; gap: 0.3rem;" title="Attach Produce Photo">
+              📷 <span style="font-size: 0.8rem; display: none;" class="photo-btn-text">Photo</span>
+            </label>
+            <input type="file" id="chatPhotoInput" accept="image/*" style="display: none;" onchange="handlePhotoUpload(event)">
+            <input type="text" id="chatMsgInput" class="form-control" placeholder="Type message in Tamil or English..." autocomplete="off" style="font-size: 0.95rem;">
             <button type="submit" class="btn btn-primary" style="padding: 0.65rem 1.25rem; display: inline-flex; align-items: center; gap: 0.4rem;">
               <span>Send</span>
               <span>&rarr;</span>
@@ -163,6 +171,40 @@
     }
   }
 
+  let attachedPhotoFilename = null;
+
+  async function handlePhotoUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('photo', file);
+
+    try {
+      const res = await fetch('/api/chat/upload-image', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        attachedPhotoFilename = data.filename;
+        document.getElementById('attachedPhotoName').innerText = file.name;
+        document.getElementById('attachedPhotoBadge').style.display = 'inline-flex';
+      } else {
+        alert(data.error || 'Failed to upload photo');
+      }
+    } catch (err) {
+      alert('Error uploading photo');
+    }
+  }
+
+  function clearAttachedPhoto() {
+    attachedPhotoFilename = null;
+    const input = document.getElementById('chatPhotoInput');
+    if (input) input.value = '';
+    const badge = document.getElementById('attachedPhotoBadge');
+    if (badge) badge.style.display = 'none';
+  }
+
   function renderMessages(msgs) {
     const wrap = document.getElementById('chatMessagesWrap');
     if (!wrap) return;
@@ -178,9 +220,21 @@
       msgDiv.style.flexDirection = 'column';
       msgDiv.style.alignItems = isMine ? 'flex-end' : 'flex-start';
 
+      let imgHtml = '';
+      if (m.image_filename) {
+        imgHtml = `
+          <div style="margin-top: 0.5rem;">
+            <a href="/static/uploads/${m.image_filename}" target="_blank" rel="noopener noreferrer">
+              <img src="/static/uploads/${m.image_filename}" alt="Produce Photo" style="max-width: 220px; max-height: 180px; border-radius: 8px; border: 1px solid ${isMine ? 'rgba(255,255,255,0.4)' : '#cbd5e1'}; object-fit: cover; display: block;">
+            </a>
+          </div>
+        `;
+      }
+
       let innerContent = `
         <div style="background: ${isMine ? '#15803d' : '#ffffff'}; color: ${isMine ? '#ffffff' : '#0f172a'}; padding: 0.65rem 0.95rem; border-radius: 12px; max-width: 75%; border: 1px solid ${isMine ? 'transparent' : '#e2e8f0'}; box-shadow: var(--shadow-sm); font-size: 0.9rem; line-height: 1.45; word-break: break-word;">
           ${m.message}
+          ${imgHtml}
           ${m.offer_price ? `
             <div style="margin-top: 0.5rem; padding: 0.5rem; background: ${isMine ? 'rgba(255,255,255,0.15)' : '#f0fdf4'}; border-radius: 6px; border: 1px dashed ${isMine ? '#ffffff' : '#86efac'}; font-size: 0.8rem;">
               <strong>Counter-Offer:</strong> ₹${m.offer_price}/kg for ${m.offer_quantity || ''} kg
@@ -202,16 +256,20 @@
     e.preventDefault();
     const input = document.getElementById('chatMsgInput');
     const msg = input.value.trim();
-    if (!msg) return;
+    if (!msg && !attachedPhotoFilename) return;
 
+    const photoToSend = attachedPhotoFilename;
     input.value = '';
+    clearAttachedPhoto();
+
     try {
       await fetch('/api/chat/send', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
           receiver_id: RECIPIENT_ID,
-          message: msg,
+          message: msg || '📷 Produce photo attached',
+          image_filename: photoToSend,
           order_id: ORDER_ID,
           listing_id: LISTING_ID
         })

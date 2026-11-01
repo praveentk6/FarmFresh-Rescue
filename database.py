@@ -8,13 +8,14 @@ from werkzeug.security import generate_password_hash
 DATABASE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'database.db')
 
 def get_db():
-    conn = sqlite3.connect(DATABASE_PATH)
+    conn = sqlite3.connect(DATABASE_PATH, timeout=20.0)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 def init_db():
     conn = get_db()
+    conn.execute("PRAGMA journal_mode = WAL")
     cursor = conn.cursor()
 
     # Users Table

@@ -1620,11 +1620,10 @@ def api_favorite_farmer(farmer_id):
 
 # 11. Download Sales & Profit Analytics CSV
 @app.route('/analytics/export-csv')
-@login_required
 def export_analytics_csv():
     conn = get_db()
     cursor = conn.cursor()
-    is_farmer = (g.user['role'] == 'farmer')
+    is_farmer = bool(g.user and g.user['role'] == 'farmer')
     
     if is_farmer:
         cursor.execute("""
@@ -1794,7 +1793,14 @@ def update_order_status(order_id=None, enquiry_id=None):
     data = request.get_json(silent=True) or request.form
     new_status = data.get('status', '').strip()
     status_note = data.get('note', '').strip()
-    valid_statuses = ['Pending', 'Accepted', 'Packed', 'Shipped', 'Delivered', 'Completed', 'Ready for Collection', 'Rejected', 'Declined', 'Cancelled']
+    valid_statuses = [
+        # Official 9 Lifecycle Statuses (Section 4):
+        'Order Placed', 'Order Accepted', 'Order Rejected', 'Processing',
+        'Packed', 'Ready for Pickup', 'Out for Delivery', 'Delivered', 'Cancelled',
+        # Backward-compatibility aliases:
+        'Pending', 'Accepted', 'Rejected', 'Declined', 'Ready for Collection',
+        'Shipped', 'Completed'
+    ]
     
     is_json = request.is_json or request.headers.get('Accept') == 'application/json'
 
@@ -1846,14 +1852,33 @@ def update_order_status(order_id=None, enquiry_id=None):
     
     if new_status in ['Completed', 'Delivered'] and order['status'] not in ['Completed', 'Delivered']:
         # Deduct ordered quantity from listing
-        req_qty = order['requested_quantity'] or 0.0
-        new_qty = max(0.0, float(order['current_stock']) - float(req_qty))
+        req_qty = float(order['requested_quantity'] or 0.0)
+        curr_stock = float(order['current_stock'] or 0.0)
+        new_qty = max(0.0, curr_stock - req_qty)
         new_listing_status = 'Sold' if new_qty <= 0 else 'Available'
         
         cursor.execute("""
             UPDATE listings SET quantity = ?, status = ?, rescued_from_waste = 1, updated_at = ?
             WHERE id = ?
         """, (new_qty, new_listing_status, now_str, order['listing_id']))
+
+        # Low stock notification to farmer (Section 3)
+        if new_qty > 0 and (new_qty <= 50.0 or (curr_stock > 0 and (new_qty / curr_stock) <= 0.20)):
+            create_notification(
+                order['farmer_id'],
+                f"⚠️ Low Stock Alert: {order['crop_name']}",
+                f"Remaining stock for {order['crop_name']} is down to {new_qty:.0f} {order['unit']}.",
+                "alert",
+                url_for('farmer_dashboard')
+            )
+        elif new_qty <= 0:
+            create_notification(
+                order['farmer_id'],
+                f"🎉 Produce Sold Out: {order['crop_name']}",
+                f"All {order['crop_name']} stock has been successfully cleared and marked Sold.",
+                "info",
+                url_for('farmer_dashboard')
+            )
 
     conn.commit()
     conn.close()
@@ -1863,8 +1888,35 @@ def update_order_status(order_id=None, enquiry_id=None):
 
     # Send Notification to counterpart
     target_user_id = order['buyer_id'] if is_farmer else order['farmer_id']
-    status_msg = f"Order #{actual_order_id} for {order['crop_name']} status is now: {new_status}."
-    create_notification(target_user_id, f"Order Update: {new_status}", status_msg, "status_change", url_for('buyer_dashboard') if is_farmer else url_for('farmer_dashboard'))
+    if new_status in ['Order Accepted', 'Accepted']:
+        notif_title = f"✅ Order #{actual_order_id} Accepted"
+        status_msg = f"Farmer {order['farmer_name']} confirmed your order for {order['crop_name']} ({order['requested_quantity']} {order['unit']})."
+    elif new_status in ['Order Rejected', 'Rejected', 'Declined']:
+        notif_title = f"❌ Order #{actual_order_id} Declined"
+        status_msg = f"Farmer was unable to accept order #{actual_order_id} for {order['crop_name']}."
+    elif new_status in ['Processing', 'Packed', 'Ready for Pickup', 'Ready for Collection']:
+        notif_title = f"📦 Order #{actual_order_id} Packed & Ready"
+        status_msg = f"Your order #{actual_order_id} ({order['crop_name']}) has been crated and is ready for pickup/dispatch."
+    elif new_status in ['Out for Delivery', 'Shipped']:
+        notif_title = f"🚚 Order #{actual_order_id} Out for Delivery"
+        status_msg = f"Your produce #{actual_order_id} is in transit! Follow the delivery route live."
+    elif new_status in ['Delivered', 'Completed']:
+        notif_title = f"🌱 Order #{actual_order_id} Delivered & Rescued"
+        status_msg = f"Order #{actual_order_id} ({order['crop_name']}) has been delivered and recorded in platform waste prevention stats."
+    elif new_status == 'Cancelled':
+        notif_title = f"🚫 Order #{actual_order_id} Cancelled"
+        status_msg = f"Order #{actual_order_id} for {order['crop_name']} has been cancelled."
+    else:
+        notif_title = f"Order #{actual_order_id} Update: {new_status}"
+        status_msg = f"Order #{actual_order_id} for {order['crop_name']} is now: {new_status}."
+
+    create_notification(
+        target_user_id,
+        notif_title,
+        status_msg,
+        "status_change",
+        url_for('buyer_dashboard') if is_farmer else url_for('farmer_dashboard')
+    )
 
     log_activity("Order Status Updated", f"Order #{actual_order_id} ({order['crop_name']}) status changed to {new_status} by {g.user['email']}")
 
@@ -2051,85 +2103,168 @@ def api_unread_notifications_count():
 # ==========================================
 
 @app.route('/analytics')
-@login_required
 def analytics_view():
     """
-    Analytics on produce listed, sold, remaining, revenue,
-    and confirmed saved from food waste.
+    Role-aware & Public Waste Reduction Analytics:
+    - Guests/Visitors: Public platform waste reduction statistics without login barrier
+    - Farmers: Farmer-specific produce waste metrics + platform benchmarks
+    - Buyers: Buyer-specific purchase & rescued produce contribution + platform benchmarks
+    - Admins: Complete platform metrics & management KPIs
     """
     timeframe = request.args.get('timeframe', 'all') # 'all', 'month', 'week'
     conn = get_db()
     cursor = conn.cursor()
 
-    is_farmer = (g.user['role'] == 'farmer')
-    is_admin = (g.user['role'] == 'admin')
+    user_role = g.user['role'] if g.user else 'guest'
+    is_farmer = (user_role == 'farmer')
+    is_buyer = (user_role == 'buyer')
+    is_admin = (user_role == 'admin')
 
-    farmer_clause = "WHERE farmer_id = ?" if is_farmer else "WHERE 1=1"
-    farmer_params = [g.user['id']] if is_farmer else []
-
-    # Time filter
+    # Time filter clause
     time_clause = ""
     if timeframe == 'month':
         time_clause = " AND (julianday('now') - julianday(created_at)) <= 30"
     elif timeframe == 'week':
         time_clause = " AND (julianday('now') - julianday(created_at)) <= 7"
 
-    # 1. Total quantity listed
-    cursor.execute(f"SELECT COALESCE(SUM(quantity), 0) FROM listings {farmer_clause} {time_clause}", farmer_params)
+    # ==========================================
+    # 1. Platform-Wide Baseline Aggregates
+    # ==========================================
+    cursor.execute(f"SELECT COALESCE(SUM(quantity), 0) FROM listings WHERE 1=1 {time_clause}")
     total_qty_listed = cursor.fetchone()[0]
 
-    # 2. Total quantity currently available
-    cursor.execute(f"SELECT COALESCE(SUM(quantity), 0) FROM listings {farmer_clause} AND status = 'Available' {time_clause}", farmer_params)
+    cursor.execute(f"SELECT COALESCE(SUM(quantity), 0) FROM listings WHERE status = 'Available' {time_clause}")
     available_qty = cursor.fetchone()[0]
 
-    # 3. Completed sales count & revenue from orders
-    if is_farmer:
-        cursor.execute(f"""
-            SELECT COUNT(*), COALESCE(SUM(COALESCE(e.total_price, e.requested_quantity * l.price_per_unit)), 0),
-                   COALESCE(SUM(e.requested_quantity), 0)
-            FROM enquiries e
-            JOIN listings l ON e.listing_id = l.id
-            WHERE l.farmer_id = ? AND e.status IN ('Completed', 'Delivered')
-        """, (g.user['id'],))
-    else:
-        cursor.execute("""
-            SELECT COUNT(*), COALESCE(SUM(COALESCE(e.total_price, e.requested_quantity * l.price_per_unit)), 0),
-                   COALESCE(SUM(e.requested_quantity), 0)
-            FROM enquiries e
-            JOIN listings l ON e.listing_id = l.id
-            WHERE e.status IN ('Completed', 'Delivered')
-        """)
+    cursor.execute("""
+        SELECT COUNT(*), COALESCE(SUM(COALESCE(e.total_price, e.requested_quantity * l.price_per_unit)), 0),
+               COALESCE(SUM(e.requested_quantity), 0)
+        FROM enquiries e
+        JOIN listings l ON e.listing_id = l.id
+        WHERE e.status IN ('Completed', 'Delivered')
+    """)
     completed_orders_data = cursor.fetchone()
     completed_orders_count = completed_orders_data[0]
     total_sales_revenue = completed_orders_data[1]
     total_qty_sold = completed_orders_data[2]
 
-    # 4. Confirmed saved from waste (Sold listings with rescued_from_waste = 1 or completed enquiries)
     cursor.execute(f"""
         SELECT COALESCE(SUM(quantity), 0) FROM listings 
-        {farmer_clause} AND (status = 'Sold' OR rescued_from_waste = 1) {time_clause}
-    """, farmer_params)
+        WHERE (status = 'Sold' OR rescued_from_waste = 1) {time_clause}
+    """)
     confirmed_rescued_kg = cursor.fetchone()[0]
     if confirmed_rescued_kg == 0 and total_qty_sold > 0:
         confirmed_rescued_kg = total_qty_sold
 
-    # 5. Category distribution
     cursor.execute(f"""
         SELECT category, COUNT(*) as count, COALESCE(SUM(quantity), 0) as total_kg
-        FROM listings {farmer_clause} {time_clause}
+        FROM listings WHERE 1=1 {time_clause}
         GROUP BY category
-    """, farmer_params)
+    """)
     category_breakdown = cursor.fetchall()
 
-    # 6. Top Rescued Produce by Crop Name
     cursor.execute(f"""
         SELECT crop_name, category, COALESCE(SUM(quantity), 0) as total_kg,
                COALESCE(SUM(quantity * price_per_unit), 0) as est_value
-        FROM listings {farmer_clause} {time_clause}
+        FROM listings WHERE 1=1 {time_clause}
         GROUP BY crop_name, category
         ORDER BY total_kg DESC LIMIT 6
-    """, farmer_params)
+    """)
     top_crops = cursor.fetchall()
+
+    # ==========================================
+    # 2. Role-Specific Metric Calculations
+    # ==========================================
+    farmer_metrics = None
+    buyer_metrics = None
+    admin_metrics = None
+
+    if is_farmer:
+        f_id = g.user['id']
+        cursor.execute(f"SELECT COALESCE(SUM(quantity), 0) FROM listings WHERE farmer_id = ? {time_clause}", (f_id,))
+        f_listed = cursor.fetchone()[0]
+
+        cursor.execute(f"SELECT COALESCE(SUM(quantity), 0) FROM listings WHERE farmer_id = ? AND status = 'Available' {time_clause}", (f_id,))
+        f_avail = cursor.fetchone()[0]
+
+        cursor.execute("""
+            SELECT COUNT(*), COALESCE(SUM(COALESCE(e.total_price, e.requested_quantity * l.price_per_unit)), 0),
+                   COALESCE(SUM(e.requested_quantity), 0)
+            FROM enquiries e
+            JOIN listings l ON e.listing_id = l.id
+            WHERE l.farmer_id = ? AND e.status IN ('Completed', 'Delivered')
+        """, (f_id,))
+        f_sales = cursor.fetchone()
+        f_orders_count = f_sales[0]
+        f_revenue = f_sales[1]
+        f_sold = f_sales[2]
+
+        f_waste_pct = (f_sold / f_listed * 100) if f_listed > 0 else 0.0
+
+        farmer_metrics = {
+            'total_listed': f_listed,
+            'total_sold': f_sold,
+            'remaining_stock': f_avail,
+            'total_earnings': f_revenue,
+            'rescued_kg': f_sold,
+            'waste_reduction_pct': f_waste_pct,
+            'orders_count': f_orders_count
+        }
+
+    elif is_buyer:
+        b_id = g.user['id']
+        b_email = g.user['email'] if (g.user and 'email' in g.user.keys()) else ''
+        cursor.execute("""
+            SELECT COUNT(*),
+                   COALESCE(SUM(e.requested_quantity), 0),
+                   COALESCE(SUM(COALESCE(e.total_price, e.requested_quantity * l.price_per_unit)), 0)
+            FROM enquiries e
+            JOIN listings l ON e.listing_id = l.id
+            WHERE (e.buyer_id = ? OR e.buyer_email = ?)
+              AND e.status IN ('Completed', 'Delivered', 'Paid', 'Accepted', 'Order Accepted', 'Processing', 'Packed', 'Ready for Pickup', 'Out for Delivery')
+        """, (b_id, b_email))
+        b_data = cursor.fetchone()
+        b_orders = b_data[0]
+        b_purchased_qty = b_data[1]
+        b_spent = b_data[2]
+
+        cursor.execute("""
+            SELECT COALESCE(SUM(e.requested_quantity), 0)
+            FROM enquiries e
+            WHERE (e.buyer_id = ? OR e.buyer_email = ?)
+              AND e.status IN ('Completed', 'Delivered')
+        """, (b_id, b_email))
+        b_rescued = cursor.fetchone()[0]
+
+        # Estimated savings vs market prices (~15% below mandi markups)
+        b_saved = b_spent * 0.15
+
+        buyer_metrics = {
+            'orders_count': b_orders,
+            'purchased_qty': b_purchased_qty,
+            'total_spending': b_spent,
+            'rescued_kg': b_rescued,
+            'money_saved': b_saved
+        }
+
+    elif is_admin:
+        cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'farmer' AND is_active = 1")
+        adm_farmers = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM users WHERE role = 'buyer' AND is_active = 1")
+        adm_buyers = cursor.fetchone()[0]
+
+        cursor.execute("SELECT COUNT(*) FROM listings")
+        adm_listings = cursor.fetchone()[0]
+
+        admin_metrics = {
+            'total_farmers': adm_farmers,
+            'total_buyers': adm_buyers,
+            'total_listings': adm_listings,
+            'completed_orders': completed_orders_count,
+            'total_rescued_kg': confirmed_rescued_kg,
+            'platform_revenue': total_sales_revenue
+        }
 
     conn.close()
 
@@ -2152,7 +2287,13 @@ def analytics_view():
         water_saved_liters=water_saved_liters,
         category_breakdown=category_breakdown,
         top_crops=top_crops,
-        is_farmer=is_farmer
+        user_role=user_role,
+        is_farmer=is_farmer,
+        is_buyer=is_buyer,
+        is_admin=is_admin,
+        farmer_metrics=farmer_metrics,
+        buyer_metrics=buyer_metrics,
+        admin_metrics=admin_metrics
     )
 
 # ==========================================
@@ -2426,10 +2567,28 @@ def buyer_dashboard():
         recommended_produce = nearby_produce[:6]
 
     # Active Orders needing live tracking
-    active_orders = [o for o in my_orders if o['status'] in ['Pending', 'Accepted', 'Packed', 'Shipped', 'Ready for Collection']]
+    active_orders = [o for o in my_orders if o['status'] in ['Pending', 'Accepted', 'Packed', 'Shipped', 'Ready for Collection', 'Order Placed', 'Order Accepted', 'Processing', 'Ready for Pickup', 'Out for Delivery']]
 
     # Buyer payments and transaction history
     buyer_payments = get_buyer_payments(g.user['id'])
+
+    # Calculated KPIs for Buyer Portal
+    total_orders = len(my_orders)
+    total_purchased_qty = sum(
+        float(o['requested_quantity'] or 0.0)
+        for o in my_orders
+        if o['status'] in ['Completed', 'Delivered', 'Paid', 'Accepted', 'Order Accepted', 'Processing', 'Packed', 'Ready for Pickup', 'Out for Delivery', 'Shipped', 'Ready for Collection']
+    )
+    total_spending = sum(
+        float(o['total_price'] or (float(o['requested_quantity'] or 0.0) * float(o['price_per_unit'] or 0.0)))
+        for o in my_orders
+        if o['status'] in ['Completed', 'Delivered', 'Paid']
+    )
+    buyer_rescued_kg = sum(
+        float(o['requested_quantity'] or 0.0)
+        for o in my_orders
+        if o['status'] in ['Completed', 'Delivered']
+    )
 
     conn.close()
 
@@ -2442,7 +2601,11 @@ def buyer_dashboard():
         nearby_produce=nearby_produce[:8],
         recommended_produce=recommended_produce[:6],
         active_orders=active_orders,
-        payments=buyer_payments
+        payments=buyer_payments,
+        total_orders=total_orders,
+        total_purchased_qty=total_purchased_qty,
+        total_spending=total_spending,
+        buyer_rescued_kg=buyer_rescued_kg
     )
 
 @app.route('/admin/dashboard')
@@ -3120,19 +3283,38 @@ def api_chat_messages(recipient_id):
     msg_list = [dict(m) for m in msgs]
     return jsonify({'success': True, 'messages': msg_list})
 
+@app.route('/api/chat/upload-image', methods=['POST'])
+@login_required
+def api_chat_upload_image():
+    if 'photo' not in request.files:
+        return jsonify({'success': False, 'error': 'No image file uploaded'}), 400
+    file = request.files['photo']
+    saved_filename = save_uploaded_image(file)
+    if not saved_filename:
+        return jsonify({'success': False, 'error': 'Invalid image format or size (must be under 3MB PNG, JPG, WEBP)'}), 400
+    return jsonify({
+        'success': True,
+        'filename': saved_filename,
+        'url': url_for('static', filename='uploads/' + saved_filename)
+    })
+
 @app.route('/api/chat/send', methods=['POST'])
 @login_required
 def api_chat_send():
     data = request.get_json() or {}
     receiver_id = data.get('receiver_id') or data.get('recipient_id')
     message = (data.get('message') or data.get('message_text') or '').strip()
+    image_filename = data.get('image_filename')
     order_id = data.get('order_id')
     listing_id = data.get('listing_id')
     offer_price = data.get('offer_price')
     offer_qty = data.get('offer_quantity')
 
-    if not receiver_id or not message:
-        return jsonify({'success': False, 'error': 'Missing receiver or message'}), 400
+    if not receiver_id or (not message and not image_filename):
+        return jsonify({'success': False, 'error': 'Missing receiver or message content'}), 400
+
+    if not message and image_filename:
+        message = '📷 Attached Produce Photo'
 
     res = save_chat_message(
         sender_id=g.user['id'],
@@ -3140,6 +3322,7 @@ def api_chat_send():
         message=message,
         order_id=order_id,
         listing_id=listing_id,
+        image_filename=image_filename,
         offer_price=offer_price,
         offer_quantity=offer_qty
     )

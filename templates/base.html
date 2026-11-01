@@ -41,6 +41,7 @@
       </a>
 
       <!-- 2. Center: Primary Navigation Links -->
+      {% set active_user = current_user if current_user else {'id': 9, 'name': 'Praveen', 'role': 'buyer', 'email': 'praveetk16@gmail.com'} %}
       <nav class="nav-menu-wrapper" id="navMenuWrapper" aria-label="Main Navigation">
         <ul class="nav-menu" id="navMenu">
           <li>
@@ -81,6 +82,11 @@
           <li>
             <a href="{{ url_for('analytics_view') }}" class="nav-link {% if request.endpoint == 'analytics_view' %}active{% endif %}">
               📊 {{ _t('analytics') }}
+            </a>
+          </li>
+          <li>
+            <a href="{{ url_for('buyer_dashboard') if active_user['role'] == 'buyer' else (url_for('farmer_dashboard') if active_user['role'] == 'farmer' else url_for('admin_dashboard')) }}" class="nav-link {% if request.endpoint in ['buyer_dashboard', 'farmer_dashboard', 'admin_dashboard'] %}active{% endif %}" id="navMyOrdersLink">
+              📦 {{ _t('my_orders') }}
             </a>
           </li>
 
