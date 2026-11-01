@@ -25,3 +25,4 @@ def generate_qr_bytes(data_url):
     # Fallback: simple 1x1 transparent PNG if library not present
     import base64
     return base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
+
