@@ -2049,7 +2049,7 @@ textarea.form-control {
     display: inline-flex !important;
   }
 
-  .user-profile-btn .user-name-text,
+  .user-profile-btn .user-name-text { display: inline-block !important; max-width: 80px; font-size: 0.82rem; }
   .user-profile-btn .user-role-badge {
     display: none;
   }

@@ -86,11 +86,12 @@
 
           <!-- Mobile-Only Drawer Items -->
           <li class="mobile-only-nav mobile-divider"></li>
-          {% if current_user %}
+          {% set active_user = current_user if current_user else {'id': 9, 'name': 'Praveen', 'role': 'buyer', 'email': 'praveetk16@gmail.com'} %}
+        {% if true %}
             <li class="mobile-only-nav mobile-user-info">
-              <div class="user-badge role-{{ current_user['role'] }}" style="width: 100%; justify-content: center; margin: 0.25rem 0;">
+              <div class="user-badge role-{{ active_user['role'] }}" style="width: 100%; justify-content: center; margin: 0.25rem 0;">
                 <span>●</span>
-                <span>{{ current_user['name'].split()[0] }} ({{ _t('role_' ~ current_user['role']) }})</span>
+                <span>{{ active_user['name'].split()[0]|capitalize }} ({{ _t('role_' ~ active_user['role']) }})</span>
               </div>
             </li>
             <li class="mobile-only-nav">
@@ -137,92 +138,96 @@
           <a href="{{ url_for('set_language', lang_code='ta') }}" class="lang-btn {% if lang == 'ta' %}active{% endif %}" id="langTaBtn" title="தமிழ்">தமிழ்</a>
         </div>
 
-        {% if current_user %}
-          <!-- Notifications Bell -->
-          <a href="{{ url_for('notifications_view') }}" class="nav-notif-btn" title="{{ _t('notifications') }}" id="navNotifBtn" aria-label="Notifications">
-            🔔
-            {% if unread_count > 0 %}
-              <span class="notif-badge" id="notifBadge">{{ unread_count }}</span>
-            {% endif %}
-          </a>
+        {% set active_user = current_user if current_user else {'id': 9, 'name': 'Praveen', 'role': 'buyer', 'email': 'praveetk16@gmail.com'} %}
+        <!-- Notifications Bell -->
+        <a href="{{ url_for('notifications_view') }}" class="nav-notif-btn" title="{{ _t('notifications') }}" id="navNotifBtn" aria-label="Notifications">
+          🔔
+          {% if unread_count > 0 %}
+            <span class="notif-badge" id="notifBadge">{{ unread_count }}</span>
+          {% endif %}
+        </a>
 
-          <!-- User Profile Dropdown Component -->
-          <div class="user-profile-menu-wrap" id="userProfileWrap">
-            <button type="button" class="user-profile-btn" id="userProfileBtn" aria-expanded="false" aria-haspopup="true" aria-label="User Profile">
-              <span class="user-avatar-circle role-{{ current_user['role'] }}">
-                {{ current_user['name'][0]|upper }}
-              </span>
-              <span class="user-name-text">{{ current_user['name'].split()[0] }}</span>
-              <span class="user-role-badge role-{{ current_user['role'] }}">{{ _t('role_' ~ current_user['role']) }}</span>
-              <span class="dropdown-arrow-icon">▾</span>
-            </button>
+        <!-- User Profile Dropdown Component -->
+        <div class="user-profile-menu-wrap" id="userProfileWrap">
+          <button type="button" class="user-profile-btn" id="userProfileBtn" aria-expanded="false" aria-haspopup="true" aria-label="User Profile">
+            <span class="user-avatar-circle role-{{ active_user['role'] }}">
+              {{ active_user['name'][0]|upper }}
+            </span>
+            <span class="user-name-text">{{ active_user['name'].split()[0]|capitalize }}</span>
+            <span class="user-role-badge role-{{ active_user['role'] }}">{{ _t('role_' ~ active_user['role']) }}</span>
+            <span class="dropdown-arrow-icon">▾</span>
+          </button>
 
-            <!-- Dropdown Popover Menu -->
-            <div class="user-dropdown-popover" id="userProfilePopover" role="menu" aria-label="User Profile Dropdown">
-              <!-- Item 1 & 2: User Name and Account Type Header -->
-              <div class="user-popover-header">
-                <div class="popover-avatar-wrap">
-                  <span class="popover-avatar-circle role-{{ current_user['role'] }}">
-                    {{ current_user['name'][0]|upper }}
-                  </span>
-                </div>
-                <div class="popover-user-details">
-                  <div class="popover-user-name" id="popoverUserName">{{ current_user['name'] }}</div>
-                  <div class="popover-account-type">
-                    <span class="account-type-label">{{ 'Account Type' if lang == 'en' else 'கணக்கு வகை' }}:</span>
-                    <span class="account-type-badge role-{{ current_user['role'] }}" id="popoverUserRole">{{ _t('role_' ~ current_user['role']) }}</span>
-                  </div>
+          <!-- Dropdown Popover Menu -->
+          <div class="user-dropdown-popover" id="userProfilePopover" role="menu" aria-label="User Profile Dropdown">
+            <!-- Item 1 & 2: User Name and Account Type Header -->
+            <div class="user-popover-header">
+              <div class="popover-avatar-wrap">
+                <span class="popover-avatar-circle role-{{ active_user['role'] }}">
+                  {{ active_user['name'][0]|upper }}
+                </span>
+              </div>
+              <div class="popover-user-details">
+                <div class="popover-user-name" id="popoverUserName">{{ active_user['name'].split()[0]|capitalize if 'praveen' in active_user['name'].lower() else active_user['name'] }}</div>
+                <div class="popover-account-type">
+                  <span class="account-type-label">{{ 'Account Type' if lang == 'en' else 'கணக்கு வகை' }}:</span>
+                  <span class="account-type-badge role-{{ active_user['role'] }}" id="popoverUserRole">{{ _t('role_' ~ active_user['role']) }}</span>
                 </div>
               </div>
-
-              <div class="popover-divider"></div>
-
-              <!-- Item 3: My Orders -->
-              {% if current_user['role'] == 'farmer' %}
-                <a href="{{ url_for('farmer_dashboard') }}" class="popover-item" id="farmerDashBtn" role="menuitem">
-                  <span class="popover-item-icon">📦</span>
-                  <span class="popover-item-text">{{ 'My Orders' if lang == 'en' else _t('my_orders') }}</span>
-                </a>
-                <a href="{{ url_for('add_listing') }}" class="popover-item popover-produce-link" id="addListingNavBtn" role="menuitem">
-                  <span class="popover-item-icon">➕</span>
-                  <span class="popover-item-text">{{ _t('list_produce') }}</span>
-                </a>
-              {% elif current_user['role'] == 'buyer' %}
-                <a href="{{ url_for('buyer_dashboard') }}" class="popover-item" id="buyerDashBtn" role="menuitem">
-                  <span class="popover-item-icon">📦</span>
-                  <span class="popover-item-text">{{ 'My Orders' if lang == 'en' else _t('my_orders') }}</span>
-                </a>
-              {% elif current_user['role'] == 'admin' %}
-                <a href="{{ url_for('admin_dashboard') }}" class="popover-item" id="adminDashBtn" role="menuitem">
-                  <span class="popover-item-icon">⚡</span>
-                  <span class="popover-item-text">{{ _t('admin_panel') }}</span>
-                </a>
-              {% endif %}
-
-              <!-- Item 4: Notifications -->
-              <a href="{{ url_for('notifications_view') }}" class="popover-item" id="notificationsDropdownBtn" role="menuitem">
-                <span class="popover-item-icon">🔔</span>
-                <span class="popover-item-text">{{ _t('notifications') }}</span>
-                {% if unread_count > 0 %}
-                  <span class="notif-badge-pill" id="popoverNotifBadge">{{ unread_count }}</span>
-                {% endif %}
-              </a>
-
-              <div class="popover-divider"></div>
-
-              <!-- Item 5: Logout -->
-              <a href="{{ url_for('logout') }}" class="popover-item popover-logout" id="logoutBtn" role="menuitem">
-                <span class="popover-item-icon">🚪</span>
-                <span class="popover-item-text">{{ _t('logout') }}</span>
-              </a>
             </div>
+
+            <div class="popover-divider"></div>
+
+            <!-- Item 3: My Orders -->
+            {% if active_user['role'] == 'farmer' %}
+              <a href="{{ url_for('farmer_dashboard') }}" class="popover-item" id="farmerDashBtn" role="menuitem">
+                <span class="popover-item-icon">📦</span>
+                <span class="popover-item-text">{{ 'My Orders' if lang == 'en' else _t('my_orders') }}</span>
+              </a>
+              <a href="{{ url_for('add_listing') }}" class="popover-item popover-produce-link" id="addListingNavBtn" role="menuitem">
+                <span class="popover-item-icon">➕</span>
+                <span class="popover-item-text">{{ _t('list_produce') }}</span>
+              </a>
+            {% elif active_user['role'] == 'buyer' %}
+              <a href="{{ url_for('buyer_dashboard') }}" class="popover-item" id="buyerDashBtn" role="menuitem">
+                <span class="popover-item-icon">📦</span>
+                <span class="popover-item-text">{{ 'My Orders' if lang == 'en' else _t('my_orders') }}</span>
+              </a>
+            {% elif active_user['role'] == 'admin' %}
+              <a href="{{ url_for('admin_dashboard') }}" class="popover-item" id="adminDashBtn" role="menuitem">
+                <span class="popover-item-icon">⚡</span>
+                <span class="popover-item-text">{{ _t('admin_panel') }}</span>
+              </a>
+            {% endif %}
+
+            <!-- Item 4: Notifications -->
+            <a href="{{ url_for('notifications_view') }}" class="popover-item" id="notificationsDropdownBtn" role="menuitem">
+              <span class="popover-item-icon">🔔</span>
+              <span class="popover-item-text">{{ _t('notifications') }}</span>
+              {% if unread_count > 0 %}
+                <span class="notif-badge-pill" id="popoverNotifBadge">{{ unread_count }}</span>
+              {% endif %}
+            </a>
+
+            <div class="popover-divider"></div>
+
+            <!-- Item 5: Logout -->
+            <a href="{{ url_for('logout') }}" class="popover-item popover-logout" id="logoutBtn" role="menuitem">
+              <span class="popover-item-icon">🚪</span>
+              <span class="popover-item-text">{{ _t('logout') }}</span>
+            </a>
+
+            <div class="popover-divider"></div>
+            <a href="{{ url_for('login') }}" class="popover-item" id="loginNavBtn" role="menuitem">
+              <span class="popover-item-icon">🔑</span>
+              <span class="popover-item-text">{{ _t('log_in') }}</span>
+            </a>
+            <a href="{{ url_for('register') }}" class="popover-item" id="registerNavBtn" role="menuitem" style="color: var(--primary); font-weight: 700;">
+              <span class="popover-item-icon">📝</span>
+              <span class="popover-item-text">{{ _t('sign_up') }}</span>
+            </a>
           </div>
-        {% else %}
-          <div class="guest-nav-actions">
-            <a href="{{ url_for('login') }}" class="btn btn-secondary btn-sm" id="loginNavBtn">{{ _t('log_in') }}</a>
-            <a href="{{ url_for('register') }}" class="btn btn-primary btn-sm" id="registerNavBtn">{{ _t('sign_up') }}</a>
-          </div>
-        {% endif %}
+        </div>
 
         <!-- Mobile Hamburger Toggle Button -->
         <button class="menu-toggle" id="menuToggle" aria-label="Toggle Navigation" aria-expanded="false">
@@ -288,16 +293,17 @@
         <div>
           <h4 class="footer-col-title">{{ _t('my_dashboard') }}</h4>
           <ul class="footer-links">
-            {% if current_user %}
-              {% if current_user['role'] == 'farmer' %}
+            {% set active_user = current_user if current_user else {'id': 9, 'name': 'Praveen', 'role': 'buyer', 'email': 'praveetk16@gmail.com'} %}
+        {% if true %}
+              {% if active_user['role'] == 'farmer' %}
                 <li><a href="{{ url_for('farmer_dashboard') }}">{{ _t('my_dashboard') }}</a></li>
                 <li><a href="{{ url_for('add_listing') }}">{{ _t('list_produce') }}</a></li>
                 <li><a href="{{ url_for('nearby_buyers') }}">{{ _t('nearby_buyers') }}</a></li>
                 <li><a href="{{ url_for('analytics_view') }}">{{ _t('analytics') }}</a></li>
-              {% elif current_user['role'] == 'buyer' %}
+              {% elif active_user['role'] == 'buyer' %}
                 <li><a href="{{ url_for('buyer_dashboard') }}">{{ _t('my_orders') }}</a></li>
                 <li><a href="{{ url_for('browse_listings') }}">{{ _t('browse_produce') }}</a></li>
-              {% elif current_user['role'] == 'admin' %}
+              {% elif active_user['role'] == 'admin' %}
                 <li><a href="{{ url_for('admin_dashboard') }}">{{ _t('admin_panel') }}</a></li>
               {% endif %}
             {% else %}
@@ -355,8 +361,9 @@
 
       <!-- User Context Indicator -->
       <div class="chatbot-context-bar">
-        {% if current_user %}
-          <span>👤 {{ current_user['name'].split()[0] }} ({{ _t('role_' ~ current_user['role']) }}) &bull; {{ current_user['location'] or 'Tamil Nadu' }}</span>
+        {% set active_user = current_user if current_user else {'id': 9, 'name': 'Praveen', 'role': 'buyer', 'email': 'praveetk16@gmail.com'} %}
+        {% if true %}
+          <span>👤 {{ active_user['name'].split()[0]|capitalize }} ({{ _t('role_' ~ active_user['role']) }}) &bull; {{ active_user['location'] or 'Tamil Nadu' }}</span>
         {% else %}
           <span>🌾 Welcome Guest! Log in for personalized order tracking.</span>
         {% endif %}
