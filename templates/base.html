@@ -67,21 +67,34 @@
           <li><a href="{{ url_for('demand_prediction') }}" class="nav-link {% if request.endpoint == 'demand_prediction' %}active{% endif %}">📈 {{ 'தேவை கணிப்பு' if lang == 'ta' else 'Demand Trends' }}</a></li>
           <li><a href="{{ url_for('nearby_buyers') }}" class="nav-link {% if request.endpoint == 'nearby_buyers' %}active{% endif %}">{{ _t('nearby_buyers') }}</a></li>
           <li><a href="{{ url_for('analytics_view') }}" class="nav-link {% if request.endpoint == 'analytics_view' %}active{% endif %}">📊 {{ _t('analytics') }}</a></li>
-          <li class="mobile-only-nav">
-            <a href="{{ url_for('notifications_view') }}" class="nav-link {% if request.endpoint == 'notifications_view' %}active{% endif %}">
-              🔔 {{ _t('notifications') }}{% if unread_count > 0 %} <span class="notif-pill">{{ unread_count }}</span>{% endif %}
-            </a>
-          </li>
           {% if current_user %}
             <li class="mobile-only-nav">
-              {% if current_user['role'] == 'farmer' %}
-                <a href="{{ url_for('farmer_dashboard') }}" class="nav-link {% if request.endpoint == 'farmer_dashboard' %}active{% endif %}">📋 {{ _t('my_orders') }}</a>
-              {% elif current_user['role'] == 'buyer' %}
-                <a href="{{ url_for('buyer_dashboard') }}" class="nav-link {% if request.endpoint == 'buyer_dashboard' %}active{% endif %}">📋 {{ _t('my_orders') }}</a>
-              {% elif current_user['role'] == 'admin' %}
-                <a href="{{ url_for('admin_dashboard') }}" class="nav-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}">⚡ {{ _t('admin_panel') }}</a>
-              {% endif %}
+              <div class="user-badge role-{{ current_user['role'] }}" style="width: 100%; justify-content: center; margin: 0.5rem 0; font-size: 0.9rem; padding: 0.55rem 1rem;">
+                <span>●</span>
+                <span>{{ current_user['name'].split()[0] }} ({{ _t('role_' ~ current_user['role']) }})</span>
+              </div>
             </li>
+            <li class="mobile-only-nav">
+              <a href="{{ url_for('notifications_view') }}" class="nav-link {% if request.endpoint == 'notifications_view' %}active{% endif %}">
+                🔔 {{ _t('notifications') }}{% if unread_count > 0 %} <span class="notif-pill">{{ unread_count }}</span>{% endif %}
+              </a>
+            </li>
+            {% if current_user['role'] == 'farmer' %}
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('add_listing') }}" class="nav-link" style="color: var(--primary); font-weight: 700;">+ {{ _t('list_produce') }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('farmer_dashboard') }}" class="nav-link {% if request.endpoint == 'farmer_dashboard' %}active{% endif %}">📋 {{ _t('my_orders') }}</a>
+              </li>
+            {% elif current_user['role'] == 'buyer' %}
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('buyer_dashboard') }}" class="nav-link {% if request.endpoint == 'buyer_dashboard' %}active{% endif %}">📋 {{ _t('my_orders') }}</a>
+              </li>
+            {% elif current_user['role'] == 'admin' %}
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}">⚡ {{ _t('admin_panel') }}</a>
+              </li>
+            {% endif %}
             <li class="mobile-only-nav">
               <a href="{{ url_for('logout') }}" class="nav-link" style="color: var(--urgent-red);">🚪 {{ _t('logout') }}</a>
             </li>
@@ -90,7 +103,7 @@
               <a href="{{ url_for('login') }}" class="nav-link">🔑 {{ _t('log_in') }}</a>
             </li>
             <li class="mobile-only-nav">
-              <a href="{{ url_for('register') }}" class="nav-link">📝 {{ _t('sign_up') }}</a>
+              <a href="{{ url_for('register') }}" class="nav-link" style="color: var(--primary); font-weight: 700;">📝 {{ _t('sign_up') }}</a>
             </li>
           {% endif %}
         </ul>

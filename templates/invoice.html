@@ -82,7 +82,7 @@
     </div>
 
     <!-- Parties Involved: Buyer & Seller -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem; font-size: 0.9rem;">
+    <div class="invoice-parties-grid">
       <div style="border-left: 3px solid #16a34a; padding-left: 1rem;">
         <span style="font-size: 0.75rem; color: #166534; font-weight: 700; text-transform: uppercase;">PRODUCED & SOLD BY (FARMER)</span>
         <h3 style="font-size: 1.1rem; font-weight: 700; margin: 0.25rem 0; color: #0f172a;">{{ payment['farmer_name'] }}</h3>
@@ -136,7 +136,7 @@
     </div>
 
     <!-- Totals & QR Code Verification -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; align-items: flex-start; padding-top: 1rem; border-top: 2px solid #f1f5f9;">
+    <div class="invoice-totals-grid">
       
       <!-- QR Verification Code -->
       <div style="display: flex; gap: 1rem; align-items: center; background: #f8fafc; padding: 1rem; border-radius: var(--radius-md); border: 1px dashed #cbd5e1;">

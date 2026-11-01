@@ -40,7 +40,7 @@
         </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; padding: 0 1rem 1rem;">
+      <div class="orders-in-transit-grid">
         {% for act in active_orders %}
           <div style="background: white; border-radius: var(--radius-md); padding: 1.25rem; border: 1px solid #bae6fd; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
             <div>
@@ -132,7 +132,7 @@
         </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1rem; padding: 1rem;">
+      <div class="favorite-farmers-grid">
         {% for f in my_favorites %}
           <div style="border: 1px solid #e2e8f0; border-radius: var(--radius-md); padding: 1.25rem; background: #ffffff; box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; align-items: center;">
             <div>

@@ -27,7 +27,7 @@
     </div>
   </div>
 
-  <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 2rem;" class="checkout-grid">
+  <div class="checkout-grid">
 
     <!-- Left Column: Order Review & Payment Selection -->
     <div>
@@ -61,7 +61,7 @@
         </div>
 
         <!-- Specifications Breakdown -->
-        <div style="margin-top: 1rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; font-size: 0.875rem;">
+        <div class="checkout-spec-grid" style="font-size: 0.875rem;">
           <div style="background: #f8fafc; padding: 0.75rem; border-radius: 8px;">
             <span style="color: #64748b; font-size: 0.75rem; display: block;">Purchasing Quantity:</span>
             <strong style="color: #0f172a; font-size: 1.05rem;">{{ "%.1f"|format(order['requested_quantity']) }} {{ listing['unit'] }}</strong>

@@ -124,6 +124,8 @@ a:hover {
 }
 
 .nav-brand {
+  order: 1;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 0.65rem;
@@ -157,6 +159,7 @@ a:hover {
 }
 
 .nav-menu-wrapper {
+  order: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -241,9 +244,11 @@ a:hover {
 
 /* Navigation Right Controls & Language Switcher */
 .nav-right-controls {
+  order: 3;
   display: flex;
   align-items: center;
   gap: 0.65rem;
+  flex-shrink: 0;
 }
 
 .lang-switch-wrap {
@@ -1719,13 +1724,19 @@ textarea.form-control {
   }
 }
 
-/* --- Navigation Bar Drawer (max-width: 1080px) --- */
-@media (max-width: 1080px) {
+/* --- Navigation Bar Drawer (max-width: 1120px) --- */
+@media (max-width: 1120px) {
   .menu-toggle {
     display: flex;
   }
 
+  .nav-right-controls {
+    order: 2;
+    margin-left: auto;
+  }
+
   .nav-menu-wrapper {
+    order: 3;
     position: absolute;
     top: 4.5rem;
     left: 0;
@@ -1777,25 +1788,7 @@ textarea.form-control {
   }
 
   .nav-actions {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 0.75rem;
-    width: 100%;
-    padding-top: 1rem;
-    border-top: 1px solid var(--border-subtle);
-  }
-
-  .nav-actions .btn {
-    width: 100%;
-    min-height: 44px;
-    font-size: 0.95rem;
-    justify-content: center;
-  }
-
-  .user-badge {
-    width: 100%;
-    justify-content: center;
-    padding: 0.6rem 1rem;
+    display: none !important;
   }
 }
 
@@ -2425,38 +2418,257 @@ textarea.form-control {
 }
 
 /* ===================================================================
+   Dedicated Responsive Grid & Layout Component Classes
+   =================================================================== */
+
+/* Checkout Grid */
+.checkout-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 0.75fr;
+  gap: 2rem;
+  align-items: start;
+}
+.checkout-spec-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+/* Order Tracking Grid */
+.tracking-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 2rem;
+  align-items: start;
+}
+.tracking-kpi-subgrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+/* Traceability & Provenance Grid */
+.trace-grid {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+}
+.trace-specs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+/* Farmer Dashboard Analytics */
+.farmer-analytics-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
+}
+.farmer-metric-subgrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.analytics-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2.5rem;
+}
+.buyer-match-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+}
+
+/* Invoice Grid */
+.invoice-parties-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  font-size: 0.9rem;
+}
+.invoice-totals-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  align-items: flex-start;
+  padding-top: 1rem;
+  border-top: 2px solid #f1f5f9;
+}
+
+/* Market Prices Filter Grid */
+.filter-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) 120px;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+/* Nearby Buyers Filter & Cards */
+.nearby-filter-grid {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 1.5fr auto;
+  gap: 1rem;
+  align-items: flex-end;
+}
+.buyer-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+.buyer-card-metric-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+/* Weather Alerts Grid */
+.weather-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+}
+
+/* Buyer Dashboard Transit & Favorites */
+.orders-in-transit-grid,
+.favorite-farmers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+  padding: 0 1rem 1rem;
+}
+
+/* Chat Layout Grid */
+.chat-layout-grid {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1.5rem;
+  height: calc(100vh - 260px);
+  min-height: 520px;
+}
+
+/* Home Steps Grid */
+.steps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 2rem;
+}
+
+/* ===================================================================
    Viewport Optimizations for Target Devices:
-   - Desktop (1920x1080)
-   - Laptop (1366x768)
-   - Tablet (768x1024)
-   - Mobile (390x844)
-   - Small Mobile (360x800)
+   1. Desktop (1920x1080)
+   2. Standard Laptop (1366x768)
+   3. Compact Laptop (1280x720)
+   4. Tablet Portrait (768x1024)
+   5. Mobile Standard (390x844)
+   6. Mobile Medium (375x812)
+   7. Small Mobile (360x800)
    =================================================================== */
 
 /* 1. Large Desktop (min-width: 1400px - e.g. 1920x1080) */
 @media (min-width: 1400px) {
   .container {
-    max-width: 1360px;
+    max-width: 1440px;
+    padding: 0 2rem;
+  }
+  .nav-menu {
+    gap: 1.35rem;
+  }
+  .nav-link {
+    font-size: 0.95rem;
   }
   .hero-title {
     font-size: 3.25rem;
   }
 }
 
-/* 2. Standard Laptop (max-width: 1366px - e.g. 1366x768) */
-@media (max-width: 1366px) {
+/* 2 & 3. Laptop Viewports (1121px to 1399px - e.g. 1366x768 and 1280x720) */
+@media (min-width: 1121px) and (max-width: 1399px) {
   .container {
-    max-width: 1200px;
+    max-width: 1240px;
+    padding: 0 1.25rem;
+  }
+  .nav-container {
+    height: 4.25rem;
+  }
+  .nav-brand {
+    font-size: 1.18rem;
+    gap: 0.45rem;
+  }
+  .nav-brand .brand-leaf {
+    width: 34px;
+    height: 34px;
+    font-size: 1.1rem;
+  }
+  .nav-menu-wrapper {
+    margin-left: 1rem;
   }
   .nav-menu {
-    gap: 1rem;
+    gap: 0.65rem;
   }
   .nav-link {
-    font-size: 0.9rem;
+    font-size: 0.84rem;
+    padding: 0.35rem 0.2rem;
+  }
+  .nav-actions {
+    gap: 0.35rem;
+  }
+  .nav-actions .btn {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.8rem;
+    min-height: 36px;
+  }
+  .user-badge {
+    font-size: 0.775rem;
+    padding: 0.25rem 0.55rem;
+  }
+  .nav-notif-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 0.95rem;
+  }
+  .lang-switch-wrap {
+    padding: 0.2rem 0.45rem;
+    font-size: 0.775rem;
   }
 }
 
-/* 3. Tablet Portrait & Small Screens (max-width: 768px - e.g. 768x1024) */
+/* Intermediate Tablet Landscape / Large Tablet (993px to 1120px) */
+@media (min-width: 993px) and (max-width: 1120px) {
+  .container {
+    max-width: 100%;
+    padding: 0 1.5rem;
+  }
+}
+
+/* 4. Tablet Portrait & Small Screens (max-width: 992px - e.g. 768x1024) */
+@media (max-width: 992px) {
+  .farmer-analytics-row {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+  .nearby-filter-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .tracking-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  .checkout-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+}
+
 @media (max-width: 768px) {
   .container {
     padding: 0 1rem;
@@ -2467,20 +2679,45 @@ textarea.form-control {
   .card-grid {
     grid-template-columns: 1fr;
   }
+  .trace-grid {
+    grid-template-columns: 1fr;
+    gap: 1.5rem;
+  }
+  .chat-layout-grid {
+    grid-template-columns: 1fr;
+    height: auto;
+  }
   .table-responsive {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     width: 100%;
+    margin-bottom: 1rem;
   }
 }
 
-/* 4. Mobile Viewports (max-width: 480px - including 390x844) */
+/* 5. Mobile Viewports (max-width: 640px) */
+@media (max-width: 640px) {
+  .nearby-filter-grid,
+  .filter-form-grid,
+  .invoice-parties-grid,
+  .invoice-totals-grid,
+  .farmer-metric-subgrid {
+    grid-template-columns: 1fr !important;
+  }
+  .buyer-match-grid {
+    grid-template-columns: 1fr;
+    padding: 0.5rem;
+  }
+}
+
+/* 5 & 6. Mobile Viewports (max-width: 480px - including 390x844 and 375x812) */
 @media (max-width: 480px) {
   .container {
     padding: 0 0.85rem;
   }
   .nav-brand {
     font-size: 1.15rem;
+    gap: 0.45rem;
   }
   .nav-brand .brand-leaf {
     width: 32px;
@@ -2504,9 +2741,23 @@ textarea.form-control {
   .form-row, .form-row-3 {
     grid-template-columns: 1fr !important;
   }
+  .btn {
+    min-height: 44px;
+  }
   .btn-lg {
     padding: 0.75rem 1.25rem;
     font-size: 0.95rem;
+    min-height: 48px;
+  }
+  .checkout-spec-grid,
+  .tracking-kpi-subgrid,
+  .trace-specs-grid,
+  .buyer-grid,
+  .weather-grid,
+  .orders-in-transit-grid,
+  .favorite-farmers-grid,
+  .steps-grid {
+    grid-template-columns: 1fr !important;
   }
   .chatbot-container {
     bottom: 12px;
@@ -2525,13 +2776,23 @@ textarea.form-control {
   }
 }
 
-/* 5. Small Mobile Viewports (max-width: 360px - 360x800) */
+/* 6. Medium Mobile Viewports (max-width: 375px - 375x812) */
+@media (max-width: 375px) {
+  .container {
+    padding: 0 0.75rem;
+  }
+  .buyer-card-metric-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 7. Small Mobile Viewports (max-width: 360px - 360x800) */
 @media (max-width: 360px) {
   .container {
     padding: 0 0.65rem;
   }
   .nav-brand {
-    font-size: 1.05rem;
+    font-size: 1.0rem;
     gap: 0.35rem;
   }
   .nav-brand .brand-leaf {
@@ -2540,13 +2801,17 @@ textarea.form-control {
     font-size: 0.95rem;
   }
   .lang-switch-wrap {
-    padding: 0.2rem 0.4rem;
-    font-size: 0.75rem;
+    padding: 0.15rem 0.35rem;
+    font-size: 0.72rem;
+  }
+  .lang-btn {
+    padding: 0.1rem 0.3rem;
+    font-size: 0.72rem;
   }
   .menu-toggle {
-    width: 38px;
-    height: 38px;
-    padding: 8px 6px;
+    width: 36px;
+    height: 36px;
+    padding: 7px 5px;
   }
   .hero-title {
     font-size: 1.6rem;
@@ -2556,7 +2821,7 @@ textarea.form-control {
     font-size: 0.85rem;
   }
   .kpi-num {
-    font-size: 1.5rem !important;
+    font-size: 1.45rem !important;
   }
 }
 

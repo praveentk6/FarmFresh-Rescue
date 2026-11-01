@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Close menu after clicking nav links on mobile
     navMenuWrapper.querySelectorAll('a').forEach(link => {
       link.addEventListener('click', () => {
-        if (window.innerWidth <= 1080) {
+        if (window.innerWidth <= 1120) {
           navMenuWrapper.classList.remove('active');
           menuToggle.classList.remove('active');
           menuToggle.setAttribute('aria-expanded', 'false');

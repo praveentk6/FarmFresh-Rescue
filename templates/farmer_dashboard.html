@@ -160,7 +160,7 @@
   </div>
 
   <!-- AI Profit & Food Waste Impact Row -->
-  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;" class="farmer-analytics-row">
+  <div class="farmer-analytics-row">
     <!-- Profit Breakdown Card -->
     <div style="background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); padding: 1.5rem; box-shadow: var(--shadow-sm);">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
@@ -170,7 +170,7 @@
         <a href="{{ url_for('analytics_view') }}" class="btn btn-sm btn-secondary">Full Analytics</a>
       </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+      <div class="farmer-metric-subgrid">
         <div style="background: #f8fafc; padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid #e2e8f0;">
           <div style="font-size: 0.75rem; color: #64748b; font-weight: 600;">Pending In Transit</div>
           <div style="font-size: 1.2rem; font-weight: 800; color: #d97706; margin-top: 0.2rem;">
@@ -206,7 +206,7 @@
         <span class="badge-available" style="font-size: 0.75rem;">Verified Sales</span>
       </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
+      <div class="farmer-metric-subgrid">
         <div style="background: #ecfdf5; padding: 0.85rem; border-radius: var(--radius-sm); border: 1px solid #a7f3d0;">
           <div style="font-size: 0.75rem; color: #065f46; font-weight: 600;">Rescued Produce</div>
           <div style="font-size: 1.2rem; font-weight: 800; color: #065f46; margin-top: 0.2rem;">
@@ -338,7 +338,7 @@
         <a href="{{ url_for('nearby_buyers') }}" class="btn btn-outline-primary btn-sm">View All Buyers</a>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 1rem; padding: 1rem;">
+      <div class="buyer-match-grid">
         {% for b in recommended_buyers %}
           <div style="border: 1px solid #e2e8f0; border-radius: var(--radius-md); padding: 1.25rem; background: #ffffff; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
             <div>

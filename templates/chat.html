@@ -23,7 +23,7 @@
     {% endif %}
   </div>
 
-  <div style="display: grid; grid-template-columns: 320px 1fr; gap: 1.5rem; height: calc(100vh - 260px); min-height: 520px;" class="chat-layout-grid">
+  <div class="chat-layout-grid">
 
     <!-- Conversations Sidebar -->
     <div class="data-table-card" style="display: flex; flex-direction: column; overflow: hidden; padding: 0;">
@@ -257,13 +257,5 @@
 </script>
 {% endif %}
 
-<style>
-@media (max-width: 768px) {
-  .chat-layout-grid {
-    grid-template-columns: 1fr !important;
-    height: auto !important;
-  }
-}
-</style>
 {% endblock %}
 

@@ -23,7 +23,7 @@
 
   <!-- Filter Controls -->
   <div class="data-table-card" style="padding: 1.25rem; margin-bottom: 2rem;">
-    <form method="GET" action="{{ url_for('live_market_prices') }}" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)) 120px; gap: 1rem; align-items: flex-end;">
+    <form method="GET" action="{{ url_for('live_market_prices') }}" class="filter-form-grid">
       <div>
         <label class="form-label" style="font-size: 0.8rem;">Filter by Crop Name</label>
         <input type="text" name="crop_name" class="form-control" placeholder="e.g. Tomatoes, Onions" value="{{ request.args.get('crop_name', '') }}">

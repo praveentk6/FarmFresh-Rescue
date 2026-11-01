@@ -24,7 +24,7 @@
   </div>
 
   <!-- Weather Cards Grid -->
-  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.5rem;">
+  <div class="weather-grid">
     {% for alert in weather_alerts %}
       <div class="data-table-card" style="padding: 1.5rem; border-top: 4px solid {% if alert['severity'] == 'Critical' or alert['severity'] == 'Warning' %}var(--urgent-red){% else %}#15803d{% endif %};">
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
