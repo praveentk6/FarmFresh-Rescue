@@ -148,7 +148,7 @@
 
           <!-- User Profile Dropdown Component -->
           <div class="user-profile-menu-wrap" id="userProfileWrap">
-            <button type="button" class="user-profile-btn" id="userProfileBtn" aria-expanded="false" aria-haspopup="true">
+            <button type="button" class="user-profile-btn" id="userProfileBtn" aria-expanded="false" aria-haspopup="true" aria-label="User Profile">
               <span class="user-avatar-circle role-{{ current_user['role'] }}">
                 {{ current_user['name'][0]|upper }}
               </span>
@@ -158,25 +158,63 @@
             </button>
 
             <!-- Dropdown Popover Menu -->
-            <div class="user-dropdown-popover" id="userProfilePopover">
+            <div class="user-dropdown-popover" id="userProfilePopover" role="menu" aria-label="User Profile Dropdown">
+              <!-- Item 1 & 2: User Name and Account Type Header -->
               <div class="user-popover-header">
-                <div class="popover-name">{{ current_user['name'] }}</div>
-                <div class="popover-role role-{{ current_user['role'] }}">{{ _t('role_' ~ current_user['role']) }} &bull; {{ current_user['email'] }}</div>
+                <div class="popover-avatar-wrap">
+                  <span class="popover-avatar-circle role-{{ current_user['role'] }}">
+                    {{ current_user['name'][0]|upper }}
+                  </span>
+                </div>
+                <div class="popover-user-details">
+                  <div class="popover-user-name" id="popoverUserName">{{ current_user['name'] }}</div>
+                  <div class="popover-account-type">
+                    <span class="account-type-label">{{ 'Account Type' if lang == 'en' else 'கணக்கு வகை' }}:</span>
+                    <span class="account-type-badge role-{{ current_user['role'] }}" id="popoverUserRole">{{ _t('role_' ~ current_user['role']) }}</span>
+                  </div>
+                </div>
               </div>
+
               <div class="popover-divider"></div>
+
+              <!-- Item 3: My Orders -->
               {% if current_user['role'] == 'farmer' %}
-                <a href="{{ url_for('farmer_dashboard') }}" class="popover-item" id="farmerDashBtn">📋 {{ _t('my_orders') }}</a>
-                <a href="{{ url_for('add_listing') }}" class="popover-item" id="addListingNavBtn" style="color: var(--primary); font-weight: 700;">+ {{ _t('list_produce') }}</a>
+                <a href="{{ url_for('farmer_dashboard') }}" class="popover-item" id="farmerDashBtn" role="menuitem">
+                  <span class="popover-item-icon">📦</span>
+                  <span class="popover-item-text">{{ 'My Orders' if lang == 'en' else _t('my_orders') }}</span>
+                </a>
+                <a href="{{ url_for('add_listing') }}" class="popover-item popover-produce-link" id="addListingNavBtn" role="menuitem">
+                  <span class="popover-item-icon">➕</span>
+                  <span class="popover-item-text">{{ _t('list_produce') }}</span>
+                </a>
               {% elif current_user['role'] == 'buyer' %}
-                <a href="{{ url_for('buyer_dashboard') }}" class="popover-item" id="buyerDashBtn">📋 {{ _t('my_orders') }}</a>
+                <a href="{{ url_for('buyer_dashboard') }}" class="popover-item" id="buyerDashBtn" role="menuitem">
+                  <span class="popover-item-icon">📦</span>
+                  <span class="popover-item-text">{{ 'My Orders' if lang == 'en' else _t('my_orders') }}</span>
+                </a>
               {% elif current_user['role'] == 'admin' %}
-                <a href="{{ url_for('admin_dashboard') }}" class="popover-item" id="adminDashBtn">⚡ {{ _t('admin_panel') }}</a>
+                <a href="{{ url_for('admin_dashboard') }}" class="popover-item" id="adminDashBtn" role="menuitem">
+                  <span class="popover-item-icon">⚡</span>
+                  <span class="popover-item-text">{{ _t('admin_panel') }}</span>
+                </a>
               {% endif %}
-              <a href="{{ url_for('notifications_view') }}" class="popover-item">
-                🔔 {{ _t('notifications') }}{% if unread_count > 0 %} <span class="notif-pill">{{ unread_count }}</span>{% endif %}
+
+              <!-- Item 4: Notifications -->
+              <a href="{{ url_for('notifications_view') }}" class="popover-item" id="notificationsDropdownBtn" role="menuitem">
+                <span class="popover-item-icon">🔔</span>
+                <span class="popover-item-text">{{ _t('notifications') }}</span>
+                {% if unread_count > 0 %}
+                  <span class="notif-badge-pill" id="popoverNotifBadge">{{ unread_count }}</span>
+                {% endif %}
               </a>
+
               <div class="popover-divider"></div>
-              <a href="{{ url_for('logout') }}" class="popover-item popover-logout" id="logoutBtn">🚪 {{ _t('logout') }}</a>
+
+              <!-- Item 5: Logout -->
+              <a href="{{ url_for('logout') }}" class="popover-item popover-logout" id="logoutBtn" role="menuitem">
+                <span class="popover-item-icon">🚪</span>
+                <span class="popover-item-text">{{ _t('logout') }}</span>
+              </a>
             </div>
           </div>
         {% else %}

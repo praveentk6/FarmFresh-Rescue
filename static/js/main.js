@@ -60,18 +60,69 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // 1b. User Profile Dropdown Popover (Desktop & Laptop)
+  // 1b. User Profile Dropdown Popover (Desktop, Laptop & Mobile)
   // ==========================================
   const userProfileTrigger = document.getElementById('userProfileBtn');
   const userProfilePopover = document.getElementById('userProfilePopover');
+
+  function repositionProfilePopover() {
+    if (!userProfilePopover || !userProfilePopover.classList.contains('active')) return;
+    userProfilePopover.style.left = '';
+    userProfilePopover.style.right = '0px';
+
+    const rect = userProfilePopover.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const margin = 12;
+
+    // Check right edge boundary
+    if (rect.right > viewportWidth - margin) {
+      const rightOverflow = rect.right - (viewportWidth - margin);
+      userProfilePopover.style.right = `${rightOverflow}px`;
+    }
+
+    // Check left edge boundary
+    const updatedRect = userProfilePopover.getBoundingClientRect();
+    if (updatedRect.left < margin) {
+      const offsetNeeded = margin - updatedRect.left;
+      const currentRight = parseFloat(userProfilePopover.style.right || '0');
+      userProfilePopover.style.right = `${currentRight - offsetNeeded}px`;
+    }
+
+    // Check bottom viewport boundary
+    if (updatedRect.bottom > viewportHeight - margin) {
+      const maxHeight = viewportHeight - updatedRect.top - margin;
+      if (maxHeight > 140) {
+        userProfilePopover.style.maxHeight = `${maxHeight}px`;
+        userProfilePopover.style.overflowY = 'auto';
+      }
+    }
+  }
+
   if (userProfileTrigger && userProfilePopover) {
     userProfileTrigger.addEventListener('click', (e) => {
       e.stopPropagation();
+      // If mobile hamburger nav is open, close it
+      if (typeof navMenuWrapper !== 'undefined' && navMenuWrapper && navMenuWrapper.classList.contains('active')) {
+        navMenuWrapper.classList.remove('active');
+        if (typeof menuToggle !== 'undefined' && menuToggle) {
+          menuToggle.classList.remove('active');
+          menuToggle.setAttribute('aria-expanded', 'false');
+        }
+      }
+
       const isOpen = userProfilePopover.classList.contains('active');
-      userProfilePopover.classList.toggle('active', !isOpen);
-      userProfileTrigger.setAttribute('aria-expanded', String(!isOpen));
+      if (!isOpen) {
+        userProfilePopover.classList.add('active');
+        userProfileTrigger.setAttribute('aria-expanded', 'true');
+        repositionProfilePopover();
+      } else {
+        userProfilePopover.classList.remove('active');
+        userProfileTrigger.setAttribute('aria-expanded', 'false');
+      }
     });
 
+    // Close when clicking outside
     document.addEventListener('click', (e) => {
       if (!userProfilePopover.contains(e.target) && !userProfileTrigger.contains(e.target)) {
         userProfilePopover.classList.remove('active');
@@ -79,10 +130,27 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
 
+    // Close on selecting any option inside the dropdown
+    userProfilePopover.querySelectorAll('a, button').forEach(item => {
+      item.addEventListener('click', () => {
+        userProfilePopover.classList.remove('active');
+        userProfileTrigger.setAttribute('aria-expanded', 'false');
+      });
+    });
+
+    // Close on Escape key
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && userProfilePopover.classList.contains('active')) {
         userProfilePopover.classList.remove('active');
         userProfileTrigger.setAttribute('aria-expanded', 'false');
+        userProfileTrigger.focus();
+      }
+    });
+
+    // Recalculate position on window resize
+    window.addEventListener('resize', () => {
+      if (userProfilePopover.classList.contains('active')) {
+        repositionProfilePopover();
       }
     });
   }
