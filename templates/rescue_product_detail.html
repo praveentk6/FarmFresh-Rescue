@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}{{ product.product_name }} - Shared Rescue Produce Details{% endblock %}
+{% block meta_desc %}Inspect {{ product.product_name }} directly from farmer {{ product.farmer_name }} in {{ product.district }}, Tamil Nadu. Transparent rescue pricing and face-to-face meet & sell.{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 5rem;">
+
+  <!-- Breadcrumb -->
+  <div style="font-size: 0.88rem; color: #6b7280; margin-bottom: 1.25rem;">
+    <a href="{{ url_for('index') }}" style="color: inherit; text-decoration: none;">Home</a> &bull;
+    <a href="{{ url_for('browse_rescue_products') }}" style="color: inherit; text-decoration: none;">Rescue Marketplace</a> &bull;
+    <span style="color: #111827; font-weight: 600;">{{ product.product_name }}</span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1.1fr 1fr; gap: 2.5rem; align-items: start;">
+    
+    <!-- Left Column: Photo Gallery -->
+    <div>
+      <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.04); margin-bottom: 1rem;">
+        <div style="position: relative; height: 420px; background: #f9fafb;">
+          {% if product.photo %}
+            <img id="mainProductImg" src="{{ url_for('static', filename='uploads/' ~ product.photo) }}" alt="{{ product.product_name }}" style="width: 100%; height: 100%; object-fit: cover;">
+          {% else %}
+            <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 6rem; background: #f0fdf4;">
+              🌾
+            </div>
+          {% endif %}
+
+          {% if product.discount_percent and product.discount_percent > 0 %}
+            <div style="position: absolute; top: 16px; left: 16px; background: #dc2626; color: white; padding: 0.35rem 0.85rem; border-radius: 20px; font-size: 0.95rem; font-weight: 800; box-shadow: 0 4px 12px rgba(220,38,38,0.4);">
+              🔥 {{ product.discount_percent|round(0)|int }}% RESCUE DISCOUNT
+            </div>
+          {% endif %}
+
+          <div style="position: absolute; bottom: 16px; left: 16px;">
+            <span style="background: rgba(17, 24, 39, 0.8); backdrop-filter: blur(4px); color: #ffffff; padding: 0.35rem 0.75rem; border-radius: 8px; font-size: 0.85rem; font-weight: 700;">
+              {{ product.category }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thumbnail Strip if Multiple Photos -->
+      {% if product.photos_list and product.photos_list|length > 0 %}
+        <div style="display: flex; gap: 0.75rem; overflow-x: auto; padding-bottom: 0.5rem;">
+          {% if product.photo %}
+            <img src="{{ url_for('static', filename='uploads/' ~ product.photo) }}" onclick="setMainImage(this.src)" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 2px solid #16a34a; cursor: pointer;">
+          {% endif %}
+          {% for extra_img in product.photos_list %}
+            <img src="{{ url_for('static', filename='uploads/' ~ extra_img) }}" onclick="setMainImage(this.src)" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid #d1d5db; cursor: pointer;">
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <!-- Trust Badges -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-top: 1.5rem; text-align: center;">
+        <div style="background: #ecfdf5; padding: 1rem 0.75rem; border-radius: 12px; border: 1px solid #d1fae5;">
+          <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">🔍</div>
+          <div style="font-weight: 700; font-size: 0.85rem; color: #065f46;">In-Person Inspection</div>
+          <div style="font-size: 0.75rem; color: #047857;">Inspect before paying</div>
+        </div>
+        <div style="background: #eff6ff; padding: 1rem 0.75rem; border-radius: 12px; border: 1px solid #dbeafe;">
+          <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">💬</div>
+          <div style="font-weight: 700; font-size: 0.85rem; color: #1e40af;">Direct Negotiation</div>
+          <div style="font-size: 0.75rem; color: #1d4ed8;">Agree price with farmer</div>
+        </div>
+        <div style="background: #fefce8; padding: 1rem 0.75rem; border-radius: 12px; border: 1px solid #fef08a;">
+          <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">💵</div>
+          <div style="font-weight: 700; font-size: 0.85rem; color: #854d0e;">Direct Payment</div>
+          <div style="font-size: 0.75rem; color: #a16207;">Cash / UPI at farmgate</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Column: Specs & Actions -->
+    <div>
+      <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 2rem; box-shadow: 0 4px 15px rgba(0,0,0,0.04);">
+        
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+          <h1 style="font-size: 2rem; font-weight: 800; color: #111827; margin: 0; line-height: 1.25;">
+            {{ product.product_name }}
+          </h1>
+          <span style="background: #dcfce7; color: #15803d; padding: 0.3rem 0.75rem; border-radius: 20px; font-weight: 700; font-size: 0.85rem;">
+            ● {{ product.status }}
+          </span>
+        </div>
+
+        <!-- Price Section -->
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;">
+          <div style="display: flex; align-items: baseline; gap: 0.75rem; margin-bottom: 0.25rem;">
+            <span style="font-size: 2.25rem; font-weight: 800; color: #16a34a;">₹{{ product.rescue_price }}</span>
+            <span style="font-size: 1.1rem; color: #4b5563; font-weight: 600;">/ {{ product.unit }}</span>
+            {% if product.original_price and product.original_price > product.rescue_price %}
+              <span style="font-size: 1.2rem; color: #9ca3af; text-decoration: line-through;">₹{{ product.original_price }}</span>
+              <span style="background: #dc2626; color: white; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; font-weight: 800;">
+                Save ₹{{ (product.original_price - product.rescue_price)|round(1) }} / kg
+              </span>
+            {% endif %}
+          </div>
+          <div style="font-size: 0.85rem; color: #047857;">
+            ✔ Direct rescue price set by farmer. No commission or delivery charges added.
+          </div>
+        </div>
+
+        <!-- Produce Specs Grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+          <div style="background: #f9fafb; padding: 0.85rem; border-radius: 10px; border: 1px solid #f3f4f6;">
+            <div style="font-size: 0.78rem; color: #6b7280; font-weight: 700;">AVAILABLE QUANTITY</div>
+            <div style="font-size: 1.2rem; font-weight: 800; color: #111827;">{{ product.quantity }} {{ product.unit }}</div>
+          </div>
+          <div style="background: #f9fafb; padding: 0.85rem; border-radius: 10px; border: 1px solid #f3f4f6;">
+            <div style="font-size: 0.78rem; color: #6b7280; font-weight: 700;">QUALITY GRADE</div>
+            <div style="font-size: 1.2rem; font-weight: 800; color: #16a34a;">{{ product.quality_grade }}</div>
+          </div>
+          <div style="background: #f9fafb; padding: 0.85rem; border-radius: 10px; border: 1px solid #f3f4f6;">
+            <div style="font-size: 0.78rem; color: #6b7280; font-weight: 700;">HARVEST DATE</div>
+            <div style="font-size: 1rem; font-weight: 700; color: #111827;">{{ product.harvest_date }}</div>
+          </div>
+          <div style="background: #f9fafb; padding: 0.85rem; border-radius: 10px; border: 1px solid #f3f4f6;">
+            <div style="font-size: 0.78rem; color: #6b7280; font-weight: 700;">BEST BEFORE</div>
+            <div style="font-size: 1rem; font-weight: 700; color: #b45309;">{{ product.expiry_date or 'Immediate Pickup Recommended' }}</div>
+          </div>
+        </div>
+
+        <!-- Description -->
+        {% if product.description %}
+          <div style="margin-bottom: 1.5rem;">
+            <h3 style="font-size: 0.95rem; font-weight: 700; color: #374151; margin-bottom: 0.35rem;">Product & Harvest Notes</h3>
+            <p style="color: #4b5563; font-size: 0.92rem; line-height: 1.5; margin: 0; background: #fafafa; padding: 0.75rem; border-radius: 8px;">
+              {{ product.description }}
+            </p>
+          </div>
+        {% endif %}
+
+        <!-- Farmer Information Card -->
+        <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.75rem;">
+          <div style="font-size: 0.78rem; color: #6b7280; font-weight: 700; margin-bottom: 0.5rem; text-transform: uppercase; letter-spacing: 0.5px;">FARMER INFORMATION</div>
+          <div style="display: flex; align-items: center; gap: 0.85rem; margin-bottom: 0.75rem;">
+            <div style="width: 48px; height: 48px; border-radius: 50%; background: #dcfce7; color: #15803d; font-size: 1.5rem; display: flex; align-items: center; justify-content: center;">
+              👨‍🌾
+            </div>
+            <div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #111827;">
+                {{ product.farmer_name }}
+                <span style="font-size: 0.75rem; color: #16a34a; font-weight: 700; background: #ecfdf5; padding: 0.15rem 0.5rem; border-radius: 12px; margin-left: 0.35rem;">✓ Verified Farmer</span>
+              </div>
+              <div style="font-size: 0.88rem; color: #4b5563;">
+                📍 {{ product.farm_location }}, {{ product.district }} (PIN: {{ product.pin_code }})
+              </div>
+            </div>
+          </div>
+
+          {% if dist_info %}
+            <div style="background: #e0f2fe; color: #0284c7; padding: 0.4rem 0.75rem; border-radius: 8px; font-size: 0.85rem; font-weight: 700; display: inline-flex; align-items: center; gap: 0.35rem;">
+              🚗 Distance from your location: {{ dist_info.distance_km }} km ({{ dist_info.transit_text }})
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Action Buttons -->
+        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+          {% if current_user and current_user['role'] == 'farmer' and current_user['id'] == product.farmer_id %}
+            <a href="{{ url_for('edit_rescue_product', product_id=product.id) }}" class="btn btn-primary" style="padding: 0.85rem; font-size: 1rem; font-weight: 700; text-align: center; border-radius: 10px;">
+              ✏️ Edit Product Details
+            </a>
+          {% else %}
+            <!-- Schedule Direct Face-to-Face Meeting -->
+            <a href="{{ url_for('schedule_direct_meeting', product_id=product.id) }}" class="btn btn-primary" style="padding: 0.85rem; font-size: 1.05rem; font-weight: 800; text-align: center; border-radius: 10px; box-shadow: 0 4px 15px rgba(22, 163, 74, 0.3);">
+              🤝 Schedule Direct Meeting at Farm
+            </a>
+
+            <!-- Contact & Chat Options -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+              <!-- WhatsApp Contact -->
+              {% set wa_num = (product.whatsapp_number or product.farmer_phone)|replace(' ', '')|replace('-', '') %}
+              {% if wa_num|length == 10 %}{% set wa_num = '91' ~ wa_num %}{% endif %}
+              <a href="https://wa.me/{{ wa_num }}?text={{ ('Hello ' ~ product.farmer_name ~ ', I would like to inspect and buy your ' ~ product.product_name ~ ' via FarmFresh Rescue.')|urlencode }}" target="_blank" class="btn" style="background: #25d366; color: white; padding: 0.7rem; font-size: 0.9rem; font-weight: 700; text-align: center; border-radius: 10px; text-decoration: none;">
+                💬 WhatsApp Farmer
+              </a>
+
+              <!-- In-App Chat -->
+              <a href="{{ url_for('direct_messages_view', other_user_id=product.farmer_id) }}" class="btn btn-secondary" style="padding: 0.7rem; font-size: 0.9rem; font-weight: 700; text-align: center; border-radius: 10px;">
+                ✉️ In-App Direct Chat
+              </a>
+            </div>
+
+            <!-- Direct Call -->
+            <a href="tel:{{ product.farmer_phone }}" class="btn" style="background: #f3f4f6; color: #1f2937; padding: 0.65rem; font-size: 0.9rem; font-weight: 600; text-align: center; border-radius: 10px; text-decoration: none;">
+              📞 Call Farmer: {{ product.farmer_phone }}
+            </a>
+          {% endif %}
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+function setMainImage(src) {
+  var mainImg = document.getElementById('mainProductImg');
+  if (mainImg) {
+    mainImg.src = src;
+  }
+}
+</script>
+{% endblock %}

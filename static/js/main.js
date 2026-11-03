@@ -1,4 +1,4 @@
-/**
+89/**
  * FarmFresh Rescue - Client-side interactive enhancements
  * Includes:
  * 1. Mobile menu toggle & drawer
@@ -62,7 +62,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   // 1b. User Profile Dropdown Popover (Desktop, Laptop & Mobile)
   // ==========================================
-  window.toggleUserProfileDropdown = function(e) {
+  window.toggleUserProfileDropdown = function (e) {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   };
 
-  window.toggleNavUserProfile = function(e) {
+  window.toggleNavUserProfile = function (e) {
     if (e) {
       e.preventDefault();
       e.stopPropagation();
@@ -799,9 +799,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function escapeHtml(str) {
       return str.replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/\n/g, '<br>');
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
     }
   }
 

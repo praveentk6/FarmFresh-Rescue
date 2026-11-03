@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+
+{% block title %}Sale Receipt #{{ sale.receipt_number }} - FarmFresh Rescue{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 5rem; max-width: 780px;">
+
+  <!-- Print & Back bar -->
+  <div class="no-print" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <a href="{{ url_for('view_direct_meeting', meeting_id=sale.meeting_id) if sale.meeting_id else url_for('list_direct_meetings') }}" class="btn btn-secondary" style="font-weight: 600; padding: 0.5rem 1rem; border-radius: 8px;">
+      &larr; Back to Meeting
+    </a>
+    <button onclick="window.print()" class="btn btn-primary" style="font-weight: 700; padding: 0.5rem 1.25rem; border-radius: 8px;">
+      🖨️ Print Sale Receipt
+    </button>
+  </div>
+
+  <!-- Official Receipt Document -->
+  <div style="background: #ffffff; border-radius: 16px; border: 2px solid #e5e7eb; padding: 3rem; box-shadow: 0 10px 30px rgba(0,0,0,0.06); position: relative;">
+    
+    <!-- Top Header -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #16a34a; padding-bottom: 1.5rem; margin-bottom: 2rem;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+          <span style="font-size: 1.75rem;">🌱</span>
+          <span style="font-size: 1.5rem; font-weight: 900; color: #166534; letter-spacing: -0.5px;">FarmFresh Rescue</span>
+        </div>
+        <div style="font-size: 0.82rem; color: #6b7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+          Direct Meet & Sell &bull; Farmgate Agricultural Sale Receipt
+        </div>
+      </div>
+
+      <div style="text-align: right;">
+        <span style="background: #dcfce7; color: #15803d; font-family: monospace; font-size: 0.95rem; font-weight: 800; padding: 0.35rem 0.75rem; border-radius: 8px;">
+          RECEIPT #{{ sale.receipt_number }}
+        </span>
+        <div style="font-size: 0.85rem; color: #6b7280; margin-top: 0.35rem;">
+          Date: <strong>{{ sale.created_at[:10] }}</strong>
+        </div>
+        <div style="font-size: 0.82rem; color: #9ca3af; font-family: monospace;">
+          Sale Code: #{{ sale.sale_code }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Parties Card -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem; background: #f9fafb; padding: 1.25rem; border-radius: 12px; border: 1px solid #e5e7eb;">
+      <!-- Farmer Details -->
+      <div>
+        <div style="font-size: 0.75rem; color: #6b7280; font-weight: 800; text-transform: uppercase; margin-bottom: 0.35rem;">FARMER / SELLER</div>
+        <div style="font-size: 1.15rem; font-weight: 800; color: #111827;">{{ sale.farmer_name }}</div>
+        <div style="font-size: 0.88rem; color: #4b5563;">Phone: {{ sale.farmer_phone }}</div>
+        <div style="font-size: 0.88rem; color: #4b5563;">Location: {{ sale.sale_location }}</div>
+        <div style="font-size: 0.8rem; color: #16a34a; font-weight: 700; margin-top: 0.25rem;">✓ Direct Seller Confirmed</div>
+      </div>
+
+      <!-- Buyer Details -->
+      <div>
+        <div style="font-size: 0.75rem; color: #6b7280; font-weight: 800; text-transform: uppercase; margin-bottom: 0.35rem;">BUYER / RECIPIENT</div>
+        <div style="font-size: 1.15rem; font-weight: 800; color: #111827;">{{ sale.buyer_name }}</div>
+        <div style="font-size: 0.88rem; color: #4b5563;">Phone: {{ sale.buyer_phone }}</div>
+        <div style="font-size: 0.88rem; color: #4b5563;">Delivery: In-Person Farmgate Collection</div>
+        <div style="font-size: 0.8rem; color: #16a34a; font-weight: 700; margin-top: 0.25rem;">✓ Direct Buyer Confirmed</div>
+      </div>
+    </div>
+
+    <!-- Itemized Produce Table -->
+    <table style="width: 100%; border-collapse: collapse; margin-bottom: 2rem;">
+      <thead>
+        <tr style="background: #f3f4f6; text-align: left; font-size: 0.82rem; color: #4b5563; text-transform: uppercase;">
+          <th style="padding: 0.75rem 1rem; border-bottom: 2px solid #e5e7eb;">Product / Crop</th>
+          <th style="padding: 0.75rem 1rem; border-bottom: 2px solid #e5e7eb;">Quality</th>
+          <th style="padding: 0.75rem 1rem; border-bottom: 2px solid #e5e7eb; text-align: right;">Quantity</th>
+          <th style="padding: 0.75rem 1rem; border-bottom: 2px solid #e5e7eb; text-align: right;">Agreed Rate</th>
+          <th style="padding: 0.75rem 1rem; border-bottom: 2px solid #e5e7eb; text-align: right;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid #e5e7eb; font-size: 0.95rem;">
+          <td style="padding: 1rem; font-weight: 700; color: #111827;">
+            {{ sale.product_name }}
+          </td>
+          <td style="padding: 1rem; color: #4b5563;">
+            {{ sale.quality_grade or 'Standard Farm Fresh' }}
+          </td>
+          <td style="padding: 1rem; text-align: right; font-weight: 700;">
+            {{ sale.final_quantity }} kg
+          </td>
+          <td style="padding: 1rem; text-align: right;">
+            ₹{{ sale.agreed_price_per_kg }} / kg
+          </td>
+          <td style="padding: 1rem; text-align: right; font-weight: 800; color: #16a34a;">
+            ₹{{ sale.total_amount }}
+          </td>
+        </tr>
+      </tbody>
+      <tfoot>
+        <tr style="border-top: 2px solid #111827; font-size: 1.15rem;">
+          <td colspan="4" style="padding: 1rem; text-align: right; font-weight: 800; color: #111827;">
+            TOTAL PAID AMOUNT:
+          </td>
+          <td style="padding: 1rem; text-align: right; font-weight: 900; color: #15803d; font-size: 1.4rem;">
+            ₹{{ sale.total_amount }}
+          </td>
+        </tr>
+      </tfoot>
+    </table>
+
+    <!-- Payment & Settlement Record -->
+    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 1.25rem; margin-bottom: 2rem;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+        <div>
+          <div style="font-size: 0.78rem; color: #166534; font-weight: 800; text-transform: uppercase;">PAYMENT SETTLEMENT</div>
+          <div style="font-size: 1.05rem; font-weight: 800; color: #111827;">
+            Method: <strong>{{ sale.payment_method }}</strong> &bull; Verified on Site
+          </div>
+          {% if sale.payment_reference %}
+            <div style="font-size: 0.85rem; color: #4b5563; font-family: monospace;">
+              Reference / UTR: {{ sale.payment_reference }}
+            </div>
+          {% endif %}
+        </div>
+        <div style="background: #16a34a; color: white; padding: 0.4rem 0.85rem; border-radius: 20px; font-size: 0.85rem; font-weight: 800;">
+          ✓ TRANSACTION COMPLETED
+        </div>
+      </div>
+    </div>
+
+    <!-- Environmental & Food Rescue Impact -->
+    <div style="background: #ecfdf5; border: 1px dashed #a7f3d0; border-radius: 12px; padding: 1rem; margin-bottom: 2.5rem; text-align: center; font-size: 0.88rem; color: #065f46;">
+      🌾 <strong>Agricultural Waste Reduction Impact:</strong> By purchasing directly at farmgate, <strong>{{ sale.final_quantity }} kg</strong> of agricultural produce was rescued from post-harvest loss, saving an estimated <strong>{{ (sale.final_quantity * 50)|round|int }} liters</strong> of agricultural water.
+    </div>
+
+    <!-- Signatures -->
+    <div style="display: flex; justify-content: space-between; padding-top: 1.5rem; border-top: 1px solid #e5e7eb; font-size: 0.85rem; color: #4b5563;">
+      <div style="text-align: center; width: 200px;">
+        <div style="height: 35px; border-bottom: 1px dashed #9ca3af; margin-bottom: 0.35rem;"></div>
+        <div>Farmer / Seller Signature</div>
+        <strong>{{ sale.farmer_name }}</strong>
+      </div>
+
+      <div style="text-align: center; width: 200px;">
+        <div style="height: 35px; border-bottom: 1px dashed #9ca3af; margin-bottom: 0.35rem;"></div>
+        <div>Buyer / Inspector Signature</div>
+        <strong>{{ sale.buyer_name }}</strong>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<style>
+@media print {
+  body { background: #ffffff !important; }
+  .no-print, nav, footer, header { display: none !important; }
+  .container { max-width: 100% !important; padding: 0 !important; }
+}
+</style>
+{% endblock %}

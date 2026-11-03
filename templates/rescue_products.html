@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block title %}Shared Rescue Products Marketplace - FarmFresh Rescue{% endblock %}
+{% block meta_desc %}Browse and purchase real-time agricultural rescue produce directly from Tamil Nadu farmers. Transparent prices, direct farmgate meetings, and no middlemen.{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 5rem;">
+
+  <!-- Marketplace Header -->
+  <div style="background: linear-gradient(135deg, #1b5e34 0%, #2d8a4e 100%); color: white; padding: 2.25rem 2rem; border-radius: 16px; margin-bottom: 2rem; box-shadow: 0 10px 25px rgba(27, 94, 52, 0.15);">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+      <div style="max-width: 720px;">
+        <span style="display: inline-block; background: rgba(255,255,255,0.2); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.75rem; letter-spacing: 0.5px;">
+          🛒 SHARED REAL-TIME MARKETPLACE
+        </span>
+        <h1 style="font-size: 2.25rem; font-weight: 800; margin: 0 0 0.5rem 0; color: #ffffff;">Rescue Products Marketplace</h1>
+        <p style="margin: 0; font-size: 1.05rem; opacity: 0.95; line-height: 1.5;">
+          Direct farmer-to-buyer rescue produce with genuine price reductions. Both farmers and buyers access the same live database. Schedule farmgate meetings, inspect quality in-person, negotiate directly, and rescue fresh harvests.
+        </p>
+      </div>
+      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+        {% if current_user and current_user['role'] == 'farmer' %}
+          <a href="{{ url_for('add_rescue_product') }}" class="btn" style="background: #ffffff; color: #1b5e34; font-weight: 700; padding: 0.75rem 1.25rem; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
+            ➕ Add Rescue Product
+          </a>
+        {% endif %}
+        <a href="{{ url_for('find_sellers') }}" class="btn" style="background: rgba(255,255,255,0.15); color: #ffffff; border: 1px solid rgba(255,255,255,0.4); font-weight: 600; padding: 0.75rem 1.25rem; border-radius: 10px;">
+          🤝 Find In-Person Sellers
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search & Multi-Parameter Filter Card -->
+  <div style="background: #ffffff; border-radius: 14px; padding: 1.75rem; border: 1px solid #e5e7eb; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 2rem;">
+    <form action="{{ url_for('browse_rescue_products') }}" method="GET" id="rescueFilterForm">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+        
+        <!-- Keyword -->
+        <div>
+          <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #4b5563; margin-bottom: 0.35rem;">Search Product / Farmer</label>
+          <input type="text" name="q" value="{{ filters.get('search_q', '') }}" placeholder="Tomato, Mango, Coimbatore..." class="filter-input" style="width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 0.6rem 0.8rem;">
+        </div>
+
+        <!-- Category -->
+        <div>
+          <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #4b5563; margin-bottom: 0.35rem;">Category</label>
+          <select name="category" class="filter-select" style="width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 0.6rem 0.8rem;">
+            <option value="All" {% if filters.get('category') == 'All' %}selected{% endif %}>All Categories</option>
+            <option value="Vegetables" {% if filters.get('category') == 'Vegetables' %}selected{% endif %}>Vegetables</option>
+            <option value="Fruits" {% if filters.get('category') == 'Fruits' %}selected{% endif %}>Fruits</option>
+            <option value="Grains" {% if filters.get('category') == 'Grains' %}selected{% endif %}>Grains</option>
+            <option value="Leafy Vegetables" {% if filters.get('category') == 'Leafy Vegetables' %}selected{% endif %}>Leafy Vegetables</option>
+            <option value="Other Agricultural Products" {% if filters.get('category') == 'Other Agricultural Products' %}selected{% endif %}>Other Agricultural Products</option>
+          </select>
+        </div>
+
+        <!-- District -->
+        <div>
+          <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #4b5563; margin-bottom: 0.35rem;">District</label>
+          <select name="district" class="filter-select" style="width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 0.6rem 0.8rem;">
+            <option value="All">All Tamil Nadu</option>
+            {% for d in districts %}
+              <option value="{{ d }}" {% if filters.get('district') == d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Quality -->
+        <div>
+          <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #4b5563; margin-bottom: 0.35rem;">Quality Grade</label>
+          <select name="quality" class="filter-select" style="width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 0.6rem 0.8rem;">
+            <option value="All">All Grades</option>
+            <option value="Grade A" {% if filters.get('quality_grade') == 'Grade A' %}selected{% endif %}>Grade A (Premium)</option>
+            <option value="Grade B" {% if filters.get('quality_grade') == 'Grade B' %}selected{% endif %}>Grade B (Standard)</option>
+            <option value="Rescue Grade" {% if filters.get('quality_grade') == 'Rescue Grade' %}selected{% endif %}>Rescue Grade (Surplus / Imperfect)</option>
+          </select>
+        </div>
+
+        <!-- Sort -->
+        <div>
+          <label style="display: block; font-size: 0.82rem; font-weight: 700; color: #4b5563; margin-bottom: 0.35rem;">Sort By</label>
+          <select name="sort" class="filter-select" style="width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 0.6rem 0.8rem;">
+            <option value="recent" {% if sort_by == 'recent' %}selected{% endif %}>Recently Added</option>
+            <option value="lowest_price" {% if sort_by == 'lowest_price' %}selected{% endif %}>Lowest Price</option>
+            <option value="discount" {% if sort_by == 'discount' %}selected{% endif %}>Highest Discount</option>
+            <option value="highest_qty" {% if sort_by == 'highest_qty' %}selected{% endif %}>Highest Available Quantity</option>
+            <option value="nearest" {% if sort_by == 'nearest' %}selected{% endif %}>Nearest Farmer</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Price & Quantity Range Row -->
+      <div style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem; border-top: 1px solid #f3f4f6; padding-top: 1rem;">
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <span style="font-size: 0.85rem; color: #6b7280;">Price:</span>
+            <input type="number" name="min_price" value="{{ filters.get('min_price', '') }}" placeholder="Min ₹" style="width: 85px; padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.85rem;">
+            <span style="color: #9ca3af;">-</span>
+            <input type="number" name="max_price" value="{{ filters.get('max_price', '') }}" placeholder="Max ₹" style="width: 85px; padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.85rem;">
+          </div>
+          <div style="display: flex; align-items: center; gap: 0.4rem;">
+            <span style="font-size: 0.85rem; color: #6b7280;">Min Qty:</span>
+            <input type="number" name="min_qty" value="{{ filters.get('min_qty', '') }}" placeholder="kg" style="width: 85px; padding: 0.4rem 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.85rem;">
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <a href="{{ url_for('browse_rescue_products') }}" class="btn btn-secondary" style="padding: 0.5rem 1rem; font-size: 0.9rem;">Reset</a>
+          <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1.25rem; font-size: 0.9rem; font-weight: 700;">Apply Filters</button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Results Count -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <h2 style="font-size: 1.25rem; font-weight: 800; color: #111827; margin: 0;">
+      Available Rescue Produce <span style="font-size: 0.95rem; font-weight: 600; color: #6b7280;">({{ products|length }} active items)</span>
+    </h2>
+    <span style="font-size: 0.85rem; color: #16a34a; font-weight: 700; background: #ecfdf5; padding: 0.25rem 0.75rem; border-radius: 20px;">
+      ● Shared Real-Time Inventory
+    </span>
+  </div>
+
+  <!-- Produce Cards Grid -->
+  {% if products %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem;">
+      {% for item in products %}
+        <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.04); display: flex; flex-direction: column; transition: transform 0.2s, box-shadow 0.2s;">
+          
+          <!-- Image with Badges -->
+          <div style="position: relative; height: 210px; background: #f3f4f6; overflow: hidden;">
+            {% if item.photo %}
+              <img src="{{ url_for('static', filename='uploads/' ~ item.photo) }}" alt="{{ item.product_name }}" style="width: 100%; height: 100%; object-fit: cover;">
+            {% else %}
+              <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 4rem; background: #f0fdf4;">
+                🥦
+              </div>
+            {% endif %}
+
+            <!-- Discount Badge -->
+            {% if item.discount_percent and item.discount_percent > 0 %}
+              <div style="position: absolute; top: 12px; left: 12px; background: #dc2626; color: white; padding: 0.3rem 0.65rem; border-radius: 20px; font-size: 0.85rem; font-weight: 800; box-shadow: 0 2px 8px rgba(220,38,38,0.4);">
+                🔥 {{ item.discount_percent|round(0)|int }}% OFF
+              </div>
+            {% endif %}
+
+            <!-- Category & Quality Badge -->
+            <div style="position: absolute; top: 12px; right: 12px; display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-end;">
+              <span style="background: rgba(17, 24, 39, 0.75); backdrop-filter: blur(4px); color: #ffffff; padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.75rem; font-weight: 700;">
+                {{ item.category }}
+              </span>
+              <span style="background: #16a34a; color: white; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">
+                {{ item.quality_grade }}
+              </span>
+            </div>
+
+            <!-- Multiple Photos indicator -->
+            {% if item.photos_list and item.photos_list|length > 0 %}
+              <div style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.65); color: white; font-size: 0.75rem; padding: 0.2rem 0.5rem; border-radius: 12px; font-weight: 600;">
+                📷 {{ item.photos_list|length + 1 }} photos
+              </div>
+            {% endif %}
+          </div>
+
+          <!-- Card Content -->
+          <div style="padding: 1.25rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.35rem;">
+                <h3 style="font-size: 1.2rem; font-weight: 800; color: #111827; margin: 0; line-height: 1.3;">
+                  <a href="{{ url_for('rescue_product_detail', product_id=item.id) }}" style="color: inherit; text-decoration: none;">
+                    {{ item.product_name }}
+                  </a>
+                </h3>
+              </div>
+
+              <!-- Farmer & Location -->
+              <div style="font-size: 0.88rem; color: #4b5563; margin-bottom: 0.65rem; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
+                <span>👨‍🌾 <strong>{{ item.farmer_name }}</strong></span>
+                <span style="color: #9ca3af;">•</span>
+                <span>📍 {{ item.farm_location }}, {{ item.district }}</span>
+                {% if item.distance_km %}
+                  <span style="background: #e0f2fe; color: #0284c7; padding: 0.15rem 0.45rem; border-radius: 10px; font-size: 0.75rem; font-weight: 700;">
+                    🚗 {{ item.distance_km }} km
+                  </span>
+                {% endif %}
+              </div>
+
+              <!-- Available Quantity & Dates -->
+              <div style="background: #f9fafb; padding: 0.65rem 0.75rem; border-radius: 8px; border: 1px solid #f3f4f6; margin-bottom: 0.75rem; font-size: 0.85rem;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 0.25rem;">
+                  <span style="color: #6b7280;">Available Stock:</span>
+                  <strong style="color: #111827;">{{ item.quantity }} {{ item.unit }}</strong>
+                </div>
+                <div style="display: flex; justify-content: space-between;">
+                  <span style="color: #6b7280;">Harvest Date:</span>
+                  <span style="color: #374151;">{{ item.harvest_date }}</span>
+                </div>
+                {% if item.expiry_date %}
+                  <div style="display: flex; justify-content: space-between; margin-top: 0.25rem;">
+                    <span style="color: #6b7280;">Best Before:</span>
+                    <span style="color: #b45309; font-weight: 600;">{{ item.expiry_date }}</span>
+                  </div>
+                {% endif %}
+              </div>
+
+              <!-- Price Box -->
+              <div style="display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 1rem;">
+                <span style="font-size: 1.6rem; font-weight: 800; color: #16a34a;">₹{{ item.rescue_price }}</span>
+                <span style="font-size: 0.9rem; color: #6b7280;">/ {{ item.unit }}</span>
+                {% if item.original_price and item.original_price > item.rescue_price %}
+                  <span style="font-size: 0.95rem; color: #9ca3af; text-decoration: line-through; margin-left: 0.25rem;">₹{{ item.original_price }}</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <!-- Action Buttons Grid -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: auto;">
+              <a href="{{ url_for('rescue_product_detail', product_id=item.id) }}" class="btn btn-secondary" style="text-align: center; font-size: 0.85rem; padding: 0.5rem; border-radius: 8px; font-weight: 600;">
+                View Details
+              </a>
+              <button onclick="openContactModal('{{ item.farmer_name }}', '{{ item.farmer_phone }}', '{{ item.whatsapp_number or item.farmer_phone }}', '{{ item.product_name }}', '{{ item.farmer_id }}')" class="btn" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-size: 0.85rem; padding: 0.5rem; border-radius: 8px; font-weight: 700;">
+                📞 Contact
+              </button>
+              <a href="{{ url_for('schedule_direct_meeting', product_id=item.id) }}" class="btn btn-primary" style="grid-column: span 2; text-align: center; font-size: 0.9rem; padding: 0.6rem; border-radius: 8px; font-weight: 700;">
+                🤝 Schedule Direct Meeting
+              </a>
+            </div>
+
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div style="text-align: center; padding: 4rem 1.5rem; background: #ffffff; border-radius: 16px; border: 1px dashed #d1d5db;">
+      <div style="font-size: 3.5rem; margin-bottom: 1rem;">🌱</div>
+      <h3 style="font-size: 1.35rem; font-weight: 800; color: #111827; margin-bottom: 0.5rem;">No Rescue Produce Found</h3>
+      <p style="color: #6b7280; max-width: 480px; margin: 0 auto 1.5rem auto;">
+        No active rescue products match your filter parameters. Try clearing some filters or browse all agricultural produce across Tamil Nadu.
+      </p>
+      <a href="{{ url_for('browse_rescue_products') }}" class="btn btn-primary" style="padding: 0.6rem 1.5rem;">Clear All Filters</a>
+    </div>
+  {% endif %}
+
+</div>
+
+<!-- Contact Farmer Modal -->
+<div id="contactFarmerModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(3px);">
+  <div style="background: #ffffff; border-radius: 16px; padding: 2rem; max-width: 450px; width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+      <h3 style="font-size: 1.25rem; font-weight: 800; margin: 0; color: #111827;">Contact Farmer</h3>
+      <button onclick="closeContactModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280;">&times;</button>
+    </div>
+    <div style="text-align: center; margin-bottom: 1.5rem;">
+      <div style="width: 60px; height: 60px; border-radius: 50%; background: #ecfdf5; color: #16a34a; font-size: 2rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.75rem auto;">
+        👨‍🌾
+      </div>
+      <h4 id="modalFarmerName" style="font-size: 1.15rem; font-weight: 800; margin: 0 0 0.25rem 0; color: #111827;">Farmer Name</h4>
+      <p id="modalProductName" style="font-size: 0.9rem; color: #6b7280; margin: 0;">Crop Offer</p>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.25rem;">
+      <!-- Direct Call -->
+      <a id="modalCallBtn" href="tel:" class="btn" style="background: #16a34a; color: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 10px; font-weight: 700; text-decoration: none;">
+        📞 Call Farmer Directly: <span id="modalPhoneText"></span>
+      </a>
+
+      <!-- WhatsApp Direct -->
+      <a id="modalWhatsAppBtn" href="#" target="_blank" class="btn" style="background: #25d366; color: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 10px; font-weight: 700; text-decoration: none;">
+        💬 Chat on WhatsApp
+      </a>
+
+      <!-- In-app Messaging -->
+      <a id="modalInAppBtn" href="#" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 10px; font-weight: 700; text-decoration: none;">
+        ✉️ In-App Direct Chat
+      </a>
+    </div>
+
+    <button onclick="closeContactModal()" class="btn" style="width: 100%; background: #f3f4f6; color: #4b5563; font-weight: 600; padding: 0.6rem; border-radius: 8px; border: none; cursor: pointer;">
+      Close
+    </button>
+  </div>
+</div>
+
+<script>
+function openContactModal(farmerName, phone, waPhone, productName, farmerId) {
+  document.getElementById('modalFarmerName').innerText = farmerName;
+  document.getElementById('modalProductName').innerText = "Regarding: " + productName;
+  document.getElementById('modalPhoneText').innerText = phone || 'Authorized';
+  document.getElementById('modalCallBtn').href = "tel:" + phone;
+
+  // Clean WhatsApp number
+  var cleanNum = (waPhone || phone || '').replace(/[^0-9]/g, '');
+  if (cleanNum.length === 10) cleanNum = "91" + cleanNum;
+  var waText = encodeURIComponent("Hello " + farmerName + ", I found your " + productName + " on FarmFresh Rescue and would like to inspect and purchase directly.");
+  document.getElementById('modalWhatsAppBtn').href = "https://wa.me/" + cleanNum + "?text=" + waText;
+
+  document.getElementById('modalInAppBtn').href = "/direct-messages/" + farmerId;
+  document.getElementById('contactFarmerModal').style.display = 'flex';
+}
+
+function closeContactModal() {
+  document.getElementById('contactFarmerModal').style.display = 'none';
+}
+</script>
+{% endblock %}

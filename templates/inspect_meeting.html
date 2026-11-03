@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Record Product Inspection - Meeting #{{ meeting.meeting_code }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 5rem; max-width: 700px;">
+
+  <div style="font-size: 0.88rem; color: #6b7280; margin-bottom: 1rem;">
+    <a href="{{ url_for('view_direct_meeting', meeting_id=meeting.id) }}" style="color: inherit; text-decoration: none;">Meeting #{{ meeting.meeting_code }}</a> &bull;
+    <span style="color: #111827; font-weight: 600;">Product Inspection</span>
+  </div>
+
+  <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 2.25rem; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+    
+    <div style="border-bottom: 1px solid #f3f4f6; padding-bottom: 1.25rem; margin-bottom: 1.5rem;">
+      <span style="background: #ecfdf5; color: #16a34a; font-weight: 700; font-size: 0.8rem; padding: 0.25rem 0.65rem; border-radius: 20px;">
+        🔍 DIRECT QUALITY INSPECTION
+      </span>
+      <h1 style="font-size: 1.85rem; font-weight: 800; color: #111827; margin: 0.5rem 0 0.25rem 0;">
+        Inspect {{ meeting.product_name }}
+      </h1>
+      <p style="color: #6b7280; font-size: 0.95rem; margin: 0;">
+        Record physical inspection findings at {{ meeting.meeting_location }} before concluding price and purchase.
+      </p>
+    </div>
+
+    <form action="{{ url_for('inspect_product_meeting', meeting_id=meeting.id) }}" method="POST">
+      
+      <!-- Freshness & Quality Grade -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.88rem; color: #374151; margin-bottom: 0.35rem;">Produce Freshness *</label>
+          <select name="product_freshness" required style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px;">
+            <option value="Excellent / Crisp">🌟 Excellent / Crisp (Farm fresh harvest)</option>
+            <option value="Good / Fresh" selected>Good / Fresh (Standard commercial grade)</option>
+            <option value="Acceptable">Acceptable (Ripe / Immediate consumption)</option>
+            <option value="Poor">Poor / Bruised / Overripe</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.88rem; color: #374151; margin-bottom: 0.35rem;">Quality Grade *</label>
+          <select name="product_quality" required style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px;">
+            <option value="Grade A" selected>Grade A (Premium size, uniform color)</option>
+            <option value="Grade B">Grade B (Standard market size)</option>
+            <option value="Fair">Fair (Minor cosmetic defects)</option>
+            <option value="Sub-standard">Sub-standard (Requires sorting)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Actual Weight & Available Quantity -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.88rem; color: #374151; margin-bottom: 0.35rem;">Actual Weight on Scale (kg) *</label>
+          <input type="number" name="actual_weight" required step="0.1" value="{{ meeting.inspection.actual_weight if meeting.inspection else meeting.required_quantity }}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px;">
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.88rem; color: #374151; margin-bottom: 0.35rem;">Available Quantity at Farm (kg)</label>
+          <input type="number" name="available_quantity" step="0.1" value="{{ meeting.inspection.available_quantity if meeting.inspection else (meeting.current_stock_qty or meeting.required_quantity) }}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px;">
+        </div>
+      </div>
+
+      <!-- Packaging Condition & Inspection Status -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.88rem; color: #374151; margin-bottom: 0.35rem;">Packaging Condition *</label>
+          <select name="packaging_condition" required style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px;">
+            <option value="Intact crates / boxes" selected>Intact crates / plastic crates</option>
+            <option value="Standard gunny bags">Standard gunny / net bags</option>
+            <option value="Loose produce in trailer">Loose produce in trailer / tractor</option>
+            <option value="Needs sorting / repacking">Needs sorting / repacking</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.88rem; color: #374151; margin-bottom: 0.35rem;">Inspection Status *</label>
+          <select name="status" required style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-weight: 700;">
+            <option value="Approved" selected>✅ Approved (Ready for Purchase)</option>
+            <option value="Inspection in Progress">⏳ Inspection in Progress</option>
+            <option value="Not Approved">❌ Not Approved (Issues found)</option>
+            <option value="Inspection Pending">Inspection Pending</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div style="margin-bottom: 2rem;">
+        <label style="display: block; font-weight: 700; font-size: 0.88rem; color: #374151; margin-bottom: 0.35rem;">Inspection Findings & Notes</label>
+        <textarea name="buyer_notes" rows="3" placeholder="e.g. Sampled 3 crates, firm skin, no pest damage, weight calibrated on electronic scale..." style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px;">{{ meeting.inspection.buyer_notes if meeting.inspection else '' }}</textarea>
+      </div>
+
+      <!-- Buttons -->
+      <div style="display: flex; gap: 1rem;">
+        <button type="submit" class="btn btn-primary" style="flex: 2; padding: 0.85rem; font-size: 1rem; font-weight: 700; border-radius: 10px;">
+          Save Inspection Record
+        </button>
+        <a href="{{ url_for('view_direct_meeting', meeting_id=meeting.id) }}" class="btn btn-secondary" style="flex: 1; padding: 0.85rem; font-size: 1rem; font-weight: 600; text-align: center; border-radius: 10px;">
+          Cancel
+        </a>
+      </div>
+
+    </form>
+  </div>
+
+</div>
+{% endblock %}

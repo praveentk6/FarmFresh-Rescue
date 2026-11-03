@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+
+{% block title %}Meeting #{{ meeting.meeting_code }} - Direct Meet & Sell{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 5rem;">
+
+  <!-- Breadcrumb -->
+  <div style="font-size: 0.88rem; color: #6b7280; margin-bottom: 1.25rem;">
+    <a href="{{ url_for('list_direct_meetings') }}" style="color: inherit; text-decoration: none;">Meeting Management</a> &bull;
+    <span style="color: #111827; font-weight: 600;">Meeting #{{ meeting.meeting_code }}</span>
+  </div>
+
+  <!-- Header Banner -->
+  <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 2rem; box-shadow: 0 4px 15px rgba(0,0,0,0.04); margin-bottom: 2rem;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.5rem;">
+          <span style="font-family: monospace; font-size: 1.1rem; font-weight: 800; color: #111827; background: #f3f4f6; padding: 0.25rem 0.65rem; border-radius: 8px;">
+            #{{ meeting.meeting_code }}
+          </span>
+          {% if meeting.status == 'Confirmed' %}
+            <span style="background: #dcfce7; color: #15803d; font-size: 0.85rem; font-weight: 800; padding: 0.25rem 0.75rem; border-radius: 20px;">
+              ● Meeting Confirmed
+            </span>
+          {% elif meeting.status == 'Pending' %}
+            <span style="background: #fef3c7; color: #b45309; font-size: 0.85rem; font-weight: 800; padding: 0.25rem 0.75rem; border-radius: 20px;">
+              ⏳ Pending Farmer Review
+            </span>
+          {% elif meeting.status == 'Completed' %}
+            <span style="background: #e0f2fe; color: #0369a1; font-size: 0.85rem; font-weight: 800; padding: 0.25rem 0.75rem; border-radius: 20px;">
+              🎉 Sale Completed
+            </span>
+          {% elif meeting.status == 'Rescheduled' %}
+            <span style="background: #ede9fe; color: #6d28d9; font-size: 0.85rem; font-weight: 800; padding: 0.25rem 0.75rem; border-radius: 20px;">
+              🔄 Rescheduled
+            </span>
+          {% else %}
+            <span style="background: #fee2e2; color: #b91c1c; font-size: 0.85rem; font-weight: 800; padding: 0.25rem 0.75rem; border-radius: 20px;">
+              ❌ {{ meeting.status }}
+            </span>
+          {% endif %}
+        </div>
+
+        <h1 style="font-size: 2rem; font-weight: 800; color: #111827; margin: 0 0 0.5rem 0;">
+          {{ meeting.product_name }} &bull; {{ meeting.required_quantity }} kg
+        </h1>
+
+        <div style="font-size: 0.95rem; color: #4b5563; display: flex; gap: 1.25rem; flex-wrap: wrap;">
+          <span>📅 Date: <strong>{{ meeting.proposed_date }}</strong></span>
+          <span>⏰ Time: <strong>{{ meeting.proposed_time }}</strong></span>
+          <span>📍 Location: <strong>{{ meeting.meeting_location }}</strong></span>
+        </div>
+      </div>
+
+      <!-- Quick Action on Pending -->
+      {% if is_farmer and meeting.status == 'Pending' %}
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+          <form action="{{ url_for('api_respond_meeting', meeting_id=meeting.id) }}" method="POST" style="margin: 0;">
+            <input type="hidden" name="action" value="accept">
+            <button type="submit" class="btn btn-primary" style="font-weight: 700; padding: 0.65rem 1.25rem;">
+              ✓ Accept Meeting
+            </button>
+          </form>
+          <button onclick="document.getElementById('rescheduleSection').style.display='block'" class="btn btn-secondary" style="font-weight: 700; padding: 0.65rem 1rem;">
+            🔄 Suggest Other Time
+          </button>
+          <form action="{{ url_for('api_respond_meeting', meeting_id=meeting.id) }}" method="POST" style="margin: 0;">
+            <input type="hidden" name="action" value="reject">
+            <button type="submit" class="btn" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; font-weight: 700; padding: 0.65rem 1rem;">
+              ✕ Decline
+            </button>
+          </form>
+        </div>
+      {% endif %}
+    </div>
+
+    <!-- Reschedule Box (Hidden by default) -->
+    <div id="rescheduleSection" style="display: none; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.25rem; margin-top: 1.5rem;">
+      <h4 style="font-size: 1rem; font-weight: 800; color: #111827; margin: 0 0 0.75rem 0;">Suggest Another Date, Time or Location</h4>
+      <form action="{{ url_for('api_respond_meeting', meeting_id=meeting.id) }}" method="POST">
+        <input type="hidden" name="action" value="reschedule">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem;">
+          <div>
+            <label style="font-size: 0.8rem; font-weight: 700;">New Date</label>
+            <input type="date" name="proposed_date" required value="{{ meeting.proposed_date }}" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; font-weight: 700;">New Time</label>
+            <input type="text" name="proposed_time" required value="{{ meeting.proposed_time }}" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; font-weight: 700;">New Location</label>
+            <input type="text" name="meeting_location" required value="{{ meeting.meeting_location }}" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+          </div>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem; font-weight: 700;">Send Reschedule Proposal</button>
+          <button type="button" onclick="document.getElementById('rescheduleSection').style.display='none'" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Main Grid: Workflow Stages & Counterparty Info -->
+  <div style="display: grid; grid-template-columns: 1.8fr 1.2fr; gap: 2rem; align-items: start;">
+    
+    <!-- Left Column: 4-Stage Meet & Sell Lifecycle -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+      
+      <!-- STAGE 1: MEETING STATUS -->
+      <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="width: 32px; height: 32px; border-radius: 50%; background: #dcfce7; color: #16a34a; font-weight: 800; display: flex; align-items: center; justify-content: center;">1</span>
+            <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: #111827;">Direct Farmgate Appointment</h3>
+          </div>
+          <span style="font-size: 0.85rem; font-weight: 700; color: #16a34a;">Status: {{ meeting.status }}</span>
+        </div>
+        <p style="font-size: 0.92rem; color: #4b5563; margin-bottom: 0.75rem;">
+          Appointment set at <strong>{{ meeting.meeting_location }}</strong> on <strong>{{ meeting.proposed_date }} at {{ meeting.proposed_time }}</strong>.
+        </p>
+        {% if meeting.buyer_notes %}
+          <div style="background: #f9fafb; padding: 0.65rem 0.85rem; border-radius: 8px; font-size: 0.88rem; color: #4b5563; margin-bottom: 0.5rem;">
+            <strong>Buyer Note:</strong> {{ meeting.buyer_notes }}
+          </div>
+        {% endif %}
+        {% if meeting.farmer_notes %}
+          <div style="background: #f9fafb; padding: 0.65rem 0.85rem; border-radius: 8px; font-size: 0.88rem; color: #4b5563;">
+            <strong>Farmer Note:</strong> {{ meeting.farmer_notes }}
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- STAGE 2: DIRECT PRODUCT INSPECTION -->
+      <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="width: 32px; height: 32px; border-radius: 50%; background: {% if meeting.inspection and meeting.inspection.status == 'Approved' %}#dcfce7; color: #16a34a;{% else %}#fef3c7; color: #b45309;{% endif %} font-weight: 800; display: flex; align-items: center; justify-content: center;">2</span>
+            <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: #111827;">Product Quality & Freshness Inspection</h3>
+          </div>
+          {% if meeting.inspection %}
+            <span style="background: #dcfce7; color: #15803d; font-size: 0.8rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 12px;">
+              {{ meeting.inspection.status }}
+            </span>
+          {% else %}
+            <span style="background: #f3f4f6; color: #6b7280; font-size: 0.8rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 12px;">
+              Pending Inspection
+            </span>
+          {% endif %}
+        </div>
+
+        {% if meeting.inspection %}
+          <div style="background: #f9fafb; border-radius: 10px; padding: 1rem; border: 1px solid #e5e7eb; margin-bottom: 1rem; font-size: 0.88rem;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-bottom: 0.5rem;">
+              <div><strong>Freshness:</strong> {{ meeting.inspection.product_freshness }}</div>
+              <div><strong>Quality Grade:</strong> {{ meeting.inspection.product_quality }}</div>
+              <div><strong>Actual Scale Weight:</strong> {{ meeting.inspection.actual_weight }} kg</div>
+              <div><strong>Packaging:</strong> {{ meeting.inspection.packaging_condition }}</div>
+            </div>
+            {% if meeting.inspection.buyer_notes %}
+              <div style="color: #4b5563; margin-top: 0.5rem;">
+                <strong>Inspection Findings:</strong> {{ meeting.inspection.buyer_notes }}
+              </div>
+            {% endif %}
+          </div>
+        {% else %}
+          <p style="font-size: 0.92rem; color: #4b5563; margin-bottom: 1rem;">
+            During the farm visit, buyer physically examines the produce freshness, tests sample crates, and verifies actual weight.
+          </p>
+        {% endif %}
+
+        {% if meeting.status in ['Confirmed', 'Completed'] %}
+          <a href="{{ url_for('inspect_product_meeting', meeting_id=meeting.id) }}" class="btn btn-secondary" style="font-size: 0.88rem; font-weight: 700; padding: 0.5rem 1rem; border-radius: 8px;">
+            🔍 {% if meeting.inspection %}Update Product Inspection{% else %}Record Product Inspection{% endif %}
+          </a>
+        {% endif %}
+      </div>
+
+      <!-- STAGE 3: DIRECT PRICE NEGOTIATION -->
+      <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="width: 32px; height: 32px; border-radius: 50%; background: {% if meeting.negotiation and meeting.negotiation.status == 'Agreed' %}#dcfce7; color: #16a34a;{% else %}#ede9fe; color: #6d28d9;{% endif %} font-weight: 800; display: flex; align-items: center; justify-content: center;">3</span>
+            <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: #111827;">Direct Price & Quantity Negotiation</h3>
+          </div>
+          {% if meeting.negotiation %}
+            <span style="background: {% if meeting.negotiation.status == 'Agreed' %}#dcfce7; color: #15803d;{% else %}#fef3c7; color: #b45309;{% endif %} font-size: 0.8rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 12px;">
+              {{ meeting.negotiation.status }}
+            </span>
+          {% else %}
+            <span style="background: #f3f4f6; color: #6b7280; font-size: 0.8rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 12px;">
+              Not Negotiated Yet
+            </span>
+          {% endif %}
+        </div>
+
+        {% if meeting.negotiation %}
+          <div style="background: #f9fafb; border-radius: 10px; padding: 1rem; border: 1px solid #e5e7eb; margin-bottom: 1rem; font-size: 0.9rem;">
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-bottom: 0.5rem;">
+              <div>
+                <span style="font-size: 0.78rem; color: #6b7280;">Initial Price:</span>
+                <div style="font-weight: 700;">₹{{ meeting.negotiation.farmer_initial_price }}/kg</div>
+              </div>
+              <div>
+                <span style="font-size: 0.78rem; color: #6b7280;">Final Agreed Rate:</span>
+                <div style="font-weight: 800; color: #16a34a; font-size: 1.15rem;">
+                  ₹{{ meeting.negotiation.final_agreed_price or meeting.negotiation.buyer_proposed_price }}/kg
+                </div>
+              </div>
+              <div>
+                <span style="font-size: 0.78rem; color: #6b7280;">Total Agreed Amount:</span>
+                <div style="font-weight: 800; color: #111827; font-size: 1.15rem;">
+                  ₹{{ meeting.negotiation.total_amount }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Agreement Badges -->
+            <div style="display: flex; gap: 1rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid #f3f4f6; font-size: 0.85rem;">
+              <span>Buyer Confirmed: {% if meeting.negotiation.buyer_agreed == 1 %}<strong style="color: #16a34a;">✓ Yes</strong>{% else %}<span style="color: #b45309;">Pending</span>{% endif %}</span>
+              <span>Farmer Confirmed: {% if meeting.negotiation.farmer_agreed == 1 %}<strong style="color: #16a34a;">✓ Yes</strong>{% else %}<span style="color: #b45309;">Pending</span>{% endif %}</span>
+            </div>
+          </div>
+        {% else %}
+          <p style="font-size: 0.92rem; color: #4b5563; margin-bottom: 1rem;">
+            Negotiate directly on final price and lot size based on inspected freshness.
+          </p>
+        {% endif %}
+
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          <a href="{{ url_for('negotiate_meeting_price', meeting_id=meeting.id) }}" class="btn btn-secondary" style="font-size: 0.88rem; font-weight: 700; padding: 0.5rem 1rem; border-radius: 8px;">
+            💬 {% if meeting.negotiation %}Update Negotiation{% else %}Start Price Negotiation{% endif %}
+          </a>
+          {% if meeting.negotiation and meeting.negotiation.status != 'Agreed' %}
+            <form action="{{ url_for('api_confirm_negotiation', meeting_id=meeting.id) }}" method="POST" style="margin:0;">
+              <button type="submit" class="btn btn-primary" style="font-size: 0.88rem; font-weight: 700; padding: 0.5rem 1rem; border-radius: 8px;">
+                ✓ I Agree to these Terms
+              </button>
+            </form>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- STAGE 4: DIRECT SALE CONFIRMATION & PAYMENT -->
+      <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <span style="width: 32px; height: 32px; border-radius: 50%; background: {% if meeting.sale and meeting.sale.status == 'Completed' %}#dcfce7; color: #16a34a;{% else %}#e0f2fe; color: #0284c7;{% endif %} font-weight: 800; display: flex; align-items: center; justify-content: center;">4</span>
+            <h3 style="font-size: 1.15rem; font-weight: 800; margin: 0; color: #111827;">Direct Sale Confirmation & Payment</h3>
+          </div>
+          {% if meeting.sale %}
+            <span style="background: {% if meeting.sale.status == 'Completed' %}#dcfce7; color: #15803d;{% else %}#fef3c7; color: #b45309;{% endif %} font-size: 0.8rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 12px;">
+              {{ meeting.sale.status }}
+            </span>
+          {% else %}
+            <span style="background: #f3f4f6; color: #6b7280; font-size: 0.8rem; font-weight: 700; padding: 0.2rem 0.6rem; border-radius: 12px;">
+              Pending Sale Confirmation
+            </span>
+          {% endif %}
+        </div>
+
+        {% if meeting.sale %}
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+              <span style="font-family: monospace; font-weight: 800; font-size: 0.95rem; color: #166534;">
+                Sale ID: #{{ meeting.sale.sale_code }}
+              </span>
+              <span style="font-weight: 800; color: #15803d; font-size: 1.35rem;">
+                ₹{{ meeting.sale.total_amount }}
+              </span>
+            </div>
+
+            <div style="font-size: 0.88rem; color: #374151; display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; margin-bottom: 0.75rem;">
+              <div>Quantity: <strong>{{ meeting.sale.final_quantity }} kg</strong></div>
+              <div>Rate: <strong>₹{{ meeting.sale.agreed_price_per_kg }} / kg</strong></div>
+              <div>Payment Method: <strong>{{ meeting.sale.payment_method }}</strong></div>
+              <div>Payment Verified: <strong>{% if meeting.sale.payment_verified == 1 %}✓ Verified{% else %}⚠️ Awaiting Confirmation{% endif %}</strong></div>
+            </div>
+
+            <div style="font-size: 0.85rem; padding-top: 0.5rem; border-top: 1px solid #bbf7d0; display: flex; gap: 1rem;">
+              <span>Buyer Confirmed: {% if meeting.sale.buyer_confirmed == 1 %}<strong>✓ Yes</strong>{% else %}<span style="color: #b45309;">Pending</span>{% endif %}</span>
+              <span>Farmer Confirmed: {% if meeting.sale.farmer_confirmed == 1 %}<strong>✓ Yes</strong>{% else %}<span style="color: #b45309;">Pending</span>{% endif %}</span>
+            </div>
+          </div>
+        {% endif %}
+
+        <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+          {% if not meeting.sale %}
+            <a href="{{ url_for('direct_sale_confirmation', meeting_id=meeting.id) }}" class="btn btn-primary" style="font-size: 0.95rem; font-weight: 800; padding: 0.65rem 1.25rem; border-radius: 8px;">
+              🧾 Confirm Direct Sale & Record Payment
+            </a>
+          {% else %}
+            {% if meeting.sale.status == 'Completed' %}
+              <a href="{{ url_for('view_direct_sale_receipt', sale_id=meeting.sale.id) }}" class="btn btn-primary" style="font-size: 0.95rem; font-weight: 800; padding: 0.65rem 1.25rem; border-radius: 8px;">
+                🎉 View & Print Official Receipt (#{{ meeting.sale.receipt_number }})
+              </a>
+            {% else %}
+              <!-- Confirm completion button -->
+              <form action="{{ url_for('api_confirm_direct_sale', sale_id=meeting.sale.id) }}" method="POST" style="margin: 0;">
+                <input type="hidden" name="payment_verified" value="1">
+                <button type="submit" class="btn btn-primary" style="font-size: 0.95rem; font-weight: 800; padding: 0.65rem 1.25rem; border-radius: 8px;">
+                  ✓ Confirm Product Handover & Finalize Sale
+                </button>
+              </form>
+              <a href="{{ url_for('direct_sale_confirmation', meeting_id=meeting.id) }}" class="btn btn-secondary" style="font-size: 0.9rem; padding: 0.65rem 1rem; border-radius: 8px;">
+                Edit Payment Details
+              </a>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Column: Counterparty Contacts & In-App Chat -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+      
+      <!-- Counterparty Card -->
+      <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03);">
+        <h3 style="font-size: 1.05rem; font-weight: 800; color: #111827; margin: 0 0 1rem 0;">
+          {% if is_farmer %}Buyer Contact Information{% else %}Farmer Contact Information{% endif %}
+        </h3>
+
+        <div style="display: flex; align-items: center; gap: 0.85rem; margin-bottom: 1rem;">
+          <div style="width: 50px; height: 50px; border-radius: 50%; background: #ecfdf5; color: #16a34a; font-size: 1.5rem; display: flex; align-items: center; justify-content: center;">
+            {% if is_farmer %}🏢{% else %}👨‍🌾{% endif %}
+          </div>
+          <div>
+            <div style="font-weight: 800; font-size: 1.1rem; color: #111827;">
+              {% if is_farmer %}{{ meeting.buyer_name }}{% else %}{{ meeting.farmer_name }}{% endif %}
+            </div>
+            <div style="font-size: 0.85rem; color: #6b7280;">
+              📍 {% if is_farmer %}{{ meeting.buyer_address or 'Tamil Nadu' }}{% else %}{{ meeting.farmer_address or meeting.meeting_location }}{% endif %}
+            </div>
+          </div>
+        </div>
+
+        {% set target_phone = meeting.buyer_phone if is_farmer else meeting.farmer_phone %}
+        {% set clean_phone = target_phone|replace(' ', '')|replace('-', '') %}
+        {% if clean_phone|length == 10 %}{% set clean_phone = '91' ~ clean_phone %}{% endif %}
+
+        <div style="display: flex; flex-direction: column; gap: 0.6rem;">
+          <a href="tel:{{ target_phone }}" class="btn" style="background: #16a34a; color: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.65rem; border-radius: 8px; font-weight: 700; text-decoration: none;">
+            📞 Call: {{ target_phone }}
+          </a>
+          <a href="https://wa.me/{{ clean_phone }}?text={{ ('Hello, I am contacting you regarding Direct Meeting #' ~ meeting.meeting_code ~ ' for ' ~ meeting.product_name)|urlencode }}" target="_blank" class="btn" style="background: #25d366; color: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.65rem; border-radius: 8px; font-weight: 700; text-decoration: none;">
+            💬 Open WhatsApp Chat
+          </a>
+        </div>
+      </div>
+
+      <!-- In-App Direct Chat Widget -->
+      <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.03); display: flex; flex-direction: column; height: 450px;">
+        <div style="padding: 1rem 1.25rem; background: #f9fafb; border-bottom: 1px solid #e5e7eb; font-weight: 800; font-size: 0.95rem; color: #111827; display: flex; justify-content: space-between; align-items: center;">
+          <span>✉️ Direct In-App Chat</span>
+          <span style="font-size: 0.75rem; color: #16a34a; font-weight: 700;">● Live</span>
+        </div>
+
+        <!-- Messages scroll box -->
+        <div id="meetingChatBox" style="flex: 1; padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; background: #fafafa;">
+          {% if messages %}
+            {% for msg in messages %}
+              <div style="display: flex; flex-direction: column; align-items: {% if msg.sender_id == current_user['id'] %}flex-end{% else %}flex-start{% endif %};">
+                <div style="background: {% if msg.sender_id == current_user['id'] %}#16a34a{% else %}#ffffff{% endif %}; color: {% if msg.sender_id == current_user['id'] %}#ffffff{% else %}#111827{% endif %}; padding: 0.6rem 0.85rem; border-radius: 12px; max-width: 80%; font-size: 0.88rem; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border: {% if msg.sender_id == current_user['id'] %}none{% else %}1px solid #e5e7eb{% endif %};">
+                  {{ msg.message }}
+                </div>
+                <div style="font-size: 0.7rem; color: #9ca3af; margin-top: 0.2rem; padding: 0 0.25rem;">
+                  {{ msg.sender_name }} &bull; {{ msg.created_at[11:16] }}
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div style="text-align: center; color: #9ca3af; font-size: 0.85rem; margin: auto;">
+              No messages yet. Send a message to coordinate meeting timing or arrival.
+            </div>
+          {% endif %}
+        </div>
+
+        <!-- Chat input box -->
+        {% set chat_receiver = meeting.buyer_id if is_farmer else meeting.farmer_id %}
+        <form action="{{ url_for('direct_messages_view', other_user_id=chat_receiver, meeting_id=meeting.id) }}" method="POST" style="padding: 0.75rem; background: #ffffff; border-top: 1px solid #e5e7eb; display: flex; gap: 0.5rem; margin: 0;">
+          <input type="text" name="message" required placeholder="Type message..." style="flex: 1; padding: 0.55rem 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.88rem;">
+          <button type="submit" class="btn btn-primary" style="padding: 0.55rem 1rem; font-weight: 700; border-radius: 8px;">
+            Send
+          </button>
+        </form>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+window.onload = function() {
+  var chatBox = document.getElementById('meetingChatBox');
+  if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+};
+</script>
+{% endblock %}

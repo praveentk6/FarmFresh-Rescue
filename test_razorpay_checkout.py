@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch, MagicMock
 import json
 import os
 import hmac
@@ -38,8 +39,17 @@ class TestRazorpayCheckoutIntegration(unittest.TestCase):
                                     content_type='application/json')
         self.assertEqual(response.status_code, 400)
 
-    def test_create_order_live_api(self):
+    @patch('razorpay_gateway.get_razorpay_client')
+    def test_create_order_live_api(self, mock_client_getter):
         """Create order via POST /api/create-order with valid paise amount."""
+        mock_client = MagicMock()
+        mock_client.order.create.return_value = {
+            'id': 'order_test_mock_001',
+            'amount': 50000,
+            'currency': 'INR'
+        }
+        mock_client_getter.return_value = mock_client
+
         payload = {"amount": 50000, "currency": "INR", "receipt": "test_rcpt_001"}
         response = self.client.post('/api/create-order',
                                     data=json.dumps(payload),

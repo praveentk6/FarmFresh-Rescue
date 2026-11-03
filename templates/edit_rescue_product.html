@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Rescue Produce - {{ product.product_name }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 5rem; max-width: 800px;">
+
+  <div style="font-size: 0.88rem; color: #6b7280; margin-bottom: 1rem;">
+    <a href="{{ url_for('farmer_dashboard') }}" style="color: inherit; text-decoration: none;">Farmer Dashboard</a> &bull;
+    <a href="{{ url_for('browse_rescue_products') }}" style="color: inherit; text-decoration: none;">Rescue Marketplace</a> &bull;
+    <span style="color: #111827; font-weight: 600;">Edit {{ product.product_name }}</span>
+  </div>
+
+  <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 2.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+    
+    <div style="border-bottom: 1px solid #f3f4f6; padding-bottom: 1.25rem; margin-bottom: 1.75rem; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h1 style="font-size: 1.85rem; font-weight: 800; color: #111827; margin: 0 0 0.25rem 0;">
+          Edit Rescue Produce
+        </h1>
+        <p style="color: #6b7280; font-size: 0.95rem; margin: 0;">
+          Update price, quantity, availability status, or harvest details.
+        </p>
+      </div>
+      <div>
+        <form action="{{ url_for('remove_rescue_product', product_id=product.id) }}" method="POST" onsubmit="return confirm('Are you sure you want to remove this product from the marketplace?');">
+          <button type="submit" class="btn" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 0.5rem 1rem; border-radius: 8px; font-weight: 700; font-size: 0.85rem;">
+            🗑️ Remove Product
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <form action="{{ url_for('edit_rescue_product', product_id=product.id) }}" method="POST" enctype="multipart/form-data">
+      
+      <!-- Status Selection -->
+      <div style="background: #f9fafb; padding: 1rem; border-radius: 10px; border: 1px solid #e5e7eb; margin-bottom: 1.5rem;">
+        <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #111827; margin-bottom: 0.4rem;">Marketplace Status</label>
+        <select name="status" style="width: 100%; padding: 0.65rem; border: 1px solid #d1d5db; border-radius: 8px; font-weight: 700; font-size: 0.95rem;">
+          <option value="Available" {% if product.status == 'Available' %}selected{% endif %}>🟢 Available for Purchase & Meetings</option>
+          <option value="Partially Reserved" {% if product.status == 'Partially Reserved' %}selected{% endif %}>🟡 Partially Reserved</option>
+          <option value="Sold" {% if product.status == 'Sold' %}selected{% endif %}>🔴 Sold Out</option>
+          <option value="Expired" {% if product.status == 'Expired' %}selected{% endif %}>⚠️ Expired</option>
+        </select>
+      </div>
+
+      <!-- Produce Name & Category -->
+      <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Produce Name</label>
+          <input type="text" name="product_name" required value="{{ product.product_name }}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Category</label>
+          <select name="category" required style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+            <option value="Vegetables" {% if product.category == 'Vegetables' %}selected{% endif %}>Vegetables</option>
+            <option value="Fruits" {% if product.category == 'Fruits' %}selected{% endif %}>Fruits</option>
+            <option value="Grains" {% if product.category == 'Grains' %}selected{% endif %}>Grains & Pulses</option>
+            <option value="Leafy Vegetables" {% if product.category == 'Leafy Vegetables' %}selected{% endif %}>Leafy Vegetables</option>
+            <option value="Other Agricultural Products" {% if product.category == 'Other Agricultural Products' %}selected{% endif %}>Other Agricultural Products</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Quantity, Original Price, Rescue Price -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Available Quantity (kg)</label>
+          <input type="number" name="quantity" required min="0" step="0.5" value="{{ product.quantity }}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Original Price (₹/kg)</label>
+          <input type="number" name="original_price" required min="1" step="0.5" value="{{ product.original_price }}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Rescue Price (₹/kg)</label>
+          <input type="number" name="rescue_price" required min="1" step="0.5" value="{{ product.rescue_price }}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+      </div>
+
+      <!-- Quality Grade & Dates -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Quality Grade</label>
+          <select name="quality_grade" required style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+            <option value="Grade A" {% if product.quality_grade == 'Grade A' %}selected{% endif %}>Grade A (Premium Fresh)</option>
+            <option value="Grade B" {% if product.quality_grade == 'Grade B' %}selected{% endif %}>Grade B (Standard Market)</option>
+            <option value="Rescue Grade" {% if product.quality_grade == 'Rescue Grade' %}selected{% endif %}>Rescue Grade (Surplus / Imperfect)</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Harvest Date</label>
+          <input type="date" name="harvest_date" required value="{{ product.harvest_date }}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Expiry / Best Before</label>
+          <input type="date" name="expiry_date" value="{{ product.expiry_date or '' }}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+      </div>
+
+      <!-- Location -->
+      <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Farm Location</label>
+          <input type="text" name="farm_location" required value="{{ product.farm_location }}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">District</label>
+          <select name="district" required style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+            {% for d in districts %}
+              <option value="{{ d }}" {% if product.district == d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+
+      <!-- Photo Update -->
+      <div style="margin-bottom: 1.25rem;">
+        <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Update Produce Photo (Optional)</label>
+        <input type="file" name="photo" accept="image/*" style="width: 100%; padding: 0.5rem; border: 1px dashed #d1d5db; border-radius: 8px;">
+        {% if product.photo %}
+          <small style="color: #6b7280; font-size: 0.8rem;">Current photo: {{ product.photo }}</small>
+        {% endif %}
+      </div>
+
+      <!-- Description -->
+      <div style="margin-bottom: 2rem;">
+        <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Description</label>
+        <textarea name="description" rows="3" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">{{ product.description or '' }}</textarea>
+      </div>
+
+      <!-- Submit & Cancel -->
+      <div style="display: flex; gap: 1rem;">
+        <button type="submit" class="btn btn-primary" style="flex: 2; padding: 0.85rem; font-size: 1rem; font-weight: 700;">
+          Save Changes
+        </button>
+        <a href="{{ url_for('rescue_product_detail', product_id=product.id) }}" class="btn btn-secondary" style="flex: 1; padding: 0.85rem; font-size: 1rem; font-weight: 600; text-align: center;">
+          Cancel
+        </a>
+      </div>
+
+    </form>
+  </div>
+
+</div>
+{% endblock %}

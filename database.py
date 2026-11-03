@@ -527,7 +527,199 @@ def init_db():
         cursor.execute("UPDATE enquiries SET handover_qr_token = HEX(RANDOMBLOB(16)) WHERE handover_qr_token IS NULL")
     except Exception as _e:
         pass
-        print(f"Enquiries migration note: {e}")
+
+    # ============================================================================
+    # DIRECT MEET & SELL AND SHARED RESCUE PRODUCTS MARKETPLACE TABLES
+    # ============================================================================
+
+    # 1. Shared Rescue Products Marketplace Table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS rescue_products (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        farmer_id INTEGER NOT NULL,
+        listing_id INTEGER,
+        product_name TEXT NOT NULL,
+        category TEXT NOT NULL CHECK(category IN ('Vegetables', 'Fruits', 'Grains', 'Leafy Vegetables', 'Other Agricultural Products')),
+        photo TEXT,
+        additional_photos TEXT,
+        quantity REAL NOT NULL,
+        initial_quantity REAL NOT NULL,
+        unit TEXT NOT NULL DEFAULT 'kg',
+        original_price REAL NOT NULL,
+        rescue_price REAL NOT NULL,
+        discount_percent REAL DEFAULT 0,
+        quality_grade TEXT NOT NULL DEFAULT 'Grade A',
+        harvest_date DATE NOT NULL,
+        expiry_date DATE,
+        farm_location TEXT NOT NULL,
+        district TEXT NOT NULL,
+        pin_code TEXT,
+        farmer_name TEXT NOT NULL,
+        farmer_phone TEXT NOT NULL,
+        whatsapp_number TEXT,
+        description TEXT,
+        status TEXT NOT NULL DEFAULT 'Available' CHECK(status IN ('Available', 'Partially Reserved', 'Sold', 'Expired', 'Removed')),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (farmer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE SET NULL
+    )
+    ''')
+
+    # 2. Direct Face-to-Face Meetings Table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS direct_meetings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        meeting_code TEXT UNIQUE NOT NULL,
+        listing_id INTEGER,
+        rescue_product_id INTEGER,
+        farmer_id INTEGER NOT NULL,
+        buyer_id INTEGER NOT NULL,
+        buyer_name TEXT NOT NULL,
+        buyer_phone TEXT NOT NULL,
+        farmer_name TEXT NOT NULL,
+        farmer_phone TEXT NOT NULL,
+        product_name TEXT NOT NULL,
+        required_quantity REAL NOT NULL,
+        proposed_date DATE NOT NULL,
+        proposed_time TEXT NOT NULL,
+        meeting_location TEXT NOT NULL,
+        buyer_notes TEXT,
+        farmer_notes TEXT,
+        status TEXT NOT NULL DEFAULT 'Pending' CHECK(status IN ('Pending', 'Confirmed', 'Rescheduled', 'Completed', 'Cancelled', 'Rejected')),
+        rescheduled_date DATE,
+        rescheduled_time TEXT,
+        rescheduled_location TEXT,
+        rescheduled_by TEXT,
+        cancellation_reason TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (farmer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (rescue_product_id) REFERENCES rescue_products(id) ON DELETE SET NULL
+    )
+    ''')
+
+    # 3. Direct Product Inspections Table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS direct_inspections (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        meeting_id INTEGER NOT NULL,
+        inspector_id INTEGER NOT NULL,
+        product_freshness TEXT,
+        product_quality TEXT,
+        actual_weight REAL,
+        available_quantity REAL,
+        packaging_condition TEXT,
+        status TEXT NOT NULL DEFAULT 'Inspection Pending' CHECK(status IN ('Inspection Pending', 'Inspection in Progress', 'Approved', 'Not Approved')),
+        buyer_notes TEXT,
+        farmer_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (meeting_id) REFERENCES direct_meetings(id) ON DELETE CASCADE
+    )
+    ''')
+
+    # 4. Direct Price Negotiations Table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS direct_negotiations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        meeting_id INTEGER NOT NULL,
+        farmer_id INTEGER NOT NULL,
+        buyer_id INTEGER NOT NULL,
+        farmer_initial_price REAL NOT NULL,
+        buyer_proposed_price REAL NOT NULL,
+        counter_price REAL,
+        counter_by TEXT,
+        final_agreed_price REAL,
+        final_quantity REAL,
+        total_amount REAL,
+        buyer_agreed INTEGER DEFAULT 0,
+        farmer_agreed INTEGER DEFAULT 0,
+        status TEXT NOT NULL DEFAULT 'Negotiating' CHECK(status IN ('Negotiating', 'Agreed', 'Declined')),
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (meeting_id) REFERENCES direct_meetings(id) ON DELETE CASCADE
+    )
+    ''')
+
+    # 5. Direct Sales, Payments & Receipts Table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS direct_sales (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        sale_code TEXT UNIQUE NOT NULL,
+        meeting_id INTEGER,
+        rescue_product_id INTEGER,
+        listing_id INTEGER,
+        farmer_id INTEGER NOT NULL,
+        buyer_id INTEGER NOT NULL,
+        product_name TEXT NOT NULL,
+        final_quantity REAL NOT NULL,
+        agreed_price_per_kg REAL NOT NULL,
+        total_amount REAL NOT NULL,
+        meeting_date DATE NOT NULL,
+        sale_location TEXT NOT NULL,
+        payment_method TEXT NOT NULL CHECK(payment_method IN ('Cash', 'UPI', 'Bank Transfer')),
+        payment_reference TEXT,
+        payment_notes TEXT,
+        payment_verified INTEGER DEFAULT 0,
+        buyer_confirmed INTEGER DEFAULT 0,
+        buyer_confirmed_at TIMESTAMP,
+        farmer_confirmed INTEGER DEFAULT 0,
+        farmer_confirmed_at TIMESTAMP,
+        status TEXT NOT NULL DEFAULT 'Pending Confirmation' CHECK(status IN ('Pending Confirmation', 'Confirmed', 'Completed', 'Cancelled')),
+        receipt_number TEXT UNIQUE,
+        notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (meeting_id) REFERENCES direct_meetings(id) ON DELETE SET NULL,
+        FOREIGN KEY (farmer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    ''')
+
+    # Migrations for chat_messages & listings
+    cursor.execute("PRAGMA table_info(chat_messages)")
+    cm_cols = [r[1] for r in cursor.fetchall()]
+    if 'meeting_id' not in cm_cols:
+        cursor.execute("ALTER TABLE chat_messages ADD COLUMN meeting_id INTEGER")
+
+    cursor.execute("PRAGMA table_info(listings)")
+    l_cols = [r[1] for r in cursor.fetchall()]
+    if 'additional_photos' not in l_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN additional_photos TEXT")
+    if 'expiry_date' not in l_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN expiry_date DATE")
+    if 'rescue_price' not in l_cols:
+        cursor.execute("ALTER TABLE listings ADD COLUMN rescue_price REAL")
+
+    # Seed rescue_products from existing listings if empty
+    try:
+        cursor.execute("SELECT COUNT(*) FROM rescue_products")
+        if cursor.fetchone()[0] == 0:
+            cursor.execute("""
+                INSERT INTO rescue_products (
+                    farmer_id, listing_id, product_name, category, photo, quantity, initial_quantity,
+                    unit, original_price, rescue_price, discount_percent, quality_grade, harvest_date,
+                    expiry_date, farm_location, district, pin_code, farmer_name, farmer_phone, whatsapp_number,
+                    description, status, created_at, updated_at
+                )
+                SELECT farmer_id, id, crop_name, 
+                       CASE WHEN category IN ('Vegetables', 'Fruits', 'Grains', 'Leafy Vegetables', 'Other Agricultural Products') THEN category ELSE 'Vegetables' END,
+                       photo, quantity, quantity, unit, 
+                       CASE WHEN original_price IS NOT NULL AND original_price > price_per_unit THEN original_price ELSE ROUND(price_per_unit * 1.3, 2) END,
+                       price_per_unit,
+                       ROUND(MAX(0, ((CASE WHEN original_price IS NOT NULL AND original_price > price_per_unit THEN original_price ELSE ROUND(price_per_unit * 1.3, 2) END) - price_per_unit) / (CASE WHEN original_price IS NOT NULL AND original_price > price_per_unit THEN original_price ELSE ROUND(price_per_unit * 1.3, 2) END) * 100), 1),
+                       COALESCE(quality_grade, 'Grade A'), harvest_date, estimated_freshness_date,
+                       village_town, district, pin_code, farmer_name, farmer_phone, whatsapp_number,
+                       description, 
+                       CASE WHEN status = 'Available' THEN 'Available' ELSE 'Sold' END,
+                       created_at, updated_at
+                FROM listings
+            """)
+    except Exception as _seed_err:
+        print(f"Rescue products seed notice: {_seed_err}")
 
     try:
         seed_market_prices(conn)
@@ -2683,7 +2875,1171 @@ def get_weather_alerts(district=None):
     except Exception:
         return []
 
-if __name__ == '__main__':
+# ============================================================================
+# SHARED RESCUE PRODUCTS MARKETPLACE & DIRECT MEET & SELL WORKFLOW MODULE
+# ============================================================================
+
+def create_rescue_product(farmer_id, product_name, category, quantity, original_price,
+                          rescue_price, harvest_date, farm_location, district, pin_code,
+                          description, quality_grade='Grade A', expiry_date=None,
+                          photo=None, additional_photos=None, whatsapp_number=None):
+    """
+    Create a new shared rescue product in the database.
+    Visible to BOTH Farmers and Buyers in real-time from the same table.
+    Also synchronizes with listings table for platform-wide compatibility.
+    """
+    import json
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT id, name, phone, location, district, pin_code FROM users WHERE id = ?", (farmer_id,))
+        farmer = cursor.fetchone()
+        if not farmer:
+            conn.close()
+            return False, "Farmer account not found", None
+
+        qty = float(quantity)
+        orig_p = float(original_price)
+        resc_p = float(rescue_price)
+        if qty <= 0:
+            conn.close()
+            return False, "Quantity must be greater than 0 kg", None
+        if resc_p <= 0:
+            conn.close()
+            return False, "Rescue price must be greater than 0", None
+
+        discount_pct = round(((orig_p - resc_p) / orig_p) * 100, 1) if orig_p > 0 else 0
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        photos_json = json.dumps(additional_photos) if isinstance(additional_photos, list) else (additional_photos or '[]')
+        loc = farm_location or farmer['location'] or 'Farmgate'
+        dist = district or farmer['district'] or 'Tamil Nadu'
+        pin = pin_code or farmer['pin_code'] or '641001'
+        phone = farmer['phone'] or '9876543210'
+        w_phone = whatsapp_number or phone
+
+        # 1. Insert into listings table for platform interoperability
+        cursor.execute("""
+            INSERT INTO listings (
+                farmer_id, crop_name, category, photo, quantity, unit,
+                price_per_unit, original_price, harvest_date, estimated_freshness_date,
+                village_town, district, pin_code, farmer_name, farmer_phone,
+                whatsapp_number, description, quality_grade, urgency_level,
+                status, rescued_from_waste, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, 'kg', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Normal', 'Available', 0, ?, ?)
+        """, (
+            farmer_id, product_name, category, photo, qty,
+            resc_p, orig_p, harvest_date, expiry_date,
+            loc, dist, pin, farmer['name'], phone,
+            w_phone, description, quality_grade, now_str, now_str
+        ))
+        listing_id = cursor.lastrowid
+
+        # 2. Insert into rescue_products shared marketplace table
+        cursor.execute("""
+            INSERT INTO rescue_products (
+                farmer_id, listing_id, product_name, category, photo, additional_photos,
+                quantity, initial_quantity, unit, original_price, rescue_price,
+                discount_percent, quality_grade, harvest_date, expiry_date,
+                farm_location, district, pin_code, farmer_name, farmer_phone,
+                whatsapp_number, description, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'kg', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Available', ?, ?)
+        """, (
+            farmer_id, listing_id, product_name, category, photo, photos_json,
+            qty, qty, orig_p, resc_p, discount_pct, quality_grade, harvest_date,
+            expiry_date, loc, dist, pin, farmer['name'], phone,
+            w_phone, description, now_str, now_str
+        ))
+        product_id = cursor.lastrowid
+        conn.commit()
+
+        # Create activity log
+        cursor.execute("""
+            INSERT INTO activity_logs (action, details, user_email)
+            VALUES (?, ?, ?)
+        """, ('RESCUE_PRODUCT_ADDED', f"Added rescue product {product_name} ({qty} kg @ ₹{resc_p}/kg)", farmer['name']))
+        conn.commit()
+        conn.close()
+
+        return True, "Rescue product published successfully to shared marketplace!", product_id
+    except Exception as e:
+        return False, str(e), None
+
+def get_shared_rescue_products(filters=None, sort_by='recent'):
+    """
+    Retrieve active rescue products visible to BOTH Farmers and Buyers in real-time.
+    Automatically filters out expired products.
+    """
+    import json
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        # Auto-update status for expired products
+        cursor.execute("""
+            UPDATE rescue_products 
+            SET status = 'Expired', updated_at = CURRENT_TIMESTAMP
+            WHERE expiry_date IS NOT NULL AND date(expiry_date) < date('now') AND status = 'Available'
+        """)
+        conn.commit()
+
+        query = """
+            SELECT rp.*, u.email as farmer_email, u.location as farmer_default_location
+            FROM rescue_products rp
+            JOIN users u ON rp.farmer_id = u.id
+            WHERE rp.status IN ('Available', 'Partially Reserved')
+              AND rp.quantity > 0
+              AND (rp.expiry_date IS NULL OR date(rp.expiry_date) >= date('now'))
+        """
+        params = []
+        filters = filters or {}
+
+        if filters.get('category') and filters['category'] != 'All':
+            query += " AND rp.category = ?"
+            params.append(filters['category'])
+
+        if filters.get('district') and filters['district'] != 'All':
+            query += " AND (rp.district LIKE ? OR rp.farm_location LIKE ?)"
+            params.extend([f"%{filters['district']}%", f"%{filters['district']}%"])
+
+        if filters.get('quality_grade') and filters['quality_grade'] != 'All':
+            query += " AND rp.quality_grade = ?"
+            params.append(filters['quality_grade'])
+
+        if filters.get('min_price'):
+            try:
+                query += " AND rp.rescue_price >= ?"
+                params.append(float(filters['min_price']))
+            except (ValueError, TypeError):
+                pass
+
+        if filters.get('max_price'):
+            try:
+                query += " AND rp.rescue_price <= ?"
+                params.append(float(filters['max_price']))
+            except (ValueError, TypeError):
+                pass
+
+        if filters.get('min_qty'):
+            try:
+                query += " AND rp.quantity >= ?"
+                params.append(float(filters['min_qty']))
+            except (ValueError, TypeError):
+                pass
+
+        if filters.get('search_q'):
+            q_pat = f"%{filters['search_q'].strip()}%"
+            query += " AND (rp.product_name LIKE ? OR rp.description LIKE ? OR rp.farmer_name LIKE ? OR rp.farm_location LIKE ?)"
+            params.extend([q_pat, q_pat, q_pat, q_pat])
+
+        # Sorting
+        if sort_by == 'lowest_price':
+            query += " ORDER BY rp.rescue_price ASC, rp.created_at DESC"
+        elif sort_by == 'highest_qty':
+            query += " ORDER BY rp.quantity DESC, rp.created_at DESC"
+        elif sort_by == 'discount':
+            query += " ORDER BY rp.discount_percent DESC, rp.created_at DESC"
+        else: # recent
+            query += " ORDER BY rp.created_at DESC, rp.id DESC"
+
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        conn.close()
+
+        products = []
+        for r in rows:
+            p_dict = dict(r)
+            # Parse additional photos
+            try:
+                p_dict['photos_list'] = json.loads(p_dict.get('additional_photos') or '[]')
+            except Exception:
+                p_dict['photos_list'] = []
+            products.append(p_dict)
+        return products
+    except Exception as e:
+        print(f"Error fetching shared rescue products: {e}")
+        return []
+
+def get_rescue_product_by_id(product_id):
+    """Retrieve full details of a single rescue product with farmer info."""
+    import json
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT rp.*, u.email as farmer_email, u.phone as farmer_user_phone,
+                   u.location as farmer_base_location, u.created_at as farmer_joined_at
+            FROM rescue_products rp
+            JOIN users u ON rp.farmer_id = u.id
+            WHERE rp.id = ?
+        """, (product_id,))
+        row = cursor.fetchone()
+        conn.close()
+        if not row:
+            return None
+        p_dict = dict(row)
+        try:
+            p_dict['photos_list'] = json.loads(p_dict.get('additional_photos') or '[]')
+        except Exception:
+            p_dict['photos_list'] = []
+        return p_dict
+    except Exception as e:
+        print(f"Error fetching product {product_id}: {e}")
+        return None
+
+def get_farmer_rescue_products(farmer_id):
+    """Retrieve all rescue products uploaded by a specific farmer."""
+    import json
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM rescue_products 
+            WHERE farmer_id = ? 
+            ORDER BY created_at DESC, id DESC
+        """, (farmer_id,))
+        rows = cursor.fetchall()
+        conn.close()
+
+        result = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d['photos_list'] = json.loads(d.get('additional_photos') or '[]')
+            except Exception:
+                d['photos_list'] = []
+            result.append(d)
+        return result
+    except Exception:
+        return []
+
+def update_rescue_product(product_id, farmer_id, data):
+    """Farmer updates their rescue product details."""
+    import json
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM rescue_products WHERE id = ? AND farmer_id = ?", (product_id, farmer_id))
+        existing = cursor.fetchone()
+        if not existing:
+            conn.close()
+            return False, "Product not found or unauthorized"
+
+        orig_p = float(data.get('original_price', existing['original_price']))
+        resc_p = float(data.get('rescue_price', existing['rescue_price']))
+        qty = float(data.get('quantity', existing['quantity']))
+        discount_pct = round(((orig_p - resc_p) / orig_p) * 100, 1) if orig_p > 0 else 0
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        photos_json = existing['additional_photos']
+        if 'additional_photos' in data:
+            if isinstance(data['additional_photos'], list):
+                photos_json = json.dumps(data['additional_photos'])
+            else:
+                photos_json = data['additional_photos']
+
+        cursor.execute("""
+            UPDATE rescue_products
+            SET product_name = ?,
+                category = ?,
+                quantity = ?,
+                original_price = ?,
+                rescue_price = ?,
+                discount_percent = ?,
+                quality_grade = ?,
+                harvest_date = ?,
+                expiry_date = ?,
+                farm_location = ?,
+                district = ?,
+                description = ?,
+                status = ?,
+                photo = COALESCE(?, photo),
+                additional_photos = ?,
+                updated_at = ?
+            WHERE id = ? AND farmer_id = ?
+        """, (
+            data.get('product_name', existing['product_name']),
+            data.get('category', existing['category']),
+            qty, orig_p, resc_p, discount_pct,
+            data.get('quality_grade', existing['quality_grade']),
+            data.get('harvest_date', existing['harvest_date']),
+            data.get('expiry_date', existing['expiry_date']),
+            data.get('farm_location', existing['farm_location']),
+            data.get('district', existing['district']),
+            data.get('description', existing['description']),
+            data.get('status', existing['status']),
+            data.get('photo'),
+            photos_json,
+            now_str,
+            product_id, farmer_id
+        ))
+
+        # Sync listings table
+        if existing['listing_id']:
+            cursor.execute("""
+                UPDATE listings
+                SET crop_name = ?, category = ?, quantity = ?,
+                    price_per_unit = ?, original_price = ?,
+                    harvest_date = ?, estimated_freshness_date = ?,
+                    village_town = ?, district = ?, description = ?,
+                    quality_grade = ?, photo = COALESCE(?, photo),
+                    status = CASE WHEN ? = 'Sold' THEN 'Sold' ELSE 'Available' END,
+                    updated_at = ?
+                WHERE id = ?
+            """, (
+                data.get('product_name', existing['product_name']),
+                data.get('category', existing['category']),
+                qty, resc_p, orig_p,
+                data.get('harvest_date', existing['harvest_date']),
+                data.get('expiry_date', existing['expiry_date']),
+                data.get('farm_location', existing['farm_location']),
+                data.get('district', existing['district']),
+                data.get('description', existing['description']),
+                data.get('quality_grade', existing['quality_grade']),
+                data.get('photo'),
+                data.get('status', existing['status']),
+                now_str,
+                existing['listing_id']
+            ))
+
+        conn.commit()
+        conn.close()
+        return True, "Product updated successfully"
+    except Exception as e:
+        return False, str(e)
+
+def delete_rescue_product(product_id, farmer_id):
+    """Farmer deletes or marks product as Removed."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT listing_id FROM rescue_products WHERE id = ? AND farmer_id = ?", (product_id, farmer_id))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return False, "Product not found or unauthorized"
+
+        cursor.execute("UPDATE rescue_products SET status = 'Removed', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (product_id,))
+        if row['listing_id']:
+            cursor.execute("UPDATE listings SET status = 'Inactive', updated_at = CURRENT_TIMESTAMP WHERE id = ?", (row['listing_id'],))
+        conn.commit()
+        conn.close()
+        return True, "Product removed from marketplace"
+    except Exception as e:
+        return False, str(e)
+
+# ----------------------------------------------------------------------------
+# DIRECT MEET & SELL: MEETINGS, INSPECTION, NEGOTIATION, SALE, RECEIPT
+# ----------------------------------------------------------------------------
+
+def create_direct_meeting(buyer_id, product_id, required_quantity, proposed_date, proposed_time,
+                          meeting_location, buyer_notes=None):
+    """
+    Buyer schedules a direct face-to-face farmgate meeting with the farmer.
+    Generates unique meeting code MTG-2026-XXXX and notifies the farmer.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        # Buyer info
+        cursor.execute("SELECT id, name, phone, email, location FROM users WHERE id = ?", (buyer_id,))
+        buyer = cursor.fetchone()
+        if not buyer:
+            conn.close()
+            return False, "Buyer account not found", None
+
+        # Product info
+        cursor.execute("""
+            SELECT rp.*, u.name as farmer_name, u.phone as farmer_phone
+            FROM rescue_products rp
+            JOIN users u ON rp.farmer_id = u.id
+            WHERE rp.id = ?
+        """, (product_id,))
+        prod = cursor.fetchone()
+        if not prod:
+            conn.close()
+            return False, "Produce item not found", None
+
+        req_qty = float(required_quantity)
+        if req_qty <= 0:
+            conn.close()
+            return False, "Requested quantity must be greater than 0 kg", None
+
+        if req_qty > float(prod['quantity']):
+            conn.close()
+            return False, f"Requested quantity ({req_qty} kg) exceeds available stock ({prod['quantity']} kg)", None
+
+        meeting_code = f"MTG-2026-{uuid.uuid4().hex[:6].upper()}"
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        loc = meeting_location or prod['farm_location'] or 'Farmer Farmgate'
+
+        cursor.execute("""
+            INSERT INTO direct_meetings (
+                meeting_code, listing_id, rescue_product_id, farmer_id, buyer_id,
+                buyer_name, buyer_phone, farmer_name, farmer_phone, product_name,
+                required_quantity, proposed_date, proposed_time, meeting_location,
+                buyer_notes, status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?, ?)
+        """, (
+            meeting_code, prod['listing_id'], prod['id'], prod['farmer_id'], buyer_id,
+            buyer['name'], buyer['phone'], prod['farmer_name'], prod['farmer_phone'],
+            prod['product_name'], req_qty, proposed_date, proposed_time, loc,
+            buyer_notes, now_str, now_str
+        ))
+        meeting_id = cursor.lastrowid
+        conn.commit()
+
+        # Send in-app notification to the farmer
+        notif_msg = f"Buyer {buyer['name']} requested a direct meeting on {proposed_date} at {proposed_time} to inspect {req_qty} kg of {prod['product_name']}."
+        create_notification(
+            prod['farmer_id'],
+            f"Direct Meeting Request: {prod['product_name']} 🤝",
+            notif_msg,
+            notif_type='order',
+            link=f"/meeting/{meeting_id}"
+        )
+        conn.close()
+
+        return True, "Direct meeting request sent to farmer!", {
+            'id': meeting_id,
+            'meeting_code': meeting_code,
+            'farmer_name': prod['farmer_name'],
+            'product_name': prod['product_name'],
+            'status': 'Pending'
+        }
+    except Exception as e:
+        return False, str(e), None
+
+def get_meeting_by_id(meeting_id):
+    """Fetch complete meeting record with inspection, negotiation, and sale status."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT dm.*, 
+                   rp.photo as product_photo, rp.rescue_price as original_rescue_price,
+                   rp.original_price as market_original_price, rp.quantity as current_stock_qty,
+                   f.email as farmer_email, f.location as farmer_address,
+                   b.email as buyer_email, b.location as buyer_address
+            FROM direct_meetings dm
+            LEFT JOIN rescue_products rp ON dm.rescue_product_id = rp.id
+            JOIN users f ON dm.farmer_id = f.id
+            JOIN users b ON dm.buyer_id = b.id
+            WHERE dm.id = ?
+        """, (meeting_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return None
+        meeting = dict(row)
+
+        # Inspection details
+        cursor.execute("SELECT * FROM direct_inspections WHERE meeting_id = ? ORDER BY id DESC LIMIT 1", (meeting_id,))
+        insp = cursor.fetchone()
+        meeting['inspection'] = dict(insp) if insp else None
+
+        # Negotiation details
+        cursor.execute("SELECT * FROM direct_negotiations WHERE meeting_id = ? ORDER BY id DESC LIMIT 1", (meeting_id,))
+        nego = cursor.fetchone()
+        meeting['negotiation'] = dict(nego) if nego else None
+
+        # Direct sale details
+        cursor.execute("SELECT * FROM direct_sales WHERE meeting_id = ? ORDER BY id DESC LIMIT 1", (meeting_id,))
+        sale = cursor.fetchone()
+        meeting['sale'] = dict(sale) if sale else None
+
+        conn.close()
+        return meeting
+    except Exception as e:
+        print(f"Error fetching meeting {meeting_id}: {e}")
+        return None
+
+def get_buyer_meetings(buyer_id, status_filter=None):
+    """Retrieve all meetings for a buyer, optionally filtered by status."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        query = """
+            SELECT dm.*, rp.photo as product_photo, rp.rescue_price
+            FROM direct_meetings dm
+            LEFT JOIN rescue_products rp ON dm.rescue_product_id = rp.id
+            WHERE dm.buyer_id = ?
+        """
+        params = [buyer_id]
+        if status_filter and status_filter != 'all':
+            query += " AND dm.status = ?"
+            params.append(status_filter.capitalize())
+
+        query += " ORDER BY dm.created_at DESC, dm.id DESC"
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+def get_farmer_meetings(farmer_id, status_filter=None):
+    """Retrieve all meetings for a farmer, optionally filtered by status."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        query = """
+            SELECT dm.*, rp.photo as product_photo, rp.rescue_price
+            FROM direct_meetings dm
+            LEFT JOIN rescue_products rp ON dm.rescue_product_id = rp.id
+            WHERE dm.farmer_id = ?
+        """
+        params = [farmer_id]
+        if status_filter and status_filter != 'all':
+            query += " AND dm.status = ?"
+            params.append(status_filter.capitalize())
+
+        query += " ORDER BY dm.created_at DESC, dm.id DESC"
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+def respond_direct_meeting(meeting_id, user_id, action, reschedule_data=None, notes=None):
+    """
+    Handle meeting response:
+    - accept: confirms meeting
+    - reject: farmer rejects
+    - reschedule: farmer or buyer proposes alternative date/time/location
+    - cancel: cancel meeting
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM direct_meetings WHERE id = ?", (meeting_id,))
+        m = cursor.fetchone()
+        if not m:
+            conn.close()
+            return False, "Meeting not found"
+
+        is_farmer = (m['farmer_id'] == user_id)
+        is_buyer = (m['buyer_id'] == user_id)
+        if not (is_farmer or is_buyer):
+            conn.close()
+            return False, "Unauthorized: you are not a party in this meeting"
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        if action == 'accept':
+            cursor.execute("""
+                UPDATE direct_meetings
+                SET status = 'Confirmed',
+                    farmer_notes = COALESCE(?, farmer_notes),
+                    updated_at = ?
+                WHERE id = ?
+            """, (notes, now_str, meeting_id))
+            conn.commit()
+            conn.close()
+
+            notify_user = m['buyer_id'] if is_farmer else m['farmer_id']
+            actor_name = m['farmer_name'] if is_farmer else m['buyer_name']
+            create_notification(
+                notify_user,
+                f"Meeting Confirmed! #{m['meeting_code']} ✅",
+                f"{actor_name} confirmed the meeting on {m['proposed_date']} at {m['proposed_time']}. Location: {m['meeting_location']}.",
+                notif_type='order',
+                link=f"/meeting/{meeting_id}"
+            )
+            return True, "Meeting confirmed successfully!"
+
+        elif action == 'reject':
+            cursor.execute("""
+                UPDATE direct_meetings
+                SET status = 'Rejected',
+                    cancellation_reason = ?,
+                    updated_at = ?
+                WHERE id = ?
+            """, (notes or 'Declined by counterpart', now_str, meeting_id))
+            conn.commit()
+            conn.close()
+
+            notify_user = m['buyer_id'] if is_farmer else m['farmer_id']
+            create_notification(
+                notify_user,
+                f"Meeting Request Declined #{m['meeting_code']}",
+                f"Meeting request for {m['product_name']} was declined. Note: {notes or 'No reason provided'}.",
+                notif_type='info',
+                link=f"/meeting/{meeting_id}"
+            )
+            return True, "Meeting request rejected"
+
+        elif action == 'reschedule':
+            r_data = reschedule_data or {}
+            new_date = r_data.get('date', m['proposed_date'])
+            new_time = r_data.get('time', m['proposed_time'])
+            new_loc = r_data.get('location', m['meeting_location'])
+            actor_label = 'Farmer' if is_farmer else 'Buyer'
+
+            cursor.execute("""
+                UPDATE direct_meetings
+                SET status = 'Rescheduled',
+                    proposed_date = ?,
+                    proposed_time = ?,
+                    meeting_location = ?,
+                    rescheduled_date = ?,
+                    rescheduled_time = ?,
+                    rescheduled_location = ?,
+                    rescheduled_by = ?,
+                    farmer_notes = CASE WHEN ? = 'Farmer' THEN ? ELSE farmer_notes END,
+                    buyer_notes = CASE WHEN ? = 'Buyer' THEN ? ELSE buyer_notes END,
+                    updated_at = ?
+                WHERE id = ?
+            """, (
+                new_date, new_time, new_loc,
+                new_date, new_time, new_loc,
+                actor_label, actor_label, notes, actor_label, notes,
+                now_str, meeting_id
+            ))
+            conn.commit()
+            conn.close()
+
+            notify_user = m['buyer_id'] if is_farmer else m['farmer_id']
+            create_notification(
+                notify_user,
+                f"Meeting Rescheduled #{m['meeting_code']} 📅",
+                f"{actor_label} proposed new time: {new_date} at {new_time}. Location: {new_loc}.",
+                notif_type='order',
+                link=f"/meeting/{meeting_id}"
+            )
+            return True, "Alternative meeting details sent to counterpart"
+
+        elif action == 'cancel':
+            cursor.execute("""
+                UPDATE direct_meetings
+                SET status = 'Cancelled',
+                    cancellation_reason = ?,
+                    updated_at = ?
+                WHERE id = ?
+            """, (notes or 'Cancelled by user', now_str, meeting_id))
+            conn.commit()
+            conn.close()
+
+            notify_user = m['buyer_id'] if is_farmer else m['farmer_id']
+            create_notification(
+                notify_user,
+                f"Meeting Cancelled #{m['meeting_code']}",
+                f"The meeting scheduled for {m['proposed_date']} has been cancelled.",
+                notif_type='info',
+                link=f"/meetings"
+            )
+            return True, "Meeting cancelled"
+
+        conn.close()
+        return False, "Unknown action"
+    except Exception as e:
+        return False, str(e)
+
+def record_direct_inspection(meeting_id, inspector_id, freshness, quality, actual_weight,
+                             available_qty, packaging, status, buyer_notes, farmer_notes=None):
+    """
+    Record in-person product inspection during the meeting.
+    Inspection statuses: Inspection Pending, Inspection in Progress, Approved, Not Approved.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM direct_meetings WHERE id = ?", (meeting_id,))
+        m = cursor.fetchone()
+        if not m:
+            conn.close()
+            return False, "Meeting not found"
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # Check existing inspection
+        cursor.execute("SELECT id FROM direct_inspections WHERE meeting_id = ?", (meeting_id,))
+        exist = cursor.fetchone()
+
+        if exist:
+            cursor.execute("""
+                UPDATE direct_inspections
+                SET product_freshness = ?,
+                    product_quality = ?,
+                    actual_weight = ?,
+                    available_quantity = ?,
+                    packaging_condition = ?,
+                    status = ?,
+                    buyer_notes = COALESCE(?, buyer_notes),
+                    farmer_notes = COALESCE(?, farmer_notes),
+                    updated_at = ?
+                WHERE id = ?
+            """, (
+                freshness, quality, float(actual_weight or 0), float(available_qty or 0),
+                packaging, status, buyer_notes, farmer_notes, now_str, exist['id']
+            ))
+        else:
+            cursor.execute("""
+                INSERT INTO direct_inspections (
+                    meeting_id, inspector_id, product_freshness, product_quality,
+                    actual_weight, available_quantity, packaging_condition, status,
+                    buyer_notes, farmer_notes, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                meeting_id, inspector_id, freshness, quality, float(actual_weight or 0),
+                float(available_qty or 0), packaging, status, buyer_notes, farmer_notes,
+                now_str, now_str
+            ))
+
+        conn.commit()
+        conn.close()
+
+        # Send notification to the farmer
+        notif_msg = f"Buyer completed product inspection: Status is '{status}' ({quality}, Freshness: {freshness})."
+        create_notification(
+            m['farmer_id'],
+            f"Product Inspection Recorded: {m['product_name']} 🔍",
+            notif_msg,
+            notif_type='order',
+            link=f"/meeting/{meeting_id}"
+        )
+        return True, "Product inspection saved successfully"
+    except Exception as e:
+        return False, str(e)
+
+def record_direct_negotiation(meeting_id, user_id, role, farmer_initial_price, buyer_proposed_price,
+                              counter_price=None, counter_by=None, final_agreed_price=None,
+                              final_quantity=None, notes=None):
+    """
+    Record or update face-to-face direct price and quantity negotiation.
+    Both parties can propose terms and confirm agreement.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM direct_meetings WHERE id = ?", (meeting_id,))
+        m = cursor.fetchone()
+        if not m:
+            conn.close()
+            return False, "Meeting not found"
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        f_init = float(farmer_initial_price)
+        b_prop = float(buyer_proposed_price)
+        c_price = float(counter_price) if counter_price else None
+        f_agreed = float(final_agreed_price) if final_agreed_price else None
+        f_qty = float(final_quantity) if final_quantity else float(m['required_quantity'])
+        tot_amt = round(f_agreed * f_qty, 2) if f_agreed else round(b_prop * f_qty, 2)
+
+        # Check existing negotiation
+        cursor.execute("SELECT id, buyer_agreed, farmer_agreed FROM direct_negotiations WHERE meeting_id = ?", (meeting_id,))
+        exist = cursor.fetchone()
+
+        buyer_agreed = 1 if role == 'buyer' and final_agreed_price else (exist['buyer_agreed'] if exist else 0)
+        farmer_agreed = 1 if role == 'farmer' and final_agreed_price else (exist['farmer_agreed'] if exist else 0)
+        nego_status = 'Agreed' if (buyer_agreed == 1 and farmer_agreed == 1) else 'Negotiating'
+
+        if exist:
+            cursor.execute("""
+                UPDATE direct_negotiations
+                SET farmer_initial_price = ?,
+                    buyer_proposed_price = ?,
+                    counter_price = COALESCE(?, counter_price),
+                    counter_by = COALESCE(?, counter_by),
+                    final_agreed_price = COALESCE(?, final_agreed_price),
+                    final_quantity = ?,
+                    total_amount = ?,
+                    buyer_agreed = ?,
+                    farmer_agreed = ?,
+                    status = ?,
+                    notes = COALESCE(?, notes),
+                    updated_at = ?
+                WHERE id = ?
+            """, (
+                f_init, b_prop, c_price, counter_by, f_agreed, f_qty, tot_amt,
+                buyer_agreed, farmer_agreed, nego_status, notes, now_str, exist['id']
+            ))
+        else:
+            cursor.execute("""
+                INSERT INTO direct_negotiations (
+                    meeting_id, farmer_id, buyer_id, farmer_initial_price,
+                    buyer_proposed_price, counter_price, counter_by, final_agreed_price,
+                    final_quantity, total_amount, buyer_agreed, farmer_agreed,
+                    status, notes, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                meeting_id, m['farmer_id'], m['buyer_id'], f_init,
+                b_prop, c_price, counter_by, f_agreed, f_qty, tot_amt,
+                buyer_agreed, farmer_agreed, nego_status, notes, now_str, now_str
+            ))
+
+        conn.commit()
+        conn.close()
+
+        # Notify counterpart
+        other_user = m['farmer_id'] if role == 'buyer' else m['buyer_id']
+        msg_body = f"Negotiation update: Proposed ₹{final_agreed_price or counter_price or buyer_proposed_price}/kg for {f_qty} kg."
+        if nego_status == 'Agreed':
+            msg_body = f"Both parties agreed to final price: ₹{f_agreed}/kg for {f_qty} kg (Total: ₹{tot_amt}). You can now proceed to direct sale confirmation!"
+        create_notification(
+            other_user,
+            f"Price Negotiation Update: {m['product_name']} 💬",
+            msg_body,
+            notif_type='order',
+            link=f"/meeting/{meeting_id}"
+        )
+        return True, "Negotiation terms saved successfully"
+    except Exception as e:
+        return False, str(e)
+
+def confirm_direct_negotiation_agreement(meeting_id, user_id, role):
+    """Confirm agreement to negotiated price and quantity."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM direct_negotiations WHERE meeting_id = ?", (meeting_id,))
+        nego = cursor.fetchone()
+        if not nego:
+            conn.close()
+            return False, "No active negotiation terms found"
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        b_agree = 1 if role == 'buyer' else nego['buyer_agreed']
+        f_agree = 1 if role == 'farmer' else nego['farmer_agreed']
+        new_status = 'Agreed' if (b_agree == 1 and f_agree == 1) else 'Negotiating'
+
+        cursor.execute("""
+            UPDATE direct_negotiations
+            SET buyer_agreed = ?,
+                farmer_agreed = ?,
+                status = ?,
+                updated_at = ?
+            WHERE id = ?
+        """, (b_agree, f_agree, new_status, now_str, nego['id']))
+        cursor.execute("SELECT farmer_id, buyer_id, product_name FROM direct_meetings WHERE id = ?", (meeting_id,))
+        m = cursor.fetchone()
+        other_user = m['farmer_id'] if role == 'buyer' else m['buyer_id']
+        conn.commit()
+        conn.close()
+
+        create_notification(
+            other_user,
+            f"Negotiation Confirmed! {m['product_name']} 🤝",
+            f"Counterpart confirmed agreement to final terms. Status: {new_status}.",
+            notif_type='order',
+            link=f"/meeting/{meeting_id}"
+        )
+        return True, "Agreement recorded"
+    except Exception as e:
+        return False, str(e)
+
+def initiate_or_update_direct_sale(meeting_id, user_id, role, payment_method,
+                                    payment_reference=None, payment_notes=None):
+    """
+    Create or update direct sale record:
+    - Generates unique DIR-2026-XXXX Sale ID and REC-2026-XXXX Receipt Number.
+    - Sets initial confirmation flag for initiating user.
+    - Supports Cash, UPI, Bank Transfer with payment references.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT dm.*, rp.rescue_price, rp.quantity as stock_qty
+            FROM direct_meetings dm
+            LEFT JOIN rescue_products rp ON dm.rescue_product_id = rp.id
+            WHERE dm.id = ?
+        """, (meeting_id,))
+        m = cursor.fetchone()
+        if not m:
+            conn.close()
+            return False, "Meeting not found", None
+
+        # Fetch negotiation details for final price and quantity
+        cursor.execute("SELECT * FROM direct_negotiations WHERE meeting_id = ?", (meeting_id,))
+        nego = cursor.fetchone()
+
+        final_price = float(nego['final_agreed_price']) if (nego and nego['final_agreed_price']) else float(m['rescue_price'] or 20.0)
+        final_qty = float(nego['final_quantity']) if (nego and nego['final_quantity']) else float(m['required_quantity'])
+        total_amt = round(final_price * final_qty, 2)
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        b_conf = 1 if role == 'buyer' else 0
+        b_time = now_str if role == 'buyer' else None
+        f_conf = 1 if role == 'farmer' else 0
+        f_time = now_str if role == 'farmer' else None
+
+        cursor.execute("SELECT * FROM direct_sales WHERE meeting_id = ?", (meeting_id,))
+        exist = cursor.fetchone()
+
+        if exist:
+            sale_id = exist['id']
+            cursor.execute("""
+                UPDATE direct_sales
+                SET payment_method = ?,
+                    payment_reference = COALESCE(?, payment_reference),
+                    payment_notes = COALESCE(?, payment_notes),
+                    buyer_confirmed = CASE WHEN ? = 'buyer' THEN 1 ELSE buyer_confirmed END,
+                    buyer_confirmed_at = CASE WHEN ? = 'buyer' THEN ? ELSE buyer_confirmed_at END,
+                    farmer_confirmed = CASE WHEN ? = 'farmer' THEN 1 ELSE farmer_confirmed END,
+                    farmer_confirmed_at = CASE WHEN ? = 'farmer' THEN ? ELSE farmer_confirmed_at END,
+                    updated_at = ?
+                WHERE id = ?
+            """, (
+                payment_method, payment_reference, payment_notes,
+                role, role, now_str, role, role, now_str, now_str, sale_id
+            ))
+        else:
+            sale_code = f"DIR-2026-{uuid.uuid4().hex[:6].upper()}"
+            receipt_no = f"REC-2026-{uuid.uuid4().hex[:6].upper()}"
+            cursor.execute("""
+                INSERT INTO direct_sales (
+                    sale_code, meeting_id, rescue_product_id, listing_id,
+                    farmer_id, buyer_id, product_name, final_quantity,
+                    agreed_price_per_kg, total_amount, meeting_date, sale_location,
+                    payment_method, payment_reference, payment_notes,
+                    buyer_confirmed, buyer_confirmed_at, farmer_confirmed, farmer_confirmed_at,
+                    status, receipt_number, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending Confirmation', ?, ?, ?)
+            """, (
+                sale_code, meeting_id, m['rescue_product_id'], m['listing_id'],
+                m['farmer_id'], m['buyer_id'], m['product_name'], final_qty,
+                final_price, total_amt, m['proposed_date'], m['meeting_location'],
+                payment_method, payment_reference, payment_notes,
+                b_conf, b_time, f_conf, f_time, receipt_no, now_str, now_str
+            ))
+            sale_id = cursor.lastrowid
+
+        conn.commit()
+
+        # Notify counterpart
+        other_user = m['farmer_id'] if role == 'buyer' else m['buyer_id']
+        create_notification(
+            other_user,
+            f"Direct Sale Confirmation Initiated: {m['product_name']} 🧾",
+            f"Direct sale details recorded via {payment_method}. Total: ₹{total_amt}. Please review and confirm to complete.",
+            notif_type='order',
+            link=f"/meeting/{meeting_id}"
+        )
+        conn.close()
+
+        # Check if both already confirmed
+        return True, "Direct sale terms recorded", sale_id
+    except Exception as e:
+        return False, str(e), None
+
+def confirm_direct_sale_step(sale_id, user_id, role, payment_verified=None, notes=None):
+    """
+    Finalize direct sale:
+    - Both Buyer and Farmer must confirm.
+    - Farmer acknowledges payment receipt (Cash / UPI / Bank Transfer).
+    - Reduces available inventory in rescue_products and listings.
+    - Prevents overselling using atomic transactions.
+    - Updates rescued produce quantity in analytics.
+    - Finalizes sale status to 'Completed'.
+    - Generates sale receipt.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM direct_sales WHERE id = ?", (sale_id,))
+        sale = cursor.fetchone()
+        if not sale:
+            conn.close()
+            return False, "Sale record not found"
+
+        if sale['status'] == 'Completed':
+            conn.close()
+            return True, "Sale is already completed and finalized"
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # Update confirmations
+        b_conf = 1 if (role == 'buyer' or sale['buyer_confirmed'] == 1) else (sale['buyer_confirmed'] or 0)
+        b_time = now_str if (role == 'buyer' and not sale['buyer_confirmed']) else sale['buyer_confirmed_at']
+        f_conf = 1 if (role == 'farmer' or sale['farmer_confirmed'] == 1) else (sale['farmer_confirmed'] or 0)
+        f_time = now_str if (role == 'farmer' and not sale['farmer_confirmed']) else sale['farmer_confirmed_at']
+        p_ver = 1 if (payment_verified or sale['payment_verified'] == 1) else (sale['payment_verified'] or 0)
+
+        # Both must confirm and payment verified
+        is_completed = (b_conf == 1 and f_conf == 1 and p_ver == 1)
+        new_status = 'Completed' if is_completed else 'Confirmed'
+
+        cursor.execute("""
+            UPDATE direct_sales
+            SET buyer_confirmed = ?,
+                buyer_confirmed_at = ?,
+                farmer_confirmed = ?,
+                farmer_confirmed_at = ?,
+                payment_verified = ?,
+                status = ?,
+                notes = COALESCE(?, notes),
+                updated_at = ?
+            WHERE id = ?
+        """, (b_conf, b_time, f_conf, f_time, p_ver, new_status, notes, now_str, sale_id))
+
+        if is_completed:
+            sold_qty = float(sale['final_quantity'])
+
+            # 1. Decrement rescue_products inventory
+            if sale['rescue_product_id']:
+                cursor.execute("""
+                    UPDATE rescue_products
+                    SET quantity = MAX(0, quantity - ?),
+                        status = CASE WHEN quantity - ? <= 0 THEN 'Sold' ELSE 'Partially Reserved' END,
+                        updated_at = ?
+                    WHERE id = ?
+                """, (sold_qty, sold_qty, now_str, sale['rescue_product_id']))
+
+            # 2. Decrement listings inventory and increment rescued_from_waste
+            if sale['listing_id']:
+                cursor.execute("""
+                    UPDATE listings
+                    SET quantity = MAX(0, quantity - ?),
+                        status = CASE WHEN quantity - ? <= 0 THEN 'Sold' ELSE 'Available' END,
+                        rescued_from_waste = rescued_from_waste + ?,
+                        updated_at = ?
+                    WHERE id = ?
+                """, (sold_qty, sold_qty, int(sold_qty), now_str, sale['listing_id']))
+
+            # 3. Update meeting status to Completed
+            if sale['meeting_id']:
+                cursor.execute("""
+                    UPDATE direct_meetings
+                    SET status = 'Completed', updated_at = ?
+                    WHERE id = ?
+                """, (now_str, sale['meeting_id']))
+
+            # 4. Record in activity log
+            cursor.execute("""
+                INSERT INTO activity_logs (action, details, user_email)
+                VALUES (?, ?, ?)
+            """, (
+                'DIRECT_SALE_COMPLETED',
+                f"Direct Meet & Sell #{sale['sale_code']} completed: {sold_qty} kg of {sale['product_name']} for ₹{sale['total_amount']}",
+                f"Farmer ID {sale['farmer_id']} & Buyer ID {sale['buyer_id']}"
+            ))
+
+        conn.commit()
+        conn.close()
+
+        if is_completed:
+            # 5. Notify both parties
+            buyer_msg = f"Direct Sale #{sale['sale_code']} complete! Receipt #{sale['receipt_number']} generated. Thank you for rescuing fresh farm produce!"
+            farmer_msg = f"Direct Sale #{sale['sale_code']} complete! Sold {sold_qty} kg for ₹{sale['total_amount']} via {sale['payment_method']}."
+            create_notification(sale['buyer_id'], "Direct Sale Completed 🎉", buyer_msg, notif_type='order', link=f"/direct-sale/{sale_id}/receipt")
+            create_notification(sale['farmer_id'], "Direct Sale Completed 🎉", farmer_msg, notif_type='order', link=f"/direct-sale/{sale_id}/receipt")
+
+        msg = "Direct sale completed and finalized! Receipt generated." if is_completed else "Your sale confirmation recorded. Waiting for counterpart."
+        return True, msg
+    except Exception as e:
+        return False, str(e)
+
+def get_direct_sale_by_id(sale_id):
+    """Retrieve full direct sale record for details and receipt view."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT ds.*, 
+                   f.name as farmer_name, f.phone as farmer_phone, f.email as farmer_email, f.location as farmer_address,
+                   b.name as buyer_name, b.phone as buyer_phone, b.email as buyer_email, b.location as buyer_address,
+                   dm.meeting_code, dm.proposed_time as meeting_time, dm.meeting_location as confirmed_location,
+                   rp.photo as product_photo, rp.quality_grade
+            FROM direct_sales ds
+            JOIN users f ON ds.farmer_id = f.id
+            JOIN users b ON ds.buyer_id = b.id
+            LEFT JOIN direct_meetings dm ON ds.meeting_id = dm.id
+            LEFT JOIN rescue_products rp ON ds.rescue_product_id = rp.id
+            WHERE ds.id = ?
+        """, (sale_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+    except Exception:
+        return None
+
+def get_direct_sales_for_user(user_id, role):
+    """Retrieve direct sales history for a buyer or farmer."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        col = "farmer_id" if role == 'farmer' else "buyer_id"
+        cursor.execute(f"""
+            SELECT ds.*, 
+                   f.name as farmer_name, f.phone as farmer_phone,
+                   b.name as buyer_name, b.phone as buyer_phone,
+                   rp.photo as product_photo
+            FROM direct_sales ds
+            JOIN users f ON ds.farmer_id = f.id
+            JOIN users b ON ds.buyer_id = b.id
+            LEFT JOIN rescue_products rp ON ds.rescue_product_id = rp.id
+            WHERE ds.{col} = ?
+            ORDER BY ds.created_at DESC, ds.id DESC
+        """, (user_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+def get_direct_chat_messages(user1_id, user2_id, meeting_id=None):
+    """Retrieve in-app chat messages between buyer and farmer."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        if meeting_id:
+            cursor.execute("""
+                SELECT cm.*, u.name as sender_name, u.role as sender_role
+                FROM chat_messages cm
+                JOIN users u ON cm.sender_id = u.id
+                WHERE ((cm.sender_id = ? AND cm.receiver_id = ?) OR (cm.sender_id = ? AND cm.receiver_id = ?))
+                  AND (cm.meeting_id = ? OR cm.meeting_id IS NULL)
+                ORDER BY cm.created_at ASC
+            """, (user1_id, user2_id, user2_id, user1_id, meeting_id))
+        else:
+            cursor.execute("""
+                SELECT cm.*, u.name as sender_name, u.role as sender_role
+                FROM chat_messages cm
+                JOIN users u ON cm.sender_id = u.id
+                WHERE ((cm.sender_id = ? AND cm.receiver_id = ?) OR (cm.sender_id = ? AND cm.receiver_id = ?))
+                ORDER BY cm.created_at ASC
+            """, (user1_id, user2_id, user2_id, user1_id))
+
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception:
+        return []
+
+def send_direct_chat_message(sender_id, receiver_id, message, meeting_id=None, listing_id=None):
+    """Send an in-app message between counterparties."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute("""
+            INSERT INTO chat_messages (
+                sender_id, receiver_id, message, meeting_id, listing_id, is_read, created_at
+            ) VALUES (?, ?, ?, ?, ?, 0, ?)
+        """, (sender_id, receiver_id, message, meeting_id, listing_id, now_str))
+        msg_id = cursor.lastrowid
+        conn.commit()
+
+        cursor.execute("SELECT name FROM users WHERE id = ?", (sender_id,))
+        sender = cursor.fetchone()
+        sender_name = sender['name'] if sender else 'User'
+        conn.close()
+
+        create_notification(
+            receiver_id,
+            f"New Message from {sender_name} 💬",
+            message[:100],
+            notif_type='info',
+            link=f"/meeting/{meeting_id}" if meeting_id else f"/direct-messages/{sender_id}"
+        )
+        return True, "Message sent", msg_id
+    except Exception as e:
+        return False, str(e), None
+
+
     init_db()
     seed_db()
     print("Database initialized and updated successfully.")

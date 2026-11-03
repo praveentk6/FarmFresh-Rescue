@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block title %}Price Negotiation - Meeting #{{ meeting.meeting_code }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 5rem; max-width: 650px;">
+
+  <div style="font-size: 0.88rem; color: #6b7280; margin-bottom: 1rem;">
+    <a href="{{ url_for('view_direct_meeting', meeting_id=meeting.id) }}" style="color: inherit; text-decoration: none;">Meeting #{{ meeting.meeting_code }}</a> &bull;
+    <span style="color: #111827; font-weight: 600;">Price Negotiation</span>
+  </div>
+
+  <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 2.25rem; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+    
+    <div style="border-bottom: 1px solid #f3f4f6; padding-bottom: 1.25rem; margin-bottom: 1.5rem;">
+      <span style="background: #ede9fe; color: #6d28d9; font-weight: 700; font-size: 0.8rem; padding: 0.25rem 0.65rem; border-radius: 20px;">
+        💬 FACE-TO-FACE NEGOTIATION
+      </span>
+      <h1 style="font-size: 1.85rem; font-weight: 800; color: #111827; margin: 0.5rem 0 0.25rem 0;">
+        Negotiate Price & Quantity
+      </h1>
+      <p style="color: #6b7280; font-size: 0.95rem; margin: 0;">
+        Agree on the final price per kg and verified quantity for {{ meeting.product_name }}.
+      </p>
+    </div>
+
+    <form action="{{ url_for('negotiate_meeting_price', meeting_id=meeting.id) }}" method="POST">
+      
+      <!-- Initial & Proposed Rates -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.88rem; color: #374151; margin-bottom: 0.35rem;">Farmer's Initial Price (₹/kg)</label>
+          <input type="number" step="0.5" name="farmer_initial_price" value="{{ meeting.negotiation.farmer_initial_price if meeting.negotiation else (meeting.original_rescue_price or 25) }}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px;">
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.88rem; color: #374151; margin-bottom: 0.35rem;">Buyer's Proposed Price (₹/kg)</label>
+          <input type="number" step="0.5" name="buyer_proposed_price" value="{{ meeting.negotiation.buyer_proposed_price if meeting.negotiation else (meeting.original_rescue_price or 25) }}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px;">
+        </div>
+      </div>
+
+      <!-- Final Agreed Price & Final Quantity -->
+      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 1.25rem; border-radius: 12px; margin-bottom: 1.25rem;">
+        <h4 style="font-size: 0.95rem; font-weight: 800; color: #166534; margin: 0 0 0.75rem 0;">Final Terms to Agree On:</h4>
+        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 0.75rem;">
+          <div>
+            <label style="display: block; font-weight: 700; font-size: 0.88rem; color: #166534; margin-bottom: 0.35rem;">Final Agreed Price (₹/kg) *</label>
+            <input type="number" step="0.5" id="finalPriceInput" name="final_agreed_price" required value="{{ meeting.negotiation.final_agreed_price if meeting.negotiation else (meeting.original_rescue_price or 25) }}" oninput="recalcTotal()" style="width: 100%; padding: 0.75rem; border: 1px solid #86efac; border-radius: 8px; font-weight: 700; font-size: 1.1rem; color: #166534;">
+          </div>
+
+          <div>
+            <label style="display: block; font-weight: 700; font-size: 0.88rem; color: #166534; margin-bottom: 0.35rem;">Final Agreed Quantity (kg) *</label>
+            <input type="number" step="0.5" id="finalQtyInput" name="final_quantity" required value="{{ meeting.negotiation.final_quantity if meeting.negotiation else meeting.required_quantity }}" oninput="recalcTotal()" style="width: 100%; padding: 0.75rem; border: 1px solid #86efac; border-radius: 8px; font-weight: 700; font-size: 1.1rem; color: #166534;">
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: baseline; padding-top: 0.5rem; border-top: 1px dashed #bbf7d0;">
+          <span style="font-weight: 700; color: #166534;">Calculated Total Sale Amount:</span>
+          <span style="font-size: 1.5rem; font-weight: 800; color: #15803d;" id="totalAmountText">₹0</span>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div style="margin-bottom: 2rem;">
+        <label style="display: block; font-weight: 700; font-size: 0.88rem; color: #374151; margin-bottom: 0.35rem;">Agreed Notes / Packaging Arrangement</label>
+        <textarea name="notes" rows="2" placeholder="e.g. Buyer provides own plastic crates; farmer assists with loading onto tempo..." style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px;">{{ meeting.negotiation.notes if meeting.negotiation else '' }}</textarea>
+      </div>
+
+      <!-- Buttons -->
+      <div style="display: flex; gap: 1rem;">
+        <button type="submit" class="btn btn-primary" style="flex: 2; padding: 0.85rem; font-size: 1rem; font-weight: 700; border-radius: 10px;">
+          Save Agreed Terms
+        </button>
+        <a href="{{ url_for('view_direct_meeting', meeting_id=meeting.id) }}" class="btn btn-secondary" style="flex: 1; padding: 0.85rem; font-size: 1rem; font-weight: 600; text-align: center; border-radius: 10px;">
+          Cancel
+        </a>
+      </div>
+
+    </form>
+  </div>
+
+</div>
+
+<script>
+function recalcTotal() {
+  var price = parseFloat(document.getElementById('finalPriceInput').value) || 0;
+  var qty = parseFloat(document.getElementById('finalQtyInput').value) || 0;
+  var total = (price * qty).toFixed(2);
+  document.getElementById('totalAmountText').innerText = '₹' + total;
+}
+window.onload = recalcTotal;
+</script>
+{% endblock %}

@@ -3,6 +3,7 @@ Comprehensive Test Suite for FarmFresh Rescue
 Real-Time Agricultural Marketplace & Full Razorpay Payment Gateway Integration
 """
 import unittest
+from unittest.mock import patch, MagicMock
 import json
 import os
 import hmac
@@ -102,8 +103,17 @@ class TestRealTimeAndPayment(unittest.TestCase):
         self.assertIn(b'Payment Breakdown', res.data)
         self.clear_session()
 
-    def test_05_online_payment_order_and_signature_verification(self):
+    @patch('razorpay_gateway.get_razorpay_client')
+    def test_05_online_payment_order_and_signature_verification(self, mock_client_getter):
         """Test Razorpay order creation and HMAC-SHA256 signature verification."""
+        mock_client = MagicMock()
+        mock_client.order.create.return_value = {
+            'id': 'order_test_mock_pay_999',
+            'amount': 42000,
+            'currency': 'INR'
+        }
+        mock_client_getter.return_value = mock_client
+
         self.set_buyer_session()
         db = get_db()
         listing = db.execute("SELECT id, price_per_unit FROM listings WHERE status = 'Available' LIMIT 1").fetchone()

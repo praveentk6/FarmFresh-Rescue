@@ -1,0 +1,179 @@
+{% extends "base.html" %}
+
+{% block title %}Publish Rescue Produce - Shared Marketplace{% endblock %}
+{% block meta_desc %}List your farm-fresh surplus produce directly in the shared rescue marketplace. Instant visibility to all buyers across Tamil Nadu.{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 5rem; max-width: 800px;">
+
+  <!-- Breadcrumb -->
+  <div style="font-size: 0.88rem; color: #6b7280; margin-bottom: 1rem;">
+    <a href="{{ url_for('farmer_dashboard') }}" style="color: inherit; text-decoration: none;">Farmer Dashboard</a> &bull;
+    <a href="{{ url_for('browse_rescue_products') }}" style="color: inherit; text-decoration: none;">Rescue Marketplace</a> &bull;
+    <span style="color: #111827; font-weight: 600;">Add Rescue Produce</span>
+  </div>
+
+  <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 2.5rem; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+    
+    <div style="border-bottom: 1px solid #f3f4f6; padding-bottom: 1.25rem; margin-bottom: 1.75rem;">
+      <span style="background: #ecfdf5; color: #16a34a; font-weight: 700; font-size: 0.8rem; padding: 0.25rem 0.65rem; border-radius: 20px;">
+        🌱 SHARED REAL-TIME MARKETPLACE
+      </span>
+      <h1 style="font-size: 1.85rem; font-weight: 800; color: #111827; margin: 0.5rem 0 0.25rem 0;">
+        Publish Rescue Produce
+      </h1>
+      <p style="color: #6b7280; font-size: 0.95rem; margin: 0;">
+        Your produce will immediately be visible to all verified buyers. Buyers can contact you, request direct meetings, and purchase face-to-face at your farm.
+      </p>
+    </div>
+
+    <form action="{{ url_for('add_rescue_product') }}" method="POST" enctype="multipart/form-data">
+      
+      <!-- Produce Name & Category -->
+      <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Produce Name *</label>
+          <input type="text" name="product_name" required placeholder="e.g. Country Tomatoes (Nattu Thakkali)" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Category *</label>
+          <select name="category" required style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+            <option value="Vegetables">Vegetables (காய்கறிகள்)</option>
+            <option value="Fruits">Fruits (பழங்கள்)</option>
+            <option value="Grains">Grains & Pulses (தானியங்கள்)</option>
+            <option value="Leafy Vegetables">Leafy Vegetables (கீரைகள்)</option>
+            <option value="Other Agricultural Products">Other Agricultural Products</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Quantity, Original Price, Rescue Price -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Available Quantity (kg) *</label>
+          <input type="number" id="qtyInput" name="quantity" required min="1" step="0.5" placeholder="e.g. 250" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Original Market Price (₹/kg) *</label>
+          <input type="number" id="origPriceInput" name="original_price" required min="1" step="0.5" placeholder="e.g. 35" oninput="calculateDiscount()" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Rescue Selling Price (₹/kg) *</label>
+          <input type="number" id="rescPriceInput" name="rescue_price" required min="1" step="0.5" placeholder="e.g. 22" oninput="calculateDiscount()" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+      </div>
+
+      <!-- Discount Calculation Preview -->
+      <div id="discountBanner" style="display: none; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; padding: 0.75rem 1rem; margin-bottom: 1.25rem; font-size: 0.9rem; color: #065f46;">
+        🔥 Buyers will see a <strong id="discountValue">0%</strong> rescue discount (Saving ₹<span id="savingsValue">0</span> per kg).
+      </div>
+
+      <!-- Quality Grade & Dates -->
+      <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Quality Grade *</label>
+          <select name="quality_grade" required style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+            <option value="Grade A">Grade A (Premium Fresh)</option>
+            <option value="Grade B">Grade B (Standard Market)</option>
+            <option value="Rescue Grade">Rescue Grade (Surplus / Imperfect)</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Harvest Date *</label>
+          <input type="date" name="harvest_date" required value="{{ default_date or '' }}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Best Before / Expiry</label>
+          <input type="date" name="expiry_date" placeholder="Optional" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+      </div>
+
+      <!-- Farm Location -->
+      <div style="display: grid; grid-template-columns: 1.2fr 1fr 0.8fr; gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Farm Location / Village *</label>
+          <input type="text" name="farm_location" required value="{{ current_user['location'] or '' }}" placeholder="Village, Landmark, Road" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">District *</label>
+          <select name="district" required style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+            {% for d in districts %}
+              <option value="{{ d }}" {% if current_user.get('district') == d or d == 'Coimbatore' %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">PIN Code</label>
+          <input type="text" name="pin_code" value="{{ current_user.get('pin_code') or '641001' }}" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+        </div>
+      </div>
+
+      <!-- WhatsApp Number -->
+      <div style="margin-bottom: 1.25rem;">
+        <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">WhatsApp Number for Direct Buyer Chats</label>
+        <input type="text" name="whatsapp_number" value="{{ current_user.get('phone') or '' }}" placeholder="10-digit mobile number" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;">
+      </div>
+
+      <!-- Photo Uploads -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.25rem;">
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Primary Produce Photo *</label>
+          <input type="file" name="photo" accept="image/*" style="width: 100%; padding: 0.5rem; border: 1px dashed #d1d5db; border-radius: 8px;">
+          <small style="color: #6b7280; font-size: 0.8rem;">Clear photo of the harvest (Max 3MB)</small>
+        </div>
+
+        <div>
+          <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Additional Inspection Photos</label>
+          <input type="file" name="additional_photos" multiple accept="image/*" style="width: 100%; padding: 0.5rem; border: 1px dashed #d1d5db; border-radius: 8px;">
+          <small style="color: #6b7280; font-size: 0.8rem;">Multiple crate / field images (Optional)</small>
+        </div>
+      </div>
+
+      <!-- Description -->
+      <div style="margin-bottom: 2rem;">
+        <label style="display: block; font-weight: 700; font-size: 0.9rem; color: #374151; margin-bottom: 0.35rem;">Harvest Freshness & Quality Description</label>
+        <textarea name="description" rows="3" placeholder="Describe produce ripeness, harvest timing, storage condition, and pickup accessibility..." style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.95rem;"></textarea>
+      </div>
+
+      <!-- Submit & Cancel -->
+      <div style="display: flex; gap: 1rem;">
+        <button type="submit" class="btn btn-primary" style="flex: 2; padding: 0.85rem; font-size: 1rem; font-weight: 700;">
+          Publish to Shared Rescue Marketplace
+        </button>
+        <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-secondary" style="flex: 1; padding: 0.85rem; font-size: 1rem; font-weight: 600; text-align: center;">
+          Cancel
+        </a>
+      </div>
+
+    </form>
+  </div>
+
+</div>
+
+<script>
+function calculateDiscount() {
+  var orig = parseFloat(document.getElementById('origPriceInput').value);
+  var resc = parseFloat(document.getElementById('rescPriceInput').value);
+  var banner = document.getElementById('discountBanner');
+  var discVal = document.getElementById('discountValue');
+  var savVal = document.getElementById('savingsValue');
+
+  if (orig && resc && orig > resc && orig > 0) {
+    var discount = Math.round(((orig - resc) / orig) * 100);
+    var savings = (orig - resc).toFixed(1);
+    discVal.innerText = discount + "%";
+    savVal.innerText = savings;
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+</script>
+{% endblock %}

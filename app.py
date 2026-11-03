@@ -11,6 +11,7 @@ import io
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from PIL import Image
+import urllib.parse
 
 from database import (
     get_db, init_db, seed_db, create_notification,
@@ -30,7 +31,15 @@ from database import (
     counter_farmer_offer, farmer_respond_counter_offer,
     update_order_harvest_and_quality, buyer_quality_decision,
     update_order_delivery_schedule, verify_order_handover,
-    build_11_stage_timeline
+    build_11_stage_timeline,
+    create_rescue_product, get_shared_rescue_products, get_rescue_product_by_id,
+    get_farmer_rescue_products, update_rescue_product, delete_rescue_product,
+    create_direct_meeting, get_meeting_by_id, get_buyer_meetings,
+    get_farmer_meetings, respond_direct_meeting, record_direct_inspection,
+    record_direct_negotiation, confirm_direct_negotiation_agreement,
+    initiate_or_update_direct_sale, confirm_direct_sale_step,
+    get_direct_sale_by_id, get_direct_sales_for_user,
+    get_direct_chat_messages, send_direct_chat_message
 )
 from razorpay_gateway import (
     create_razorpay_order, verify_razorpay_signature,
@@ -3373,7 +3382,10 @@ def farmer_dashboard():
         payments=farmer_payments,
         weather_alerts=farmer_weather_alerts[:3],
         paid_orders_revenue=paid_orders_revenue,
-        cod_pending_revenue=cod_pending_revenue
+        cod_pending_revenue=cod_pending_revenue,
+        farmer_rescue_products=get_farmer_rescue_products(farmer_id),
+        farmer_meetings=get_farmer_meetings(farmer_id),
+        farmer_direct_sales=get_direct_sales_for_user(farmer_id, 'farmer')
     )
 
 @app.route('/buyer/dashboard')
@@ -3494,7 +3506,10 @@ def buyer_dashboard():
         total_orders=total_orders,
         total_purchased_qty=total_purchased_qty,
         total_spending=total_spending,
-        buyer_rescued_kg=buyer_rescued_kg
+        buyer_rescued_kg=buyer_rescued_kg,
+        shared_rescue_products=get_shared_rescue_products()[:8],
+        buyer_meetings=get_buyer_meetings(g.user['id']),
+        buyer_direct_sales=get_direct_sales_for_user(g.user['id'], 'buyer')
     )
 
 @app.route('/admin/dashboard')
@@ -4381,6 +4396,607 @@ def api_update_order_status(order_id):
     )
 
     return jsonify({'success': True, 'message': f"Order status updated to {new_status}"})
+
+# ============================================================================
+# SHARED RESCUE PRODUCTS MARKETPLACE ROUTES
+# ============================================================================
+
+@app.route('/rescue-products')
+def browse_rescue_products():
+    """
+    Dedicated Shared Rescue Products Marketplace.
+    Shows active rescue produce uploaded by farmers, visible to BOTH Farmers and Buyers.
+    Supports search, category, location, price, quantity, and sorting.
+    """
+    category = request.args.get('category', 'All').strip()
+    district = request.args.get('district', 'All').strip()
+    quality = request.args.get('quality', 'All').strip()
+    min_price = request.args.get('min_price', '').strip()
+    max_price = request.args.get('max_price', '').strip()
+    min_qty = request.args.get('min_qty', '').strip()
+    search_q = request.args.get('q', '').strip()
+    sort_by = request.args.get('sort', 'recent').strip()
+
+    filters = {
+        'category': category,
+        'district': district,
+        'quality_grade': quality,
+        'min_price': min_price,
+        'max_price': max_price,
+        'min_qty': min_qty,
+        'search_q': search_q
+    }
+
+    products = get_shared_rescue_products(filters, sort_by=sort_by)
+
+    # Compute distance if user has location
+    if g.user and g.user.get('location'):
+        user_lat, user_lng, _ = get_coordinates_for_location(g.user['location'])
+        if user_lat and user_lng:
+            for p in products:
+                f_lat, f_lng, _ = get_coordinates_for_location(p['farm_location'], p['district'])
+                dist_info = calculate_haversine_distance(f_lat, f_lng, user_lat, user_lng)
+                p['distance_km'] = dist_info['distance_km']
+                p['transit_text'] = dist_info['transit_text']
+            if sort_by == 'nearest':
+                products.sort(key=lambda x: x.get('distance_km', 9999))
+
+    return render_template(
+        'rescue_products.html',
+        products=products,
+        filters=filters,
+        sort_by=sort_by,
+        districts=sorted(list(TN_DISTRICT_COORDINATES.keys()))
+    )
+
+@app.route('/rescue-product/<int:product_id>')
+def rescue_product_detail(product_id):
+    """Detailed view of a shared rescue product."""
+    product = get_rescue_product_by_id(product_id)
+    if not product:
+        flash("Rescue product not found or has expired.", "warning")
+        return redirect(url_for('browse_rescue_products'))
+
+    # Calculate distance if user is logged in
+    dist_info = None
+    if g.user and g.user.get('location'):
+        b_lat, b_lng, _ = get_coordinates_for_location(g.user['location'])
+        f_lat, f_lng, _ = get_coordinates_for_location(product['farm_location'], product['district'])
+        dist_info = calculate_haversine_distance(f_lat, f_lng, b_lat, b_lng)
+
+    return render_template(
+        'rescue_product_detail.html',
+        product=product,
+        dist_info=dist_info
+    )
+
+@app.route('/farmer/rescue-product/add', methods=['GET', 'POST'])
+@login_required
+@farmer_required
+def add_rescue_product():
+    """Farmer publishes a new rescue product into the shared marketplace."""
+    if request.method == 'POST':
+        product_name = request.form.get('product_name', '').strip()
+        category = request.form.get('category', 'Vegetables').strip()
+        quantity = request.form.get('quantity', '0').strip()
+        original_price = request.form.get('original_price', '0').strip()
+        rescue_price = request.form.get('rescue_price', '0').strip()
+        quality_grade = request.form.get('quality_grade', 'Grade A').strip()
+        harvest_date = request.form.get('harvest_date', datetime.now().strftime('%Y-%m-%d')).strip()
+        expiry_date = request.form.get('expiry_date', '').strip() or None
+        farm_location = request.form.get('farm_location', g.user.get('location') or 'Farmgate').strip()
+        district = request.form.get('district', g.user.get('district') or 'Coimbatore').strip()
+        pin_code = request.form.get('pin_code', g.user.get('pin_code') or '641001').strip()
+        description = request.form.get('description', '').strip()
+        whatsapp_number = request.form.get('whatsapp_number', g.user.get('phone') or '').strip()
+
+        # Handle primary photo & additional photos
+        photo_filename = None
+        if 'photo' in request.files:
+            file = request.files['photo']
+            if file and file.filename and allowed_file(file.filename):
+                fname = secure_filename(file.filename)
+                unique_name = f"rescue_{int(datetime.now().timestamp())}_{fname}"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
+                photo_filename = unique_name
+
+        additional_photos = []
+        if 'additional_photos' in request.files:
+            for extra_file in request.files.getlist('additional_photos'):
+                if extra_file and extra_file.filename and allowed_file(extra_file.filename):
+                    f_sec = secure_filename(extra_file.filename)
+                    u_sec = f"rescue_extra_{int(datetime.now().timestamp())}_{f_sec}"
+                    extra_file.save(os.path.join(app.config['UPLOAD_FOLDER'], u_sec))
+                    additional_photos.append(u_sec)
+
+        ok, msg, pid = create_rescue_product(
+            farmer_id=g.user['id'],
+            product_name=product_name,
+            category=category,
+            quantity=quantity,
+            original_price=original_price,
+            rescue_price=rescue_price,
+            harvest_date=harvest_date,
+            farm_location=farm_location,
+            district=district,
+            pin_code=pin_code,
+            description=description,
+            quality_grade=quality_grade,
+            expiry_date=expiry_date,
+            photo=photo_filename,
+            additional_photos=additional_photos,
+            whatsapp_number=whatsapp_number
+        )
+
+        if not ok:
+            flash(f"Failed to publish rescue product: {msg}", "danger")
+            return render_template('add_rescue_product.html', form_data=request.form, districts=sorted(list(TN_DISTRICT_COORDINATES.keys())))
+
+        flash("🌱 Rescue product published successfully! It is now visible to all buyers in real-time.", "success")
+        return redirect(url_for('rescue_product_detail', product_id=pid))
+
+    return render_template('add_rescue_product.html', districts=sorted(list(TN_DISTRICT_COORDINATES.keys())))
+
+@app.route('/farmer/rescue-product/edit/<int:product_id>', methods=['GET', 'POST'])
+@login_required
+@farmer_required
+def edit_rescue_product(product_id):
+    """Farmer edits their rescue product."""
+    product = get_rescue_product_by_id(product_id)
+    if not product or product['farmer_id'] != g.user['id']:
+        flash("Product not found or unauthorized.", "danger")
+        return redirect(url_for('farmer_dashboard') + '#rescueProductsSection')
+
+    if request.method == 'POST':
+        update_data = {
+            'product_name': request.form.get('product_name', product['product_name']).strip(),
+            'category': request.form.get('category', product['category']).strip(),
+            'quantity': request.form.get('quantity', product['quantity']).strip(),
+            'original_price': request.form.get('original_price', product['original_price']).strip(),
+            'rescue_price': request.form.get('rescue_price', product['rescue_price']).strip(),
+            'quality_grade': request.form.get('quality_grade', product['quality_grade']).strip(),
+            'harvest_date': request.form.get('harvest_date', product['harvest_date']).strip(),
+            'expiry_date': request.form.get('expiry_date', product['expiry_date']).strip() or None,
+            'farm_location': request.form.get('farm_location', product['farm_location']).strip(),
+            'district': request.form.get('district', product['district']).strip(),
+            'description': request.form.get('description', product['description']).strip(),
+            'status': request.form.get('status', product['status']).strip()
+        }
+
+        if 'photo' in request.files:
+            file = request.files['photo']
+            if file and file.filename and allowed_file(file.filename):
+                fname = secure_filename(file.filename)
+                unique_name = f"rescue_{int(datetime.now().timestamp())}_{fname}"
+                file.save(os.path.join(app.config['UPLOAD_FOLDER'], unique_name))
+                update_data['photo'] = unique_name
+
+        ok, msg = update_rescue_product(product_id, g.user['id'], update_data)
+        if not ok:
+            flash(f"Update failed: {msg}", "danger")
+        else:
+            flash("✅ Rescue product updated successfully!", "success")
+        return redirect(url_for('rescue_product_detail', product_id=product_id))
+
+    return render_template('edit_rescue_product.html', product=product, districts=sorted(list(TN_DISTRICT_COORDINATES.keys())))
+
+@app.route('/farmer/rescue-product/delete/<int:product_id>', methods=['POST'])
+@login_required
+@farmer_required
+def remove_rescue_product(product_id):
+    """Farmer removes product from active marketplace."""
+    ok, msg = delete_rescue_product(product_id, g.user['id'])
+    if ok:
+        flash("Product removed from marketplace.", "info")
+    else:
+        flash(f"Could not remove product: {msg}", "danger")
+    return redirect(url_for('farmer_dashboard') + '#rescueProductsSection')
+
+# ============================================================================
+# DIRECT MEET & SELL WORKFLOW ROUTES
+# ============================================================================
+
+@app.route('/find-sellers')
+def find_sellers():
+    """
+    Section 1: Find Sellers (Buyer View).
+    Displays verified farmers and direct farmgate produce available for in-person inspection and pickup.
+    """
+    category = request.args.get('category', 'All').strip()
+    district = request.args.get('district', 'All').strip()
+    search_q = request.args.get('q', '').strip()
+    sort_by = request.args.get('sort', 'recent').strip()
+
+    filters = {'category': category, 'district': district, 'search_q': search_q}
+    products = get_shared_rescue_products(filters, sort_by=sort_by)
+
+    # Compute distance for logged in buyer
+    if g.user and g.user.get('location'):
+        b_lat, b_lng, _ = get_coordinates_for_location(g.user['location'])
+        if b_lat and b_lng:
+            for p in products:
+                f_lat, f_lng, _ = get_coordinates_for_location(p['farm_location'], p['district'])
+                dist_info = calculate_haversine_distance(f_lat, f_lng, b_lat, b_lng)
+                p['distance_km'] = dist_info['distance_km']
+                p['transit_text'] = dist_info['transit_text']
+            if sort_by == 'nearest':
+                products.sort(key=lambda x: x.get('distance_km', 9999))
+
+    return render_template(
+        'find_sellers.html',
+        products=products,
+        filters=filters,
+        districts=sorted(list(TN_DISTRICT_COORDINATES.keys()))
+    )
+
+@app.route('/meetings/schedule/<int:product_id>', methods=['GET', 'POST'])
+@login_required
+def schedule_direct_meeting(product_id):
+    """
+    Section 3: Schedule Direct Meeting.
+    Buyer proposes date, time, location, and quantity to inspect & buy face-to-face.
+    """
+    product = get_rescue_product_by_id(product_id)
+    if not product:
+        flash("Produce item not found.", "danger")
+        return redirect(url_for('browse_rescue_products'))
+
+    if g.user['role'] == 'farmer' and product['farmer_id'] == g.user['id']:
+        flash("You cannot schedule a meeting with your own product.", "warning")
+        return redirect(url_for('rescue_product_detail', product_id=product_id))
+
+    if request.method == 'POST':
+        required_qty = request.form.get('required_quantity', product['quantity'])
+        proposed_date = request.form.get('proposed_date')
+        proposed_time = request.form.get('proposed_time', '10:00 AM')
+        meeting_location = request.form.get('meeting_location', product['farm_location'])
+        buyer_notes = request.form.get('buyer_notes', '')
+
+        ok, msg, mtg = create_direct_meeting(
+            buyer_id=g.user['id'],
+            product_id=product_id,
+            required_quantity=required_qty,
+            proposed_date=proposed_date,
+            proposed_time=proposed_time,
+            meeting_location=meeting_location,
+            buyer_notes=buyer_notes
+        )
+
+        if not ok:
+            flash(f"Could not schedule meeting: {msg}", "danger")
+            return render_template('schedule_meeting.html', product=product, form_data=request.form)
+
+        flash(f"🤝 Meeting request #{mtg['meeting_code']} sent to Farmer {mtg['farmer_name']}! You will be notified when accepted.", "success")
+        return redirect(url_for('view_direct_meeting', meeting_id=mtg['id']))
+
+    # Default to tomorrow 10:00 AM
+    tomorrow_str = (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+    return render_template('schedule_meeting.html', product=product, default_date=tomorrow_str)
+
+@app.route('/meetings')
+@login_required
+def list_direct_meetings():
+    """
+    Section 4: Meeting Management.
+    Buyer Dashboard -> My Meetings / Farmer Dashboard -> Incoming & Upcoming Meetings.
+    """
+    status_filter = request.args.get('status', 'all').strip()
+    role = g.user['role']
+    if role == 'farmer':
+        meetings = get_farmer_meetings(g.user['id'], status_filter=status_filter)
+    else:
+        meetings = get_buyer_meetings(g.user['id'], status_filter=status_filter)
+
+    return render_template('meetings_list.html', meetings=meetings, current_filter=status_filter, role=role)
+
+@app.route('/meeting/<int:meeting_id>')
+@login_required
+def view_direct_meeting(meeting_id):
+    """
+    Complete meeting dashboard with Inspection, Negotiation, Direct Sale, and In-App Messaging.
+    """
+    meeting = get_meeting_by_id(meeting_id)
+    if not meeting:
+        flash("Meeting record not found.", "danger")
+        return redirect(url_for('list_direct_meetings'))
+
+    is_farmer = (meeting['farmer_id'] == g.user['id'])
+    is_buyer = (meeting['buyer_id'] == g.user['id'])
+    is_admin = (g.user['role'] == 'admin')
+    if not (is_farmer or is_buyer or is_admin):
+        flash("Unauthorized to access this meeting.", "danger")
+        return redirect(url_for('index'))
+
+    # Fetch chat messages for this meeting
+    counterpart_id = meeting['farmer_id'] if is_buyer else meeting['buyer_id']
+    messages = get_direct_chat_messages(g.user['id'], counterpart_id, meeting_id=meeting_id)
+
+    return render_template(
+        'meeting_detail.html',
+        meeting=meeting,
+        is_farmer=is_farmer,
+        is_buyer=is_buyer,
+        is_admin=is_admin,
+        messages=messages
+    )
+
+@app.route('/api/meeting/<int:meeting_id>/respond', methods=['POST'])
+@login_required
+def api_respond_meeting(meeting_id):
+    """Farmer accepts, rejects, or reschedules meeting request."""
+    data = request.get_json(silent=True) or request.form
+    action = data.get('action')
+    notes = data.get('notes')
+    reschedule_data = {
+        'date': data.get('proposed_date'),
+        'time': data.get('proposed_time'),
+        'location': data.get('meeting_location')
+    }
+
+    ok, msg = respond_direct_meeting(
+        meeting_id=meeting_id,
+        user_id=g.user['id'],
+        action=action,
+        reschedule_data=reschedule_data,
+        notes=notes
+    )
+
+    if request.is_json:
+        return jsonify({'success': ok, 'message': msg}), (200 if ok else 400)
+
+    if ok:
+        flash(f"Meeting status updated: {msg}", "success")
+    else:
+        flash(f"Action failed: {msg}", "danger")
+    return redirect(url_for('view_direct_meeting', meeting_id=meeting_id))
+
+@app.route('/meeting/<int:meeting_id>/inspect', methods=['GET', 'POST'])
+@login_required
+def inspect_product_meeting(meeting_id):
+    """
+    Section 5: Direct Product Inspection.
+    Buyer records physical produce quality, actual weight, and condition at farmgate.
+    """
+    meeting = get_meeting_by_id(meeting_id)
+    if not meeting:
+        flash("Meeting not found.", "danger")
+        return redirect(url_for('list_direct_meetings'))
+
+    if request.method == 'POST':
+        freshness = request.form.get('product_freshness', 'Good / Fresh')
+        quality = request.form.get('product_quality', 'Grade A')
+        actual_weight = request.form.get('actual_weight', meeting['required_quantity'])
+        available_qty = request.form.get('available_quantity', meeting['current_stock_qty'] or meeting['required_quantity'])
+        packaging = request.form.get('packaging_condition', 'Intact crates / boxes')
+        status = request.form.get('status', 'Approved')
+        buyer_notes = request.form.get('buyer_notes', '')
+        farmer_notes = request.form.get('farmer_notes', '')
+
+        ok, msg = record_direct_inspection(
+            meeting_id=meeting_id,
+            inspector_id=g.user['id'],
+            freshness=freshness,
+            quality=quality,
+            actual_weight=actual_weight,
+            available_qty=available_qty,
+            packaging=packaging,
+            status=status,
+            buyer_notes=buyer_notes,
+            farmer_notes=farmer_notes
+        )
+
+        if not ok:
+            flash(f"Failed to record inspection: {msg}", "danger")
+        else:
+            flash("🔍 Product inspection recorded successfully!", "success")
+        return redirect(url_for('view_direct_meeting', meeting_id=meeting_id))
+
+    return render_template('inspect_meeting.html', meeting=meeting)
+
+@app.route('/meeting/<int:meeting_id>/negotiate', methods=['GET', 'POST'])
+@login_required
+def negotiate_meeting_price(meeting_id):
+    """
+    Section 6: Direct Price Negotiation.
+    Counterparties propose and agree on final price per kg and quantity.
+    """
+    meeting = get_meeting_by_id(meeting_id)
+    if not meeting:
+        flash("Meeting not found.", "danger")
+        return redirect(url_for('list_direct_meetings'))
+
+    if request.method == 'POST':
+        farmer_initial = request.form.get('farmer_initial_price', meeting['original_rescue_price'] or 25.0)
+        buyer_proposed = request.form.get('buyer_proposed_price', meeting['original_rescue_price'] or 25.0)
+        counter_price = request.form.get('counter_price')
+        final_price = request.form.get('final_agreed_price')
+        final_qty = request.form.get('final_quantity', meeting['required_quantity'])
+        notes = request.form.get('notes', '')
+
+        ok, msg = record_direct_negotiation(
+            meeting_id=meeting_id,
+            user_id=g.user['id'],
+            role=g.user['role'],
+            farmer_initial_price=farmer_initial,
+            buyer_proposed_price=buyer_proposed,
+            counter_price=counter_price,
+            counter_by=g.user['role'].capitalize(),
+            final_agreed_price=final_price,
+            final_quantity=final_qty,
+            notes=notes
+        )
+
+        if not ok:
+            flash(f"Negotiation update failed: {msg}", "danger")
+        else:
+            flash("💬 Price negotiation terms updated!", "success")
+        return redirect(url_for('view_direct_meeting', meeting_id=meeting_id))
+
+    return render_template('negotiate_meeting.html', meeting=meeting)
+
+@app.route('/api/meeting/<int:meeting_id>/confirm-negotiation', methods=['POST'])
+@login_required
+def api_confirm_negotiation(meeting_id):
+    """Confirm agreement to negotiated terms."""
+    ok, msg = confirm_direct_negotiation_agreement(meeting_id, g.user['id'], g.user['role'])
+    if request.is_json:
+        return jsonify({'success': ok, 'message': msg}), (200 if ok else 400)
+    flash("✅ Agreement confirmed!", "success")
+    return redirect(url_for('view_direct_meeting', meeting_id=meeting_id))
+
+@app.route('/direct-sale/confirm/<int:meeting_id>', methods=['GET', 'POST'])
+@login_required
+def direct_sale_confirmation(meeting_id):
+    """
+    Section 7 & 8: Direct Sale Confirmation & Payment Recording.
+    Records payment method (Cash, UPI, Bank Transfer) and independent confirmation.
+    """
+    meeting = get_meeting_by_id(meeting_id)
+    if not meeting:
+        flash("Meeting not found.", "danger")
+        return redirect(url_for('list_direct_meetings'))
+
+    if request.method == 'POST':
+        payment_method = request.form.get('payment_method', 'Cash')
+        payment_reference = request.form.get('payment_reference', '')
+        payment_notes = request.form.get('payment_notes', '')
+
+        ok, msg, sale_id = initiate_or_update_direct_sale(
+            meeting_id=meeting_id,
+            user_id=g.user['id'],
+            role=g.user['role'],
+            payment_method=payment_method,
+            payment_reference=payment_reference,
+            payment_notes=payment_notes
+        )
+
+        if not ok:
+            flash(f"Sale recording failed: {msg}", "danger")
+            return redirect(url_for('view_direct_meeting', meeting_id=meeting_id))
+
+        flash("🧾 Direct sale terms recorded! Waiting for both parties to confirm completion.", "success")
+        return redirect(url_for('view_direct_meeting', meeting_id=meeting_id))
+
+    return render_template('direct_sale_confirm.html', meeting=meeting)
+
+@app.route('/api/direct-sale/<int:sale_id>/confirm', methods=['POST'])
+@login_required
+def api_confirm_direct_sale(sale_id):
+    """Confirm direct sale and finalize inventory reduction upon dual confirmation."""
+    data = request.get_json(silent=True) or request.form
+    payment_verified = (data.get('payment_verified') in ['1', True, 'true'])
+    notes = data.get('notes')
+
+    ok, msg = confirm_direct_sale_step(
+        sale_id=sale_id,
+        user_id=g.user['id'],
+        role=g.user['role'],
+        payment_verified=payment_verified,
+        notes=notes
+    )
+
+    if request.is_json:
+        return jsonify({'success': ok, 'message': msg}), (200 if ok else 400)
+
+    if ok:
+        flash(f"Sale confirmation: {msg}", "success")
+    else:
+        flash(f"Confirmation failed: {msg}", "danger")
+
+    sale = get_direct_sale_by_id(sale_id)
+    if sale and sale['status'] == 'Completed':
+        return redirect(url_for('view_direct_sale_receipt', sale_id=sale_id))
+    return redirect(request.referrer or url_for('list_direct_meetings'))
+
+@app.route('/direct-sale/<int:sale_id>/receipt')
+@login_required
+def view_direct_sale_receipt(sale_id):
+    """
+    Section 9: Direct Sale Receipt Generation.
+    Clean, verifiable sale receipt with unique Receipt No, counterparty badges, and payment evidence.
+    """
+    sale = get_direct_sale_by_id(sale_id)
+    if not sale:
+        flash("Sale receipt not found.", "danger")
+        return redirect(url_for('list_direct_meetings'))
+
+    is_farmer = (sale['farmer_id'] == g.user['id'])
+    is_buyer = (sale['buyer_id'] == g.user['id'])
+    is_admin = (g.user['role'] == 'admin')
+    if not (is_farmer or is_buyer or is_admin):
+        flash("Unauthorized to access this sale receipt.", "danger")
+        return redirect(url_for('index'))
+
+    return render_template('direct_sale_receipt.html', sale=sale)
+
+@app.route('/direct-messages/<int:other_user_id>', methods=['GET', 'POST'])
+@login_required
+def direct_messages_view(other_user_id):
+    """
+    Section 2: Direct Contact / In-App Messaging.
+    Allows farmers and buyers to chat directly regarding quantity, price, and meeting details.
+    """
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name, role, phone, email, location FROM users WHERE id = ?", (other_user_id,))
+    other_user = cursor.fetchone()
+    conn.close()
+
+    if not other_user:
+        flash("User not found.", "warning")
+        return redirect(url_for('index'))
+
+    meeting_id = request.args.get('meeting_id')
+
+    if request.method == 'POST':
+        message_text = request.form.get('message', '').strip()
+        if message_text:
+            send_direct_chat_message(
+                sender_id=g.user['id'],
+                receiver_id=other_user_id,
+                message=message_text,
+                meeting_id=meeting_id
+            )
+        return redirect(url_for('direct_messages_view', other_user_id=other_user_id, meeting_id=meeting_id))
+
+    messages = get_direct_chat_messages(g.user['id'], other_user_id, meeting_id=meeting_id)
+
+    # Format WhatsApp URL with prefilled text
+    wa_phone = other_user['phone'] or ''
+    clean_phone = ''.join(c for c in wa_phone if c.isdigit())
+    if len(clean_phone) == 10:
+        clean_phone = f"91{clean_phone}"
+    wa_msg = f"Hello {other_user['name']}, I am contacting you via FarmFresh Rescue regarding agricultural produce."
+    wa_url = f"https://wa.me/{clean_phone}?text={urllib.parse.quote(wa_msg)}" if clean_phone else None
+
+    return render_template(
+        'direct_messages.html',
+        other_user=dict(other_user),
+        messages=messages,
+        wa_url=wa_url,
+        meeting_id=meeting_id
+    )
+
+@app.route('/api/direct-messages/<int:other_user_id>', methods=['GET', 'POST'])
+@login_required
+def api_direct_messages(other_user_id):
+    """JSON API for real-time messaging."""
+    meeting_id = request.args.get('meeting_id')
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or request.form
+        msg_text = (data.get('message') or '').strip()
+        if not msg_text:
+            return jsonify({'success': False, 'message': 'Message is required'}), 400
+        ok, msg, mid = send_direct_chat_message(
+            sender_id=g.user['id'],
+            receiver_id=other_user_id,
+            message=msg_text,
+            meeting_id=meeting_id
+        )
+        return jsonify({'success': ok, 'message_id': mid})
+
+    messages = get_direct_chat_messages(g.user['id'], other_user_id, meeting_id=meeting_id)
+    return jsonify({'success': True, 'messages': messages})
 
 # ==========================================
 # Error Handlers

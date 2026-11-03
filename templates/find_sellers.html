@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+
+{% block title %}Find In-Person Sellers - Direct Meet & Sell{% endblock %}
+{% block meta_desc %}Find local farmers across Tamil Nadu for direct face-to-face agricultural produce inspection, price negotiation, and farmgate purchase.{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 5rem;">
+
+  <!-- Header Banner -->
+  <div style="background: linear-gradient(135deg, #065f46 0%, #047857 100%); color: white; padding: 2.25rem 2rem; border-radius: 16px; margin-bottom: 2rem; box-shadow: 0 10px 25px rgba(6, 95, 70, 0.15);">
+    <div style="max-width: 750px;">
+      <span style="display: inline-block; background: rgba(255,255,255,0.2); padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.82rem; font-weight: 700; margin-bottom: 0.6rem;">
+        🤝 DIRECT MEET & SELL MODULE
+      </span>
+      <h1 style="font-size: 2.2rem; font-weight: 800; margin: 0 0 0.5rem 0; color: #ffffff;">Find Direct Sellers & Farms</h1>
+      <p style="margin: 0; font-size: 1.05rem; opacity: 0.95; line-height: 1.5;">
+        Meet farmers in person, inspect produce on-site, negotiate prices directly, and complete transactions without middlemen or mandatory platform delivery.
+      </p>
+    </div>
+  </div>
+
+  <!-- Search & Filter Bar -->
+  <div style="background: #ffffff; border-radius: 14px; padding: 1.25rem 1.5rem; border: 1px solid #e5e7eb; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 2rem;">
+    <form action="{{ url_for('find_sellers') }}" method="GET" style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: flex-end;">
+      <div style="flex: 2; min-width: 220px;">
+        <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #4b5563; margin-bottom: 0.3rem;">Search Farmer / Produce / Village</label>
+        <input type="text" name="q" value="{{ filters.get('search_q', '') }}" placeholder="Tomato, Muthuvel, Pollachi..." style="width: 100%; padding: 0.65rem 0.8rem; border: 1px solid #d1d5db; border-radius: 8px;">
+      </div>
+
+      <div style="flex: 1; min-width: 160px;">
+        <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #4b5563; margin-bottom: 0.3rem;">District</label>
+        <select name="district" style="width: 100%; padding: 0.65rem 0.8rem; border: 1px solid #d1d5db; border-radius: 8px;">
+          <option value="All">All Tamil Nadu</option>
+          {% for d in districts %}
+            <option value="{{ d }}" {% if filters.get('district') == d %}selected{% endif %}>{{ d }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div style="flex: 1; min-width: 160px;">
+        <label style="display: block; font-size: 0.8rem; font-weight: 700; color: #4b5563; margin-bottom: 0.3rem;">Sort</label>
+        <select name="sort" style="width: 100%; padding: 0.65rem 0.8rem; border: 1px solid #d1d5db; border-radius: 8px;">
+          <option value="recent">Recently Added</option>
+          <option value="lowest_price">Lowest Price</option>
+          <option value="highest_qty">Highest Quantity</option>
+          <option value="nearest">Nearest to Me</option>
+        </select>
+      </div>
+
+      <div style="display: flex; gap: 0.5rem;">
+        <button type="submit" class="btn btn-primary" style="padding: 0.65rem 1.25rem; font-weight: 700;">Find Sellers</button>
+        <a href="{{ url_for('find_sellers') }}" class="btn btn-secondary" style="padding: 0.65rem 1rem;">Reset</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Sellers & Available Produce Grid -->
+  <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.25rem;">
+    <h2 style="font-size: 1.2rem; font-weight: 800; color: #111827; margin: 0;">
+      Verified Farmers Ready for In-Person Visit ({{ products|length }})
+    </h2>
+    <span style="font-size: 0.85rem; color: #047857; font-weight: 600;">
+      ✓ Direct farmgate transactions supported
+    </span>
+  </div>
+
+  {% if products %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1.5rem;">
+      {% for item in products %}
+        <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.03); display: flex; flex-direction: column;">
+          
+          <div style="display: flex; padding: 1.25rem; gap: 1rem; border-bottom: 1px solid #f3f4f6;">
+            <!-- Thumbnail -->
+            <div style="width: 90px; height: 90px; border-radius: 12px; background: #f3f4f6; overflow: hidden; flex-shrink: 0;">
+              {% if item.photo %}
+                <img src="{{ url_for('static', filename='uploads/' ~ item.photo) }}" alt="{{ item.product_name }}" style="width: 100%; height: 100%; object-fit: cover;">
+              {% else %}
+                <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 2rem;">🌾</div>
+              {% endif %}
+            </div>
+
+            <!-- Farmer & Product Summary -->
+            <div style="flex: 1;">
+              <div style="font-size: 0.8rem; font-weight: 700; color: #16a34a; text-transform: uppercase;">{{ item.category }}</div>
+              <h3 style="font-size: 1.15rem; font-weight: 800; color: #111827; margin: 0 0 0.25rem 0;">{{ item.product_name }}</h3>
+              <div style="font-size: 0.9rem; font-weight: 700; color: #374151;">👨‍🌾 {{ item.farmer_name }}</div>
+              <div style="font-size: 0.82rem; color: #6b7280;">📍 {{ item.farm_location }}, {{ item.district }}</div>
+            </div>
+          </div>
+
+          <!-- Specs & Distance -->
+          <div style="padding: 1rem 1.25rem; background: #f9fafb; font-size: 0.88rem; flex: 1;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <div>
+                <span style="color: #6b7280; font-size: 0.78rem;">AVAILABLE QTY:</span>
+                <div style="font-weight: 800; color: #111827;">{{ item.quantity }} {{ item.unit }}</div>
+              </div>
+              <div>
+                <span style="color: #6b7280; font-size: 0.78rem;">EXPECTED PRICE:</span>
+                <div style="font-weight: 800; color: #16a34a; font-size: 1.1rem;">₹{{ item.rescue_price }} <span style="font-size: 0.75rem; color: #6b7280;">/ kg</span></div>
+              </div>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.82rem; border-top: 1px solid #f3f4f6; padding-top: 0.5rem;">
+              <span style="background: #e0f2fe; color: #0369a1; padding: 0.2rem 0.5rem; border-radius: 6px; font-weight: 700;">
+                Quality: {{ item.quality_grade }}
+              </span>
+
+              {% if item.distance_km %}
+                <span style="color: #0284c7; font-weight: 700;">
+                  🚗 {{ item.distance_km }} km away
+                </span>
+              {% else %}
+                <span style="color: #9ca3af;">Farmgate Location</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <!-- Action Buttons -->
+          <div style="padding: 1rem 1.25rem; display: grid; grid-template-columns: 1fr 1.2fr; gap: 0.75rem; background: #ffffff;">
+            <!-- Contact Farmer -->
+            <button onclick="openContactModal('{{ item.farmer_name }}', '{{ item.farmer_phone }}', '{{ item.whatsapp_number or item.farmer_phone }}', '{{ item.product_name }}', '{{ item.farmer_id }}')" class="btn" style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; font-weight: 700; font-size: 0.88rem; padding: 0.6rem; border-radius: 8px;">
+              📞 Contact Farmer
+            </button>
+
+            <!-- Schedule Direct Meeting -->
+            <a href="{{ url_for('schedule_direct_meeting', product_id=item.id) }}" class="btn btn-primary" style="font-weight: 700; font-size: 0.88rem; padding: 0.6rem; border-radius: 8px; text-align: center;">
+              🤝 Schedule Meeting
+            </a>
+          </div>
+
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div style="text-align: center; padding: 4rem 1.5rem; background: #ffffff; border-radius: 16px; border: 1px dashed #d1d5db;">
+      <div style="font-size: 3rem; margin-bottom: 0.75rem;">👨‍🌾</div>
+      <h3 style="font-size: 1.25rem; font-weight: 800; color: #111827;">No Farmers Found</h3>
+      <p style="color: #6b7280;">No farmers currently match your search criteria. Try a different crop name or district.</p>
+    </div>
+  {% endif %}
+
+</div>
+
+<!-- Contact Modal -->
+<div id="contactFarmerModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; align-items: center; justify-content: center;">
+  <div style="background: #ffffff; border-radius: 16px; padding: 2rem; max-width: 440px; width: 90%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2);">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+      <h3 style="font-size: 1.2rem; font-weight: 800; margin: 0; color: #111827;">Farmer Direct Contact</h3>
+      <button onclick="closeContactModal()" style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #6b7280;">&times;</button>
+    </div>
+    <div style="text-align: center; margin-bottom: 1.25rem;">
+      <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">👨‍🌾</div>
+      <h4 id="modalFarmerName" style="font-size: 1.15rem; font-weight: 800; margin: 0 0 0.25rem 0;">Farmer</h4>
+      <p id="modalProductName" style="font-size: 0.88rem; color: #6b7280; margin: 0;">Product</p>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.25rem;">
+      <a id="modalCallBtn" href="tel:" class="btn" style="background: #16a34a; color: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 10px; font-weight: 700; text-decoration: none;">
+        📞 Call Farmer Directly
+      </a>
+      <a id="modalWhatsAppBtn" href="#" target="_blank" class="btn" style="background: #25d366; color: white; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 10px; font-weight: 700; text-decoration: none;">
+        💬 Chat on WhatsApp
+      </a>
+      <a id="modalInAppBtn" href="#" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.75rem; border-radius: 10px; font-weight: 700; text-decoration: none;">
+        ✉️ In-App Messaging
+      </a>
+    </div>
+
+    <button onclick="closeContactModal()" class="btn" style="width: 100%; background: #f3f4f6; color: #4b5563; font-weight: 600; padding: 0.6rem; border-radius: 8px; border: none; cursor: pointer;">
+      Close
+    </button>
+  </div>
+</div>
+
+<script>
+function openContactModal(farmerName, phone, waPhone, productName, farmerId) {
+  document.getElementById('modalFarmerName').innerText = farmerName;
+  document.getElementById('modalProductName').innerText = "Regarding: " + productName;
+  document.getElementById('modalCallBtn').href = "tel:" + phone;
+  var cleanNum = (waPhone || phone || '').replace(/[^0-9]/g, '');
+  if (cleanNum.length === 10) cleanNum = "91" + cleanNum;
+  var waText = encodeURIComponent("Hello " + farmerName + ", I found your " + productName + " on FarmFresh Rescue and would like to inspect and purchase directly.");
+  document.getElementById('modalWhatsAppBtn').href = "https://wa.me/" + cleanNum + "?text=" + waText;
+  document.getElementById('modalInAppBtn').href = "/direct-messages/" + farmerId;
+  document.getElementById('contactFarmerModal').style.display = 'flex';
+}
+function closeContactModal() {
+  document.getElementById('contactFarmerModal').style.display = 'none';
+}
+</script>
+{% endblock %}

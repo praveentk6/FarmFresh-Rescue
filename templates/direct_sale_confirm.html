@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Direct Sale - Meeting #{{ meeting.meeting_code }}{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 5rem; max-width: 720px;">
+
+  <div style="font-size: 0.88rem; color: #6b7280; margin-bottom: 1rem;">
+    <a href="{{ url_for('view_direct_meeting', meeting_id=meeting.id) }}" style="color: inherit; text-decoration: none;">Meeting #{{ meeting.meeting_code }}</a> &bull;
+    <span style="color: #111827; font-weight: 600;">Confirm Direct Sale</span>
+  </div>
+
+  <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 2.25rem; box-shadow: 0 4px 20px rgba(0,0,0,0.05);">
+    
+    <div style="border-bottom: 1px solid #f3f4f6; padding-bottom: 1.25rem; margin-bottom: 1.5rem;">
+      <span style="background: #ecfdf5; color: #16a34a; font-weight: 700; font-size: 0.8rem; padding: 0.25rem 0.65rem; border-radius: 20px;">
+        🧾 DIRECT TRANSACTION CONFIRMATION
+      </span>
+      <h1 style="font-size: 1.85rem; font-weight: 800; color: #111827; margin: 0.5rem 0 0.25rem 0;">
+        Direct Sale Confirmation & Payment
+      </h1>
+      <p style="color: #6b7280; font-size: 0.95rem; margin: 0;">
+        Review finalized farmgate sale details and record payment method (Cash, UPI, or Bank Transfer). Both parties confirm independently.
+      </p>
+    </div>
+
+    <!-- Sale Specs Summary Card -->
+    {% set agreed_price = (meeting.negotiation.final_agreed_price if meeting.negotiation and meeting.negotiation.final_agreed_price else (meeting.original_rescue_price or 25.0))|float %}
+    {% set agreed_qty = (meeting.negotiation.final_quantity if meeting.negotiation and meeting.negotiation.final_quantity else meeting.required_quantity)|float %}
+    {% set total_val = (agreed_price * agreed_qty)|round(2) %}
+
+    <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.75rem;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid #e5e7eb; padding-bottom: 1rem; margin-bottom: 1rem;">
+        <div>
+          <span style="font-size: 0.78rem; color: #6b7280; font-weight: 700; text-transform: uppercase;">PRODUCT</span>
+          <h3 style="font-size: 1.35rem; font-weight: 800; color: #111827; margin: 0.2rem 0 0 0;">{{ meeting.product_name }}</h3>
+        </div>
+        <div style="text-align: right;">
+          <span style="font-size: 0.78rem; color: #6b7280; font-weight: 700; text-transform: uppercase;">TOTAL VALUE</span>
+          <div style="font-size: 1.6rem; font-weight: 800; color: #16a34a;">₹{{ total_val }}</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; font-size: 0.9rem; margin-bottom: 0.75rem;">
+        <div>👨‍🌾 <strong>Farmer:</strong> {{ meeting.farmer_name }} (📞 {{ meeting.farmer_phone }})</div>
+        <div>🏢 <strong>Buyer:</strong> {{ meeting.buyer_name }} (📞 {{ meeting.buyer_phone }})</div>
+        <div>📦 <strong>Final Quantity:</strong> {{ agreed_qty }} kg</div>
+        <div>💰 <strong>Agreed Price:</strong> ₹{{ agreed_price }} / kg</div>
+        <div>📍 <strong>Sale Location:</strong> {{ meeting.meeting_location }}</div>
+        <div>📅 <strong>Meeting Date:</strong> {{ meeting.proposed_date }} ({{ meeting.proposed_time }})</div>
+      </div>
+    </div>
+
+    <form action="{{ url_for('direct_sale_confirmation', meeting_id=meeting.id) }}" method="POST">
+      
+      <!-- Payment Method Selection -->
+      <div style="margin-bottom: 1.5rem;">
+        <label style="display: block; font-weight: 800; font-size: 0.95rem; color: #111827; margin-bottom: 0.5rem;">Select Direct Payment Method *</label>
+        
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem;">
+          <label style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem 0.5rem; border: 2px solid #e5e7eb; border-radius: 12px; cursor: pointer; text-align: center; background: #ffffff;">
+            <input type="radio" name="payment_method" value="Cash" checked style="margin-bottom: 0.5rem;">
+            <span style="font-size: 1.5rem; margin-bottom: 0.25rem;">💵</span>
+            <span style="font-weight: 800; font-size: 0.9rem; color: #111827;">Direct Cash</span>
+            <span style="font-size: 0.72rem; color: #6b7280;">Handover at farm</span>
+          </label>
+
+          <label style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem 0.5rem; border: 2px solid #e5e7eb; border-radius: 12px; cursor: pointer; text-align: center; background: #ffffff;">
+            <input type="radio" name="payment_method" value="UPI" style="margin-bottom: 0.5rem;">
+            <span style="font-size: 1.5rem; margin-bottom: 0.25rem;">📱</span>
+            <span style="font-weight: 800; font-size: 0.9rem; color: #111827;">Instant UPI</span>
+            <span style="font-size: 0.72rem; color: #6b7280;">GPay / PhonePe / Paytm</span>
+          </label>
+
+          <label style="display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1rem 0.5rem; border: 2px solid #e5e7eb; border-radius: 12px; cursor: pointer; text-align: center; background: #ffffff;">
+            <input type="radio" name="payment_method" value="Bank Transfer" style="margin-bottom: 0.5rem;">
+            <span style="font-size: 1.5rem; margin-bottom: 0.25rem;">🏦</span>
+            <span style="font-weight: 800; font-size: 0.9rem; color: #111827;">Bank Transfer</span>
+            <span style="font-size: 0.72rem; color: #6b7280;">IMPS / NEFT</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Payment Reference -->
+      <div style="margin-bottom: 1.25rem;">
+        <label style="display: block; font-weight: 700; font-size: 0.88rem; color: #374151; margin-bottom: 0.35rem;">Payment Reference / UTR / Cash Voucher No (Optional)</label>
+        <input type="text" name="payment_reference" placeholder="e.g. UPI Ref: 432890123891 or Cash Receipt Memo" style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px;">
+      </div>
+
+      <!-- Additional Notes -->
+      <div style="margin-bottom: 2rem;">
+        <label style="display: block; font-weight: 700; font-size: 0.88rem; color: #374151; margin-bottom: 0.35rem;">Transaction Notes</label>
+        <textarea name="payment_notes" rows="2" placeholder="e.g. Produce weighed and loaded on tempo; cash paid in full on-site..." style="width: 100%; padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px;"></textarea>
+      </div>
+
+      <!-- Submit -->
+      <div style="display: flex; gap: 1rem;">
+        <button type="submit" class="btn btn-primary" style="flex: 2; padding: 0.85rem; font-size: 1.05rem; font-weight: 800; border-radius: 10px;">
+          ✓ Confirm Direct Sale Terms
+        </button>
+        <a href="{{ url_for('view_direct_meeting', meeting_id=meeting.id) }}" class="btn btn-secondary" style="flex: 1; padding: 0.85rem; font-size: 1rem; font-weight: 600; text-align: center; border-radius: 10px;">
+          Cancel
+        </a>
+      </div>
+
+    </form>
+  </div>
+
+</div>
+{% endblock %}

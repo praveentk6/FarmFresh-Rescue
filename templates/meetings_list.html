@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+
+{% block title %}Meeting Management - Direct Meet & Sell{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 5rem;">
+
+  <!-- Header -->
+  <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
+    <div>
+      <span style="background: #e0f2fe; color: #0369a1; font-weight: 700; font-size: 0.8rem; padding: 0.25rem 0.65rem; border-radius: 20px;">
+        🤝 IN-PERSON MEET & SELL
+      </span>
+      <h1 style="font-size: 2rem; font-weight: 800; color: #111827; margin: 0.35rem 0 0.2rem 0;">
+        {% if role == 'farmer' %}Buyer Meeting Requests & Farm Visits{% else %}My In-Person Farm Meetings{% endif %}
+      </h1>
+      <p style="color: #6b7280; margin: 0; font-size: 0.95rem;">
+        Manage your face-to-face appointments, inspect product quality, negotiate terms, and complete direct farmgate sales.
+      </p>
+    </div>
+    <div>
+      {% if role == 'buyer' %}
+        <a href="{{ url_for('find_sellers') }}" class="btn btn-primary" style="font-weight: 700; padding: 0.65rem 1.25rem; border-radius: 10px;">
+          ➕ Schedule New Meeting
+        </a>
+      {% else %}
+        <a href="{{ url_for('farmer_dashboard') }}" class="btn btn-secondary" style="font-weight: 700; padding: 0.65rem 1.25rem; border-radius: 10px;">
+          📋 Farmer Dashboard
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Filter Pills -->
+  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.75rem; border-bottom: 1px solid #e5e7eb; padding-bottom: 1rem;">
+    <a href="{{ url_for('list_direct_meetings', status='all') }}" class="btn" style="padding: 0.45rem 1rem; border-radius: 20px; font-size: 0.88rem; font-weight: 700; text-decoration: none; background: {% if current_filter == 'all' %}#16a34a{% else %}#f3f4f6{% endif %}; color: {% if current_filter == 'all' %}#ffffff{% else %}#4b5563{% endif %};">
+      All Meetings
+    </a>
+    <a href="{{ url_for('list_direct_meetings', status='pending') }}" class="btn" style="padding: 0.45rem 1rem; border-radius: 20px; font-size: 0.88rem; font-weight: 700; text-decoration: none; background: {% if current_filter == 'pending' %}#f59e0b{% else %}#f3f4f6{% endif %}; color: {% if current_filter == 'pending' %}#ffffff{% else %}#4b5563{% endif %};">
+      ⏳ {% if role == 'farmer' %}Incoming Requests{% else %}Pending Farmer Review{% endif %}
+    </a>
+    <a href="{{ url_for('list_direct_meetings', status='confirmed') }}" class="btn" style="padding: 0.45rem 1rem; border-radius: 20px; font-size: 0.88rem; font-weight: 700; text-decoration: none; background: {% if current_filter == 'confirmed' %}#0284c7{% else %}#f3f4f6{% endif %}; color: {% if current_filter == 'confirmed' %}#ffffff{% else %}#4b5563{% endif %};">
+      ✅ Confirmed / Upcoming Visits
+    </a>
+    <a href="{{ url_for('list_direct_meetings', status='completed') }}" class="btn" style="padding: 0.45rem 1rem; border-radius: 20px; font-size: 0.88rem; font-weight: 700; text-decoration: none; background: {% if current_filter == 'completed' %}#059669{% else %}#f3f4f6{% endif %}; color: {% if current_filter == 'completed' %}#ffffff{% else %}#4b5563{% endif %};">
+      🎉 Completed Sales
+    </a>
+    <a href="{{ url_for('list_direct_meetings', status='cancelled') }}" class="btn" style="padding: 0.45rem 1rem; border-radius: 20px; font-size: 0.88rem; font-weight: 700; text-decoration: none; background: {% if current_filter == 'cancelled' %}#dc2626{% else %}#f3f4f6{% endif %}; color: {% if current_filter == 'cancelled' %}#ffffff{% else %}#4b5563{% endif %};">
+      ❌ Cancelled / Rejected
+    </a>
+  </div>
+
+  <!-- Meetings List -->
+  {% if meetings %}
+    <div style="display: flex; flex-direction: column; gap: 1.25rem;">
+      {% for m in meetings %}
+        <div style="background: #ffffff; border-radius: 16px; border: 1px solid #e5e7eb; padding: 1.5rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.25rem;">
+          
+          <div style="display: flex; gap: 1.25rem; align-items: center; flex: 1; min-width: 280px;">
+            <div style="width: 70px; height: 70px; border-radius: 12px; background: #f3f4f6; overflow: hidden; flex-shrink: 0;">
+              {% if m.product_photo %}
+                <img src="{{ url_for('static', filename='uploads/' ~ m.product_photo) }}" alt="{{ m.product_name }}" style="width: 100%; height: 100%; object-fit: cover;">
+              {% else %}
+                <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 2rem;">🌾</div>
+              {% endif %}
+            </div>
+
+            <div>
+              <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                <span style="font-family: monospace; font-weight: 800; font-size: 0.85rem; color: #4b5563; background: #f3f4f6; padding: 0.15rem 0.5rem; border-radius: 6px;">
+                  #{{ m.meeting_code }}
+                </span>
+                {% if m.status == 'Confirmed' %}
+                  <span style="background: #dcfce7; color: #15803d; font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 12px;">● Confirmed</span>
+                {% elif m.status == 'Pending' %}
+                  <span style="background: #fef3c7; color: #b45309; font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 12px;">⏳ Pending Review</span>
+                {% elif m.status == 'Completed' %}
+                  <span style="background: #e0f2fe; color: #0369a1; font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 12px;">🎉 Completed</span>
+                {% elif m.status == 'Rescheduled' %}
+                  <span style="background: #ede9fe; color: #6d28d9; font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 12px;">🔄 Rescheduled</span>
+                {% else %}
+                  <span style="background: #fee2e2; color: #b91c1c; font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 12px;">❌ {{ m.status }}</span>
+                {% endif %}
+              </div>
+
+              <h3 style="font-size: 1.2rem; font-weight: 800; color: #111827; margin: 0 0 0.35rem 0;">
+                {{ m.product_name }} ({{ m.required_quantity }} kg)
+              </h3>
+
+              <div style="font-size: 0.88rem; color: #4b5563; display: flex; gap: 1rem; flex-wrap: wrap;">
+                {% if role == 'farmer' %}
+                  <span>Buyer: <strong>{{ m.buyer_name }}</strong> (📞 {{ m.buyer_phone }})</span>
+                {% else %}
+                  <span>Farmer: <strong>{{ m.farmer_name }}</strong> (📞 {{ m.farmer_phone }})</span>
+                {% endif %}
+                <span>📅 <strong>{{ m.proposed_date }}</strong> at <strong>{{ m.proposed_time }}</strong></span>
+                <span>📍 {{ m.meeting_location }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div style="display: flex; gap: 0.65rem; align-items: center; flex-wrap: wrap;">
+            <a href="{{ url_for('view_direct_meeting', meeting_id=m.id) }}" class="btn btn-primary" style="font-weight: 700; padding: 0.6rem 1.15rem; border-radius: 8px; font-size: 0.9rem;">
+              View Meeting Details &rarr;
+            </a>
+            {% set chat_user = m.buyer_id if role == 'farmer' else m.farmer_id %}
+            <a href="{{ url_for('direct_messages_view', other_user_id=chat_user, meeting_id=m.id) }}" class="btn btn-secondary" style="font-weight: 700; padding: 0.6rem 0.85rem; border-radius: 8px; font-size: 0.9rem;" title="Message Counterpart">
+              💬 Chat
+            </a>
+          </div>
+
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div style="text-align: center; padding: 4rem 1.5rem; background: #ffffff; border-radius: 16px; border: 1px dashed #d1d5db;">
+      <div style="font-size: 3rem; margin-bottom: 0.75rem;">📅</div>
+      <h3 style="font-size: 1.25rem; font-weight: 800; color: #111827;">No Meetings in this Category</h3>
+      <p style="color: #6b7280; margin-bottom: 1.5rem;">
+        {% if role == 'buyer' %}
+          You have no active meeting requests here. Find a seller and schedule a direct meeting.
+        {% else %}
+          You have no incoming buyer meeting requests in this status.
+        {% endif %}
+      </p>
+      {% if role == 'buyer' %}
+        <a href="{{ url_for('find_sellers') }}" class="btn btn-primary" style="padding: 0.6rem 1.5rem;">Find Sellers</a>
+      {% endif %}
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}

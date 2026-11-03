@@ -31,6 +31,25 @@
     </div>
   </div>
 
+  <!-- Direct Meet & Sell Navigation Shortcuts -->
+  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; background: #ffffff; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid #e5e7eb; align-items: center;">
+    <a href="{{ url_for('browse_rescue_products') }}" class="btn btn-sm" style="background: #ecfdf5; color: #166534; font-weight: 700; border-radius: 20px;">
+      🛒 Shared Rescue Marketplace
+    </a>
+    <a href="{{ url_for('find_sellers') }}" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; font-weight: 700; border-radius: 20px;">
+      🤝 Find In-Person Sellers
+    </a>
+    <a href="#meetingsSection" class="btn btn-sm" style="background: #fef3c7; color: #92400e; font-weight: 700; border-radius: 20px;">
+      📅 My Direct Meetings ({{ buyer_meetings|length }})
+    </a>
+    <a href="#directPurchasesSection" class="btn btn-sm" style="background: #ede9fe; color: #6d28d9; font-weight: 700; border-radius: 20px;">
+      💵 Direct Purchases ({{ buyer_direct_sales|length }})
+    </a>
+    <a href="{{ url_for('find_sellers') }}" class="btn btn-sm" style="background: #16a34a; color: white; font-weight: 700; border-radius: 20px; margin-left: auto;">
+      ➕ Schedule Direct Meeting
+    </a>
+  </div>
+
   <!-- Primary Calculated KPI Summary Cards for Buyer -->
   <div class="dashboard-grid-kpis" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 2rem;">
     <!-- 1. Total Orders -->
@@ -404,6 +423,221 @@
       </div>
     </div>
   {% endif %}
+
+  <!-- 1. SHARED RESCUE PRODUCE HIGHLIGHTS -->
+  <div class="data-table-card" id="sharedRescueSection" style="margin-bottom: 3rem; border-top: 4px solid #16a34a;">
+    <div class="data-table-header">
+      <div>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: #0f172a;">
+          🛒 Shared Rescue Produce Marketplace
+        </h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">
+          Real-time harvest surplus from Tamil Nadu farmers. Inspect in-person and buy face-to-face.
+        </span>
+      </div>
+      <a href="{{ url_for('browse_rescue_products') }}" class="btn btn-outline-primary btn-sm">
+        View All Marketplace Produce &rarr;
+      </a>
+    </div>
+
+    {% if shared_rescue_products %}
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.25rem; padding: 1.25rem;">
+        {% for rp in shared_rescue_products %}
+          <div style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; background: #ffffff; display: flex; flex-direction: column; justify-content: space-between;">
+            <div style="height: 150px; background: #f8fafc; position: relative;">
+              {% if rp.photo %}
+                <img src="{{ url_for('static', filename='uploads/' ~ rp.photo) }}" alt="{{ rp.product_name }}" style="width: 100%; height: 100%; object-fit: cover;">
+              {% else %}
+                <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 2.5rem;">🌾</div>
+              {% endif %}
+              {% if rp.discount_percent and rp.discount_percent > 0 %}
+                <span style="position: absolute; top: 8px; left: 8px; background: #dc2626; color: white; padding: 0.2rem 0.5rem; border-radius: 12px; font-size: 0.75rem; font-weight: 800;">
+                  {{ rp.discount_percent|round(0)|int }}% OFF
+                </span>
+              {% endif %}
+              <span style="position: absolute; bottom: 8px; right: 8px; background: rgba(0,0,0,0.7); color: white; padding: 0.15rem 0.45rem; border-radius: 6px; font-size: 0.72rem; font-weight: 700;">
+                {{ rp.quality_grade }}
+              </span>
+            </div>
+            <div style="padding: 1rem;">
+              <h4 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0 0 0.25rem 0;">{{ rp.product_name }}</h4>
+              <div style="font-size: 0.8rem; color: #475569; margin-bottom: 0.5rem;">
+                👨‍🌾 {{ rp.farmer_name }} &bull; 📍 {{ rp.farm_location }}, {{ rp.district }}
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 0.75rem;">
+                <div>
+                  <strong style="color: #16a34a; font-size: 1.25rem;">₹{{ rp.rescue_price }}</strong>
+                  <span style="font-size: 0.8rem; color: #64748b;">/ {{ rp.unit }}</span>
+                </div>
+                <span style="font-size: 0.8rem; color: #64748b;">Stock: <strong>{{ rp.quantity }} {{ rp.unit }}</strong></span>
+              </div>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem;">
+                <a href="{{ url_for('rescue_product_detail', product_id=rp.id) }}" class="btn btn-secondary btn-sm" style="text-align: center; font-size: 0.8rem; padding: 0.35rem;">Details</a>
+                <a href="{{ url_for('schedule_direct_meeting', product_id=rp.id) }}" class="btn btn-primary btn-sm" style="text-align: center; font-size: 0.8rem; padding: 0.35rem; font-weight: 700;">🤝 Meet</a>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- 2. MY DIRECT MEETINGS & FARMGATE VISITS -->
+  <div class="data-table-card" id="meetingsSection" style="margin-bottom: 3rem; border-top: 4px solid #0284c7;">
+    <div class="data-table-header">
+      <div>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: #0f172a;">
+          📅 My In-Person Meetings & Farm Visits
+        </h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">
+          Face-to-face product inspection & negotiation appointments scheduled with farmers.
+        </span>
+      </div>
+      <a href="{{ url_for('list_direct_meetings') }}" class="btn btn-outline-primary btn-sm">
+        All Meetings ({{ buyer_meetings|length }}) &rarr;
+      </a>
+    </div>
+
+    {% if buyer_meetings %}
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Meeting Code</th>
+              <th>Produce</th>
+              <th>Farmer Details</th>
+              <th>Scheduled Time</th>
+              <th>Location</th>
+              <th>Status</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for m in buyer_meetings %}
+              <tr>
+                <td><span style="font-family: monospace; font-weight: 800; font-size: 0.82rem; color: #0284c7;">#{{ m.meeting_code }}</span></td>
+                <td>
+                  <strong style="color: #0f172a;">{{ m.product_name }}</strong>
+                  <div style="font-size: 0.78rem; color: #64748b;">Req: {{ m.required_quantity }} kg</div>
+                </td>
+                <td>
+                  <div style="font-weight: 700; color: #334155;">{{ m.farmer_name }}</div>
+                  <div style="font-size: 0.78rem; color: #64748b;">📞 {{ m.farmer_phone }}</div>
+                </td>
+                <td>
+                  <strong style="color: #0f172a;">{{ m.proposed_date }}</strong>
+                  <div style="font-size: 0.78rem; color: #0284c7; font-weight: 600;">{{ m.proposed_time }}</div>
+                </td>
+                <td><span style="font-size: 0.82rem; color: #475569;">📍 {{ m.meeting_location }}</span></td>
+                <td>
+                  {% if m.status == 'Confirmed' %}
+                    <span style="background: #dcfce7; color: #15803d; font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 12px;">● Confirmed</span>
+                  {% elif m.status == 'Pending' %}
+                    <span style="background: #fef3c7; color: #b45309; font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 12px;">⏳ Pending</span>
+                  {% elif m.status == 'Completed' %}
+                    <span style="background: #e0f2fe; color: #0369a1; font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.6rem; border-radius: 12px;">🎉 Completed</span>
+                  {% else %}
+                    <span style="background: #f1f5f9; color: #475569; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 12px;">{{ m.status }}</span>
+                  {% endif %}
+                </td>
+                <td style="text-align: right;">
+                  <div style="display: flex; gap: 0.35rem; justify-content: flex-end;">
+                    <a href="{{ url_for('view_direct_meeting', meeting_id=m.id) }}" class="btn btn-primary btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">
+                      Manage &rarr;
+                    </a>
+                    <a href="{{ url_for('direct_messages_view', other_user_id=m.farmer_id, meeting_id=m.id) }}" class="btn btn-secondary btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;" title="Chat">
+                      💬
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="padding: 2.5rem 1.5rem; text-align: center; color: #64748b;">
+        <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">🤝</span>
+        <div style="font-weight: 700; color: #0f172a; margin-bottom: 0.25rem;">No Farm Visits Scheduled Yet</div>
+        <p style="font-size: 0.85rem; max-width: 450px; margin: 0 auto 1rem;">
+          Find sellers near you and schedule a face-to-face meeting at the farm gate to inspect produce and negotiate prices directly.
+        </p>
+        <a href="{{ url_for('find_sellers') }}" class="btn btn-primary btn-sm" style="background: #16a34a;">
+          Find In-Person Sellers
+        </a>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- 3. MY DIRECT PURCHASES & RECEIPTS -->
+  <div class="data-table-card" id="directPurchasesSection" style="margin-bottom: 3rem; border-top: 4px solid #f59e0b;">
+    <div class="data-table-header">
+      <div>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: #0f172a;">
+          💵 Direct Purchases & Receipts
+        </h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">
+          Produce bought directly in person at farmgate with verified receipts.
+        </span>
+      </div>
+    </div>
+
+    {% if buyer_direct_sales %}
+      <div class="table-responsive">
+        <table class="custom-table">
+          <thead>
+            <tr>
+              <th>Sale Code</th>
+              <th>Produce</th>
+              <th>Farmer</th>
+              <th>Purchased Qty</th>
+              <th>Agreed Rate</th>
+              <th>Total Paid</th>
+              <th>Payment Method</th>
+              <th>Status</th>
+              <th style="text-align: right;">Receipt</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in buyer_direct_sales %}
+              <tr>
+                <td><span style="font-family: monospace; font-weight: 800; font-size: 0.82rem; color: #166534;">#{{ s.sale_code }}</span></td>
+                <td><strong style="color: #0f172a;">{{ s.product_name }}</strong></td>
+                <td>
+                  <div style="font-weight: 700; color: #334155;">{{ s.farmer_name }}</div>
+                  <div style="font-size: 0.75rem; color: #64748b;">📞 {{ s.farmer_phone }}</div>
+                </td>
+                <td><strong style="color: #0f172a;">{{ s.final_quantity }} kg</strong></td>
+                <td>₹{{ s.agreed_price_per_kg }} / kg</td>
+                <td><strong style="color: #16a34a; font-size: 1rem;">₹{{ s.total_amount }}</strong></td>
+                <td><span class="badge-category" style="font-size: 0.75rem;">{{ s.payment_method }}</span></td>
+                <td>
+                  {% if s.status == 'Completed' %}
+                    <span style="background: #dcfce7; color: #15803d; font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.5rem; border-radius: 12px;">Completed</span>
+                  {% else %}
+                    <span style="background: #fef3c7; color: #b45309; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 12px;">{{ s.status }}</span>
+                  {% endif %}
+                </td>
+                <td style="text-align: right;">
+                  <a href="{{ url_for('view_direct_sale_receipt', sale_id=s.id) }}" class="btn btn-outline-primary btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
+                    🧾 Receipt
+                  </a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="padding: 2.5rem 1.5rem; text-align: center; color: #64748b;">
+        <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">🧾</span>
+        <div style="font-weight: 700; color: #0f172a; margin-bottom: 0.25rem;">No Direct Purchases Yet</div>
+        <p style="font-size: 0.85rem; max-width: 450px; margin: 0 auto;">
+          Meet farmers directly, inspect fresh crops, and complete purchases at the farm. Your direct receipts will be saved here.
+        </p>
+      </div>
+    {% endif %}
+  </div>
 
   <!-- Buyer Sent Orders Table -->
   <div class="data-table-card" style="margin-bottom: 3rem;">

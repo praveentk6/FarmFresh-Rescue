@@ -69,6 +69,16 @@
             </a>
           </li>
           <li>
+            <a href="{{ url_for('browse_rescue_products') }}" class="nav-link {% if request.endpoint in ['browse_rescue_products', 'rescue_product_detail', 'add_rescue_product', 'edit_rescue_product'] %}active{% endif %}" style="color: var(--primary); font-weight: 700;">
+              🛒 Rescue Marketplace
+            </a>
+          </li>
+          <li>
+            <a href="{{ url_for('find_sellers') }}" class="nav-link {% if request.endpoint in ['find_sellers', 'schedule_direct_meeting', 'list_direct_meetings', 'view_direct_meeting', 'inspect_product_meeting', 'negotiate_meeting_price', 'direct_sale_confirmation', 'view_direct_sale_receipt'] %}active{% endif %}">
+              🤝 Meet & Sell
+            </a>
+          </li>
+          <li>
             <a href="{{ url_for('nearby_buyers') }}" class="nav-link {% if request.endpoint == 'nearby_buyers' %}active{% endif %}">
               {{ _t('nearby_buyers') }}
             </a>
@@ -136,6 +146,12 @@
                 <span>●</span>
                 <span>{{ current_user['name'].split()[0]|capitalize }} ({{ _t('role_' ~ current_user['role']) }})</span>
               </div>
+            </li>
+            <li class="mobile-only-nav">
+              <a href="{{ url_for('browse_rescue_products') }}" class="nav-link">🛒 Rescue Marketplace</a>
+            </li>
+            <li class="mobile-only-nav">
+              <a href="{{ url_for('list_direct_meetings') }}" class="nav-link">🤝 Direct Meetings</a>
             </li>
             <li class="mobile-only-nav">
               <a href="{{ url_for('notifications_view') }}" class="nav-link {% if request.endpoint == 'notifications_view' %}active{% endif %}">
