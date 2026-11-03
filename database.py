@@ -711,14 +711,22 @@ def seed_db():
         conn.close()
         return
 
-    # Seed Users
-    admin_pw = generate_password_hash("admin123")
-    farmer_pw = generate_password_hash("farmer123")
-    buyer_pw = generate_password_hash("buyer123")
+    # Seed Users with bcrypt hashing
+    admin_email = os.environ.get('ADMIN_EMAIL', 'Pp274142@gmail.com').strip().lower()
+    admin_pw_plain = os.environ.get('ADMIN_PASSWORD', 'praveen16')
+    try:
+        import bcrypt
+        admin_pw = bcrypt.hashpw(admin_pw_plain.encode('utf-8'), bcrypt.gensalt(12)).decode('utf-8')
+        farmer_pw = bcrypt.hashpw(b"farmer123", bcrypt.gensalt(12)).decode('utf-8')
+        buyer_pw = bcrypt.hashpw(b"buyer123", bcrypt.gensalt(12)).decode('utf-8')
+    except Exception:
+        admin_pw = generate_password_hash(admin_pw_plain)
+        farmer_pw = generate_password_hash("farmer123")
+        buyer_pw = generate_password_hash("buyer123")
 
     users_data = [
-        # Admin
-        ("Platform Administrator", "admin@farmfresh.org", admin_pw, "admin", "9842100001", "Chennai Head Office", "600001", "Platform Admin"),
+        # Exactly ONE Authorized Admin Account
+        ("Platform Administrator", admin_email, admin_pw, "admin", "9842100001", "Chennai Head Office", "600001", "Platform Admin"),
         # Farmers
         ("Muthuvel Karuppan", "muthu.farmer@gmail.com", farmer_pw, "farmer", "9842112345", "Ottanchathiram", "624619", "Smallholder Farmer"),
         ("Selvi Shanmugam", "selvi.farms@gmail.com", farmer_pw, "farmer", "9443256789", "Rayakottai", "635116", "Vegetable Grower"),

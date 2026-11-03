@@ -1,102 +1,360 @@
 {% extends "base.html" %}
 
-{% block title %}Sign Up - FarmFresh Rescue{% endblock %}
+{% block title %}Create Account - FarmFresh Rescue{% endblock %}
 
 {% block content %}
-<div class="container">
-  <div class="form-card" style="max-width: 600px; margin: 3rem auto;">
-    
-    <div style="text-align: center; margin-bottom: 2rem;">
-      <h1 class="form-title">Create Free Account</h1>
-      <p class="form-subtitle">Join Tamil Nadu's real-time agricultural produce waste reduction network</p>
+<div class="auth-page-wrapper">
+  <div class="auth-card auth-register-card">
+
+    <!-- Brand Header -->
+    <div class="auth-header">
+      <div class="auth-logo-badge">
+        <span class="auth-leaf">🌱</span>
+      </div>
+      <h1 class="auth-title">Join FarmFresh Rescue</h1>
+      <p class="auth-subtitle">Tamil Nadu Agricultural Produce Direct Marketplace &bull; Zero Waste Network</p>
     </div>
 
-    <form action="{{ url_for('register') }}" method="POST">
-      
-      <!-- Role Selection -->
-      <div class="form-group">
-        <label class="form-label">I am registering as: <span class="required">*</span></label>
-        <div class="role-selection-grid">
-          <label class="role-card-label">
-            <input type="radio" name="role" value="farmer" {% if initial_role == 'farmer' or role == 'farmer' %}checked{% endif %} id="roleFarmer">
-            <div>
-              <strong style="color: #166534; display: block;">👨‍🌾 Farmer / Producer</strong>
-              <small style="color: #64748b; font-size: 0.775rem;">Sell unsold surplus harvests</small>
-            </div>
-          </label>
-
-          <label class="role-card-label">
-            <input type="radio" name="role" value="buyer" {% if initial_role == 'buyer' or role == 'buyer' %}checked{% endif %} id="roleBuyer">
-            <div>
-              <strong style="color: #1e40af; display: block;">🏪 Commercial Buyer</strong>
-              <small style="color: #64748b; font-size: 0.775rem;">Hotels, shops, processors</small>
-            </div>
-          </label>
-        </div>
-      </div>
-
-      <!-- Full Name & Email -->
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Full Name <span class="required">*</span></label>
-          <input type="text" name="name" value="{{ name or '' }}" class="form-control" placeholder="e.g. Selvi Shanmugam" required>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Email Address <span class="required">*</span></label>
-          <input type="email" name="email" value="{{ email or '' }}" class="form-control" placeholder="name@example.com" required>
-        </div>
-      </div>
-
-      <!-- Password & Confirm -->
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Password <span class="required">*</span></label>
-          <input type="password" name="password" class="form-control" placeholder="Min 6 characters" required>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Confirm Password <span class="required">*</span></label>
-          <input type="password" name="confirm_password" class="form-control" placeholder="Repeat password" required>
-        </div>
-      </div>
-
-      <!-- Phone & Type -->
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Contact Phone Number <span class="required">*</span></label>
-          <input type="tel" name="phone" value="{{ phone or '' }}" class="form-control" placeholder="10-digit mobile" required>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Business / Producer Type</label>
-          <input type="text" name="user_type" value="{{ user_type or '' }}" class="form-control" placeholder="e.g. Smallholder, Restaurant, Supermarket">
-        </div>
-      </div>
-
-      <!-- Location & PIN -->
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Village / Town / City (Tamil Nadu)</label>
-          <input type="text" name="location" value="{{ location or '' }}" class="form-control" placeholder="e.g. Ottanchathiram, Dindigul">
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Postal PIN Code</label>
-          <input type="text" name="pin_code" value="{{ pin_code or '' }}" class="form-control" placeholder="6-digit PIN" maxlength="6">
-        </div>
-      </div>
-
-      <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top: 1rem;">
-        Complete Registration
+    <!-- Role Selection Tabs: Farmer vs Buyer -->
+    <div class="auth-role-tabs" role="tablist" aria-label="Role Registration Options">
+      <button type="button" class="auth-tab {% if active_role == 'farmer' or not active_role or active_role not in ['farmer', 'buyer'] %}active{% endif %}" id="tabRegFarmer" onclick="switchRegRole('farmer')" role="tab" aria-selected="true" aria-controls="paneRegFarmer">
+        <span class="tab-icon">👨‍🌾</span>
+        <span class="tab-text">Farmer Sign Up</span>
       </button>
-    </form>
+      <button type="button" class="auth-tab {% if active_role == 'buyer' %}active{% endif %}" id="tabRegBuyer" onclick="switchRegRole('buyer')" role="tab" aria-selected="false" aria-controls="paneRegBuyer">
+        <span class="tab-icon">🛒</span>
+        <span class="tab-text">Buyer Sign Up</span>
+      </button>
+    </div>
 
-    <div style="text-align: center; margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle); font-size: 0.9rem; color: #64748b;">
+    <!-- Admin Registration Notice -->
+    <div class="admin-notice-box" style="margin-bottom: 1.25rem;">
+      <span class="notice-icon">🛡️</span>
+      <span class="notice-text">
+        <strong>Platform Admin?</strong> Admin accounts cannot be created publicly. 
+        <a href="{{ url_for('login_admin') }}" style="color: #1e3a8a; font-weight: 700; text-decoration: underline;">Go to Admin Login &rarr;</a>
+      </span>
+    </div>
+
+    <!-- 1. FARMER REGISTRATION PANE -->
+    <div class="auth-role-pane {% if active_role == 'farmer' or not active_role or active_role not in ['farmer', 'buyer'] %}active{% endif %}" id="paneRegFarmer">
+      <div class="role-badge role-badge-farmer">
+        <span>👨‍🌾</span>
+        <span>Farmer / Producer Registration &bull; Sell surplus crops directly to buyers</span>
+      </div>
+
+      <form action="{{ url_for('register_post') }}" method="POST" class="auth-form" id="formRegFarmer" onsubmit="return validateRegForm('Farmer')">
+        <input type="hidden" name="role" value="farmer">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="farmerName">Full Name <span class="required">*</span></label>
+            <div class="input-with-icon">
+              <span class="input-icon">👤</span>
+              <input type="text" name="name" id="farmerName" class="form-control auth-input" placeholder="e.g. Selvi Shanmugam" required value="{{ name if active_role == 'farmer' else '' }}">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="farmerEmail">Email Address <span class="required">*</span></label>
+            <div class="input-with-icon">
+              <span class="input-icon">✉️</span>
+              <input type="email" name="email" id="farmerEmail" class="form-control auth-input" placeholder="selvi.farms@gmail.com" required value="{{ email if active_role == 'farmer' else '' }}">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="farmerPhone">Mobile Number (10 Digits) <span class="required">*</span></label>
+            <div class="input-with-icon">
+              <span class="input-icon">📱</span>
+              <input type="tel" name="phone" id="farmerPhone" class="form-control auth-input" placeholder="9876543210" pattern="[0-9]{10}" maxlength="10" required value="{{ phone if active_role == 'farmer' else '' }}">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="farmerType">Producer / Farm Type</label>
+            <div class="input-with-icon">
+              <span class="input-icon">🌾</span>
+              <input type="text" name="user_type" id="farmerType" class="form-control auth-input" placeholder="e.g. Smallholder, Organic Farmer, FPO" value="{{ user_type if active_role == 'farmer' else '' }}">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="farmerLocation">Farm Location / Village / City <span class="required">*</span></label>
+            <div class="input-with-icon">
+              <span class="input-icon">📍</span>
+              <input type="text" name="location" id="farmerLocation" class="form-control auth-input" placeholder="e.g. Ottanchathiram, Dindigul" required value="{{ location if active_role == 'farmer' else '' }}">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="farmerPin">Postal PIN Code</label>
+            <div class="input-with-icon">
+              <span class="input-icon">📮</span>
+              <input type="text" name="pin_code" id="farmerPin" class="form-control auth-input" placeholder="624619" maxlength="6" pattern="[0-9]{6}" value="{{ pin_code if active_role == 'farmer' else '' }}">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="farmerPassword">Password (Min 6 chars) <span class="required">*</span></label>
+            <div class="password-input-wrap">
+              <input type="password" name="password" id="farmerPassword" class="form-control auth-input" placeholder="••••••••" minlength="6" required oninput="evaluateStrength(this.value, 'meterFarmer', 'labelFarmer')">
+              <button type="button" class="btn-toggle-pw" onclick="togglePasswordVisibility('farmerPassword', this)" aria-label="Toggle password">👁️</button>
+            </div>
+            <div class="pw-strength-meter" id="meterFarmer">
+              <div class="bar bar-1"></div>
+              <div class="bar bar-2"></div>
+              <div class="bar bar-3"></div>
+              <div class="bar bar-4"></div>
+            </div>
+            <div class="pw-strength-label" id="labelFarmer">Password strength</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="farmerConfirm">Confirm Password <span class="required">*</span></label>
+            <div class="password-input-wrap">
+              <input type="password" name="confirm_password" id="farmerConfirm" class="form-control auth-input" placeholder="••••••••" minlength="6" required>
+              <button type="button" class="btn-toggle-pw" onclick="togglePasswordVisibility('farmerConfirm', this)" aria-label="Toggle password">👁️</button>
+            </div>
+            <div class="pw-match-error" id="errFarmerMatch" style="display: none; color: #dc2626; font-size: 0.775rem; margin-top: 0.25rem;">
+              Passwords do not match
+            </div>
+          </div>
+        </div>
+
+        <div class="terms-group">
+          <label class="checkbox-label" style="align-items: flex-start;">
+            <input type="checkbox" name="terms" id="farmerTerms" value="1" required style="margin-top: 0.2rem;">
+            <span style="font-size: 0.825rem; color: #475569; line-height: 1.45;">
+              I agree to the <a href="#" onclick="alert('FarmFresh Rescue Terms:\n1. Provide accurate crop harvest data.\n2. Fair zero-waste pricing.\n3. Direct farm pickup/dispatch integrity.'); return false;" style="color: var(--primary); font-weight: 600;">Terms &amp; Conditions</a>, fair pricing pledge, and zero agricultural waste initiative.
+            </span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg auth-submit-btn" id="btnSubmitFarmer" style="margin-top: 1rem;">
+          <span>🌱 Create Farmer Account &rarr;</span>
+        </button>
+
+        <div class="auth-card-footer">
+          Already registered as Farmer? <a href="{{ url_for('login_farmer') }}" class="auth-link-highlight">Farmer Sign In &rarr;</a>
+        </div>
+      </form>
+    </div>
+
+    <!-- 2. BUYER REGISTRATION PANE -->
+    <div class="auth-role-pane {% if active_role == 'buyer' %}active{% endif %}" id="paneRegBuyer">
+      <div class="role-badge role-badge-buyer">
+        <span>🛒</span>
+        <span>Buyer Registration &bull; Hotels, Supermarkets, Food Processors &amp; Wholesalers</span>
+      </div>
+
+      <form action="{{ url_for('register_post') }}" method="POST" class="auth-form" id="formRegBuyer" onsubmit="return validateRegForm('Buyer')">
+        <input type="hidden" name="role" value="buyer">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="buyerName">Business / Contact Name <span class="required">*</span></label>
+            <div class="input-with-icon">
+              <span class="input-icon">👤</span>
+              <input type="text" name="name" id="buyerName" class="form-control auth-input" placeholder="e.g. Saravana Hotel Group" required value="{{ name if active_role == 'buyer' else '' }}">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="buyerEmail">Email Address <span class="required">*</span></label>
+            <div class="input-with-icon">
+              <span class="input-icon">✉️</span>
+              <input type="email" name="email" id="buyerEmail" class="form-control auth-input" placeholder="procurement@saravana.com" required value="{{ email if active_role == 'buyer' else '' }}">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="buyerPhone">Mobile Number (10 Digits) <span class="required">*</span></label>
+            <div class="input-with-icon">
+              <span class="input-icon">📱</span>
+              <input type="tel" name="phone" id="buyerPhone" class="form-control auth-input" placeholder="9840123456" pattern="[0-9]{10}" maxlength="10" required value="{{ phone if active_role == 'buyer' else '' }}">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="buyerType">Business Category</label>
+            <div class="input-with-icon">
+              <span class="input-icon">🏪</span>
+              <input type="text" name="user_type" id="buyerType" class="form-control auth-input" placeholder="e.g. Restaurant, Supermarket, Juice Chain" value="{{ user_type if active_role == 'buyer' else '' }}">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="buyerLocation">Delivery / Business Address <span class="required">*</span></label>
+            <div class="input-with-icon">
+              <span class="input-icon">📍</span>
+              <input type="text" name="location" id="buyerLocation" class="form-control auth-input" placeholder="e.g. T. Nagar, Chennai" required value="{{ location if active_role == 'buyer' else '' }}">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="buyerPin">Postal PIN Code</label>
+            <div class="input-with-icon">
+              <span class="input-icon">📮</span>
+              <input type="text" name="pin_code" id="buyerPin" class="form-control auth-input" placeholder="600017" maxlength="6" pattern="[0-9]{6}" value="{{ pin_code if active_role == 'buyer' else '' }}">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="buyerPassword">Password (Min 6 chars) <span class="required">*</span></label>
+            <div class="password-input-wrap">
+              <input type="password" name="password" id="buyerPassword" class="form-control auth-input" placeholder="••••••••" minlength="6" required oninput="evaluateStrength(this.value, 'meterBuyer', 'labelBuyer')">
+              <button type="button" class="btn-toggle-pw" onclick="togglePasswordVisibility('buyerPassword', this)" aria-label="Toggle password">👁️</button>
+            </div>
+            <div class="pw-strength-meter" id="meterBuyer">
+              <div class="bar bar-1"></div>
+              <div class="bar bar-2"></div>
+              <div class="bar bar-3"></div>
+              <div class="bar bar-4"></div>
+            </div>
+            <div class="pw-strength-label" id="labelBuyer">Password strength</div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="buyerConfirm">Confirm Password <span class="required">*</span></label>
+            <div class="password-input-wrap">
+              <input type="password" name="confirm_password" id="buyerConfirm" class="form-control auth-input" placeholder="••••••••" minlength="6" required>
+              <button type="button" class="btn-toggle-pw" onclick="togglePasswordVisibility('buyerConfirm', this)" aria-label="Toggle password">👁️</button>
+            </div>
+            <div class="pw-match-error" id="errBuyerMatch" style="display: none; color: #dc2626; font-size: 0.775rem; margin-top: 0.25rem;">
+              Passwords do not match
+            </div>
+          </div>
+        </div>
+
+        <div class="terms-group">
+          <label class="checkbox-label" style="align-items: flex-start;">
+            <input type="checkbox" name="terms" id="buyerTerms" value="1" required style="margin-top: 0.2rem;">
+            <span style="font-size: 0.825rem; color: #475569; line-height: 1.45;">
+              I agree to the <a href="#" onclick="alert('FarmFresh Rescue Terms:\n1. Prompt procurement commitments.\n2. Transparent payment settlement.\n3. Supporting local farming communities.'); return false;" style="color: #0284c7; font-weight: 600;">Terms &amp; Conditions</a> and zero-waste commercial procurement pledge.
+            </span>
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg auth-submit-btn" id="btnSubmitBuyer" style="margin-top: 1rem; background: linear-gradient(135deg, #0284c7, #0369a1);">
+          <span>🛒 Create Buyer Account &rarr;</span>
+        </button>
+
+        <div class="auth-card-footer">
+          Already registered as Buyer? <a href="{{ url_for('login_buyer') }}" class="auth-link-highlight" style="color: #0284c7;">Buyer Sign In &rarr;</a>
+        </div>
+      </form>
+    </div>
+
+    <!-- Bottom Global Navigation -->
+    <div style="text-align: center; margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border-subtle); font-size: 0.85rem; color: #64748b;">
       Already have an account? 
-      <a href="{{ url_for('login') }}" style="font-weight: 700; color: var(--primary);">Log In Here</a>
+      <a href="{{ url_for('login') }}" style="font-weight: 700; color: var(--primary); text-decoration: underline;">Sign In to FarmFresh &rarr;</a>
     </div>
 
   </div>
 </div>
+
+<script>
+function switchRegRole(role) {
+  var tabFarmer = document.getElementById('tabRegFarmer');
+  var tabBuyer = document.getElementById('tabRegBuyer');
+  var paneFarmer = document.getElementById('paneRegFarmer');
+  var paneBuyer = document.getElementById('paneRegBuyer');
+
+  if (role === 'farmer') {
+    tabFarmer.classList.add('active');
+    tabBuyer.classList.remove('active');
+    tabFarmer.setAttribute('aria-selected', 'true');
+    tabBuyer.setAttribute('aria-selected', 'false');
+
+    paneFarmer.classList.add('active');
+    paneBuyer.classList.remove('active');
+  } else {
+    tabBuyer.classList.add('active');
+    tabFarmer.classList.remove('active');
+    tabBuyer.setAttribute('aria-selected', 'true');
+    tabFarmer.setAttribute('aria-selected', 'false');
+
+    paneBuyer.classList.add('active');
+    paneFarmer.classList.remove('active');
+  }
+}
+
+function togglePasswordVisibility(inputId, btn) {
+  var input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    btn.textContent = '🔒';
+    btn.setAttribute('aria-label', 'Hide password');
+  } else {
+    input.type = 'password';
+    btn.textContent = '👁️';
+    btn.setAttribute('aria-label', 'Show password');
+  }
+}
+
+function evaluateStrength(pw, meterId, labelId) {
+  var meter = document.getElementById(meterId);
+  var label = document.getElementById(labelId);
+  if (!meter || !label) return;
+
+  var score = 0;
+  if (!pw) {
+    meter.className = 'pw-strength-meter';
+    label.textContent = 'Password strength';
+    label.style.color = '#64748b';
+    return;
+  }
+  if (pw.length >= 6) score++;
+  if (pw.length >= 10) score++;
+  if (/[0-9]/.test(pw)) score++;
+  if (/[A-Z]/.test(pw) || /[^A-Za-z0-9]/.test(pw)) score++;
+
+  if (score <= 1) {
+    meter.className = 'pw-strength-meter weak';
+    label.textContent = 'Weak (add numbers & mix length)';
+    label.style.color = '#dc2626';
+  } else if (score === 2) {
+    meter.className = 'pw-strength-meter fair';
+    label.textContent = 'Fair (could be stronger)';
+    label.style.color = '#ea580c';
+  } else if (score === 3) {
+    meter.className = 'pw-strength-meter good';
+    label.textContent = 'Good password';
+    label.style.color = '#0284c7';
+  } else {
+    meter.className = 'pw-strength-meter strong';
+    label.textContent = 'Strong password!';
+    label.style.color = '#16a34a';
+  }
+}
+
+function validateRegForm(role) {
+  var pw = document.getElementById(role === 'Farmer' ? 'farmerPassword' : 'buyerPassword').value;
+  var cpw = document.getElementById(role === 'Farmer' ? 'farmerConfirm' : 'buyerConfirm').value;
+  var err = document.getElementById(role === 'Farmer' ? 'errFarmerMatch' : 'errBuyerMatch');
+
+  if (pw !== cpw) {
+    if (err) err.style.display = 'block';
+    alert('Passwords do not match. Please verify.');
+    return false;
+  }
+  if (err) err.style.display = 'none';
+  return true;
+}
+</script>
 {% endblock %}

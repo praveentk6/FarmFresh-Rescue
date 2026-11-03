@@ -30,6 +30,7 @@ from razorpay_gateway import (
     create_razorpay_order, verify_razorpay_signature,
     verify_webhook_signature, RAZORPAY_KEY_ID
 )
+import auth_service
 from qr_generator import generate_qr_bytes
 from translations import t, TRANSLATIONS
 from ai_engine import (
@@ -50,10 +51,11 @@ MAX_FILE_SIZE = 3 * 1024 * 1024  # 3MB
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
 
-# Ensure database tables and initial seed data exist
+# Ensure database tables, seed data, and single authorized admin exist
 try:
     init_db()
     seed_db()
+    auth_service.seed_single_admin_account()
 except Exception as _e:
     print(f"Database initialization notice: {_e}")
 
@@ -121,21 +123,41 @@ def validate_and_save_image(file_storage):
 # ==========================================
 
 def get_current_user():
-    """Retrieve current logged in user from session."""
+    """
+    Retrieve current logged-in user from:
+    1. Flask session
+    2. Signed JWT cookie ('farmfresh_auth_token')
+    3. Authorization header ('Bearer <jwt>')
+    """
+    user = None
     user_id = session.get('user_id')
-    if not user_id:
-        return None
-    conn = get_db()
-    cursor = conn.cursor()
-    cursor.execute("""
-        SELECT id, name, email, role, phone, location, pin_code, user_type, is_active 
-        FROM users WHERE id = ?
-    """, (user_id,))
-    user = cursor.fetchone()
-    conn.close()
-    if user and user['is_active'] == 0:
+
+    # 1. Check Flask session
+    if user_id:
+        user = auth_service.get_user_by_id(user_id)
+
+    # 2. Check JWT token in cookie or Authorization header
+    if not user:
+        jwt_token = request.cookies.get('farmfresh_auth_token')
+        if not jwt_token and request.headers.get('Authorization'):
+            auth_header = request.headers.get('Authorization', '').strip()
+            if auth_header.startswith('Bearer '):
+                jwt_token = auth_header.split(' ', 1)[1].strip()
+
+        if jwt_token:
+            payload = auth_service.decode_jwt_token(jwt_token)
+            if payload and 'user_id' in payload:
+                user = auth_service.get_user_by_id(payload['user_id'])
+                if user and user.get('is_active') == 1:
+                    session['user_id'] = user['id']
+                    session['user_name'] = user['name']
+                    session['user_role'] = user['role']
+
+    # 3. Check active status
+    if user and user.get('is_active') == 0:
         session.clear()
         return None
+
     return user
 
 @app.before_request
@@ -315,7 +337,9 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if not g.user:
-            flash("Please log in to access this page.", "warning")
+            if request.is_json or request.path.startswith('/api/'):
+                return jsonify({'error': 'Authentication required. Please log in.', 'code': 'UNAUTHENTICATED'}), 401
+            flash("Please log in to continue.", "warning")
             return redirect(url_for('login', next=request.url))
         return f(*args, **kwargs)
     return decorated_function
@@ -327,14 +351,84 @@ def role_required(allowed_roles):
         @wraps(f)
         def decorated_function(*args, **kwargs):
             if not g.user:
+                if request.is_json or request.path.startswith('/api/'):
+                    return jsonify({'error': 'Authentication required. Please log in.', 'code': 'UNAUTHENTICATED'}), 401
                 flash("Please log in to continue.", "warning")
                 return redirect(url_for('login', next=request.url))
             if g.user['role'] not in allowed_roles:
+                if request.is_json or request.path.startswith('/api/'):
+                    return jsonify({'error': 'Access denied. Unauthorized role.', 'code': 'FORBIDDEN'}), 403
                 flash("Access denied. You do not have permissions for this page.", "danger")
-                return redirect(url_for('index'))
+                if g.user['role'] == 'farmer':
+                    return redirect(url_for('farmer_dashboard'))
+                elif g.user['role'] == 'buyer':
+                    return redirect(url_for('buyer_dashboard'))
+                elif g.user['role'] == 'admin':
+                    return redirect(url_for('admin_dashboard'))
+                return redirect(url_for('login'))
             return f(*args, **kwargs)
         return decorated_function
     return decorator
+
+def farmer_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not g.user:
+            if request.is_json or request.path.startswith('/api/'):
+                return jsonify({'error': 'Authentication required. Please log in as a Farmer.', 'code': 'UNAUTHENTICATED'}), 401
+            flash("Please log in as a Farmer to access the Farmer Portal.", "warning")
+            return redirect(url_for('login_farmer', next=request.url))
+        if g.user['role'] != 'farmer':
+            if request.is_json or request.path.startswith('/api/'):
+                return jsonify({'error': 'Forbidden. Only registered farmers may access this portal.', 'code': 'FORBIDDEN'}), 403
+            flash("Access denied. The Farmer Portal is reserved for registered farmers.", "danger")
+            if g.user['role'] == 'buyer':
+                return redirect(url_for('buyer_dashboard'))
+            elif g.user['role'] == 'admin':
+                return redirect(url_for('admin_dashboard'))
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def buyer_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not g.user:
+            if request.is_json or request.path.startswith('/api/'):
+                return jsonify({'error': 'Authentication required. Please log in as a Buyer.', 'code': 'UNAUTHENTICATED'}), 401
+            flash("Please log in as a Buyer to access the Buyer Portal.", "warning")
+            return redirect(url_for('login_buyer', next=request.url))
+        if g.user['role'] != 'buyer':
+            if request.is_json or request.path.startswith('/api/'):
+                return jsonify({'error': 'Forbidden. Only registered buyers may access this portal.', 'code': 'FORBIDDEN'}), 403
+            flash("Access denied. The Buyer Portal is reserved for registered buyers.", "danger")
+            if g.user['role'] == 'farmer':
+                return redirect(url_for('farmer_dashboard'))
+            elif g.user['role'] == 'admin':
+                return redirect(url_for('admin_dashboard'))
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not g.user:
+            if request.is_json or request.path.startswith('/api/'):
+                return jsonify({'error': 'Authentication required. Administrator login required.', 'code': 'UNAUTHENTICATED'}), 401
+            flash("Administrator login required to access the Admin Panel.", "warning")
+            return redirect(url_for('login_admin', next=request.url))
+        if g.user['role'] != 'admin':
+            if request.is_json or request.path.startswith('/api/'):
+                return jsonify({'error': 'Forbidden. Administrator privileges required.', 'code': 'FORBIDDEN'}), 403
+            flash("Access denied. Administrator privileges required.", "danger")
+            if g.user['role'] == 'farmer':
+                return redirect(url_for('farmer_dashboard'))
+            elif g.user['role'] == 'buyer':
+                return redirect(url_for('buyer_dashboard'))
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 # ==========================================
 # Language Switcher Route
@@ -358,6 +452,23 @@ def set_language(lang_code):
 
 @app.route('/')
 def index():
+    """
+    Entry point:
+    When users open the website, display the Login / Welcome page first.
+    If already authenticated, immediately direct them to their role-specific dashboard.
+    """
+    if g.user:
+        if g.user['role'] == 'farmer':
+            return redirect(url_for('farmer_dashboard'))
+        elif g.user['role'] == 'buyer':
+            return redirect(url_for('buyer_dashboard'))
+        elif g.user['role'] == 'admin':
+            return redirect(url_for('admin_dashboard'))
+    return redirect(url_for('login'))
+
+@app.route('/home')
+@app.route('/marketplace')
+def marketplace_home():
     conn = get_db()
     cursor = conn.cursor()
 
@@ -667,146 +778,467 @@ def listing_detail(listing_id):
     )
 
 # ==========================================
-# Authentication Routes
+# Authentication Helpers & Core Handlers
 # ==========================================
 
-@app.route('/register', methods=['GET', 'POST'])
-def register():
-    if g.user:
-        flash("You are already logged in.", "info")
-        return redirect(url_for('index'))
+def _role_dashboard_endpoint(role):
+    r = (role or '').lower().strip()
+    if r == 'farmer':
+        return 'farmer_dashboard'
+    elif r == 'buyer':
+        return 'buyer_dashboard'
+    elif r == 'admin':
+        return 'admin_dashboard'
+    return 'login'
 
-    if request.method == 'POST':
-        name = request.form.get('name', '').strip()
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
-        confirm_password = request.form.get('confirm_password', '')
-        role = request.form.get('role', 'farmer').strip()
-        phone = request.form.get('phone', '').strip()
-        location = request.form.get('location', '').strip()
-        pin_code = request.form.get('pin_code', '').strip()
-        user_type = request.form.get('user_type', '').strip()
+def _make_auth_response(user, target_endpoint, remember_me=False, flash_msg=None):
+    session['user_id'] = user['id']
+    session['user_name'] = user['name']
+    session['user_role'] = user['role']
+    token = auth_service.generate_jwt_token(user['id'], user['email'], user['role'], days=30 if remember_me else 7)
+    if flash_msg:
+        flash(flash_msg, "success")
+    resp = make_response(redirect(url_for(target_endpoint)))
+    max_age = 60 * 60 * 24 * (30 if remember_me else 7)
+    resp.set_cookie('farmfresh_auth_token', token, max_age=max_age, httponly=True, samesite='Lax')
+    return resp
 
-        errors = []
-        if not name or len(name) < 2:
-            errors.append("Please enter your full name (minimum 2 characters).")
-        if not email or '@' not in email or '.' not in email:
-            errors.append("Please enter a valid email address.")
-        if not password or len(password) < 6:
-            errors.append("Password must be at least 6 characters long.")
-        if password != confirm_password:
-            errors.append("Passwords do not match.")
-        if role not in ['farmer', 'buyer', 'admin']:
-            errors.append("Invalid user role selected.")
-        if not phone or len(phone) < 10:
-            errors.append("Please provide a valid 10-digit contact phone number.")
+def _authenticate_credentials(email, password, expected_role=None):
+    if not email or not password:
+        return False, "Please enter both email address and password.", None
 
-        if errors:
-            for err in errors:
-                flash(err, "danger")
-            return render_template('register.html', **request.form)
+    user = auth_service.get_user_by_email(email)
+    if not user:
+        return False, "Invalid email address or password.", None
 
-        conn = get_db()
-        cursor = conn.cursor()
+    if not auth_service.verify_password(password, user['password_hash']):
+        return False, "Invalid email address or password.", None
 
-        cursor.execute("SELECT id FROM users WHERE email = ?", (email,))
-        if cursor.fetchone():
-            conn.close()
-            flash("An account with this email address already exists. Please login instead.", "warning")
-            return redirect(url_for('login'))
+    if user.get('is_active') == 0:
+        return False, "Your account has been deactivated by administrator. Please contact support.", None
 
-        password_hash = generate_password_hash(password)
-        cursor.execute('''
-            INSERT INTO users (name, email, password_hash, role, phone, location, pin_code, user_type, is_active)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
-        ''', (name, email, password_hash, role, phone, location, pin_code, user_type))
-        conn.commit()
+    actual_role = (user.get('role') or '').lower().strip()
+    if expected_role and expected_role.lower().strip() != actual_role:
+        role_label = actual_role.capitalize()
+        return False, f"This account is registered as a {role_label}. Please use the {role_label} login tab.", None
 
-        user_id = cursor.lastrowid
-        conn.close()
+    return True, None, user
 
-        # Send welcome notification
-        create_notification(
-            user_id,
-            "Welcome to FarmFresh Rescue!",
-            "Explore direct farm produce trade in Tamil Nadu and prevent agricultural waste.",
-            "info",
-            url_for('farmer_dashboard') if role == 'farmer' else url_for('browse_listings')
-        )
+def _perform_registration(data, target_role):
+    # Strictly reject admin role
+    if target_role == 'admin' or (data.get('role') or '').strip().lower() == 'admin':
+        return False, "Admin accounts cannot be registered publicly.", None
 
-        log_activity("User Registered", f"New {role} registered: {name} ({email})", email)
+    name = data.get('name', '').strip()
+    email = data.get('email', '').strip().lower()
+    password = data.get('password', '')
+    confirm_password = data.get('confirm_password', '')
+    phone = data.get('phone', '').strip()
+    location = data.get('location', '').strip()
+    pin_code = data.get('pin_code', '').strip()
+    user_type = data.get('user_type', '').strip()
+    terms = data.get('terms')
 
-        session['user_id'] = user_id
-        session['user_name'] = name
-        session['user_role'] = role
+    if not name or len(name) < 2:
+        return False, "Please enter your full name (minimum 2 characters).", None
+    if not email or '@' not in email or '.' not in email:
+        return False, "Please enter a valid email address.", None
+    if not phone or len(phone) < 10:
+        return False, "Please provide a valid 10-digit mobile number.", None
+    if not password or len(password) < 6:
+        return False, "Password must be at least 6 characters long.", None
+    if password != confirm_password:
+        return False, "Passwords do not match.", None
+    if not terms and 'terms' in data:
+        return False, "You must agree to the Terms & Conditions and zero-waste policy.", None
 
-        flash(f"Welcome to FarmFresh Rescue, {name}! Your {role.capitalize()} account has been created successfully.", "success")
-        
-        if role == 'farmer':
-            return redirect(url_for('farmer_dashboard'))
-        elif role == 'buyer':
-            return redirect(url_for('buyer_dashboard'))
-        elif role == 'admin':
-            return redirect(url_for('admin_dashboard'))
-        return redirect(url_for('index'))
+    existing = auth_service.get_user_by_email(email)
+    if existing:
+        return False, f"An account with email '{email}' already exists. Please log in instead.", None
 
-    initial_role = request.args.get('role', 'farmer')
-    return render_template('register.html', initial_role=initial_role)
+    ok, user_or_err = auth_service.create_user_account(
+        name=name,
+        email=email,
+        plain_password=password,
+        role=target_role,
+        phone=phone,
+        location=location,
+        pin_code=pin_code,
+        user_type=user_type
+    )
+
+    if not ok:
+        return False, str(user_or_err), None
+
+    user = user_or_err
+    create_notification(
+        user['id'],
+        f"Welcome to FarmFresh Rescue, {name}!",
+        "Your account has been registered successfully. Explore Tamil Nadu direct produce zero-waste trading.",
+        "info",
+        url_for('farmer_dashboard') if target_role == 'farmer' else url_for('buyer_dashboard')
+    )
+    log_activity("User Registered", f"New {target_role} registered: {name} ({email})", email)
+    return True, None, user
+
+# ==========================================
+# Authentication Web Routes
+# ==========================================
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if g.user:
-        flash("You are already logged in.", "info")
-        return redirect(url_for('index'))
+        return redirect(url_for(_role_dashboard_endpoint(g.user['role'])))
 
     if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
-        next_url = request.args.get('next')
+        return login_post()
 
-        if not email or not password:
-            flash("Please enter both email address and password.", "danger")
-            return render_template('login.html', email=email)
+    active_role = request.args.get('role', 'farmer').lower()
+    if active_role not in ['farmer', 'buyer', 'admin']:
+        active_role = 'farmer'
+    return render_template('login.html', active_role=active_role)
 
-        conn = get_db()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
-        user = cursor.fetchone()
-        conn.close()
+@app.route('/login_post', methods=['POST'])
+def login_post():
+    if g.user:
+        return redirect(url_for(_role_dashboard_endpoint(g.user['role'])))
 
-        if user and check_password_hash(user['password_hash'], password):
-            if user['is_active'] == 0:
-                flash("Your account has been deactivated by administrator. Please contact support.", "danger")
-                return render_template('login.html', email=email)
+    email = request.form.get('email', '').strip().lower()
+    password = request.form.get('password', '')
+    expected_role = request.form.get('role', '').strip().lower()
+    remember_me = bool(request.form.get('remember_me'))
+    next_url = request.form.get('next') or request.args.get('next')
 
+    ok, err_msg, user = _authenticate_credentials(email, password, expected_role or None)
+    if not ok:
+        flash(err_msg, "danger")
+        return render_template('login.html', active_role=expected_role or 'farmer', email=email)
+
+    log_activity("User Logged In", f"{user['role'].capitalize()} logged in: {user['email']}", user['email'])
+    target_endpoint = _role_dashboard_endpoint(user['role'])
+    
+    if next_url and next_url.startswith('/'):
+        # Verify next_url doesn't cross forbidden boundaries
+        if '/admin' in next_url and user['role'] != 'admin':
+            pass
+        elif '/farmer' in next_url and user['role'] != 'farmer':
+            pass
+        elif '/buyer' in next_url and user['role'] != 'buyer':
+            pass
+        else:
             session['user_id'] = user['id']
             session['user_name'] = user['name']
             session['user_role'] = user['role']
-
-            log_activity("User Logged In", f"{user['role'].capitalize()} logged in: {user['email']}", user['email'])
+            token = auth_service.generate_jwt_token(user['id'], user['email'], user['role'], days=30 if remember_me else 7)
             flash(f"Welcome back, {user['name']}!", "success")
+            resp = make_response(redirect(next_url))
+            max_age = 60 * 60 * 24 * (30 if remember_me else 7)
+            resp.set_cookie('farmfresh_auth_token', token, max_age=max_age, httponly=True, samesite='Lax')
+            return resp
 
-            if next_url:
-                return redirect(next_url)
+    return _make_auth_response(user, target_endpoint, remember_me=remember_me, flash_msg=f"Welcome back, {user['name']}!")
 
-            if user['role'] == 'farmer':
-                return redirect(url_for('farmer_dashboard'))
-            elif user['role'] == 'buyer':
-                return redirect(url_for('buyer_dashboard'))
-            elif user['role'] == 'admin':
-                return redirect(url_for('admin_dashboard'))
-            return redirect(url_for('index'))
-        else:
-            flash("Invalid email or password. Please check your credentials.", "danger")
-            return render_template('login.html', email=email)
+@app.route('/login/farmer')
+def login_farmer():
+    return redirect(url_for('login', role='farmer'))
 
-    return render_template('login.html')
+@app.route('/login/buyer')
+def login_buyer():
+    return redirect(url_for('login', role='buyer'))
 
-@app.route('/logout')
+@app.route('/login/admin')
+@app.route('/admin/login')
+def login_admin():
+    return render_template('login.html', active_role='admin')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if g.user:
+        return redirect(url_for(_role_dashboard_endpoint(g.user['role'])))
+
+    if request.method == 'POST':
+        return register_post()
+
+    active_role = request.args.get('role', 'farmer').lower()
+    if active_role not in ['farmer', 'buyer']:
+        active_role = 'farmer'
+    return render_template('register.html', active_role=active_role)
+
+@app.route('/register_post', methods=['POST'])
+def register_post():
+    if g.user:
+        return redirect(url_for(_role_dashboard_endpoint(g.user['role'])))
+
+    role = request.form.get('role', 'farmer').strip().lower()
+    if role not in ['farmer', 'buyer']:
+        flash("Admin accounts cannot be registered publicly.", "danger")
+        return render_template('register.html', active_role='farmer', **request.form)
+
+    ok, err_msg, user = _perform_registration(request.form, role)
+    if not ok:
+        flash(err_msg, "danger")
+        return render_template('register.html', active_role=role, **request.form)
+
+    target_endpoint = 'farmer_dashboard' if role == 'farmer' else 'buyer_dashboard'
+    return _make_auth_response(
+        user, target_endpoint, remember_me=False,
+        flash_msg=f"Welcome to FarmFresh Rescue, {user['name']}! Your {role.capitalize()} account has been created."
+    )
+
+@app.route('/register/farmer')
+def register_farmer():
+    return render_template('register.html', active_role='farmer')
+
+@app.route('/register/buyer')
+def register_buyer():
+    return render_template('register.html', active_role='buyer')
+
+@app.route('/logout', methods=['GET', 'POST'])
 def logout():
     session.clear()
     flash("You have been successfully logged out. Have a productive day!", "info")
-    return redirect(url_for('index'))
+    resp = make_response(redirect(url_for('login')))
+    resp.delete_cookie('farmfresh_auth_token')
+    return resp
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    role_param = request.args.get('role', 'farmer').lower()
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        if not email or '@' not in email:
+            flash("Please enter a valid email address.", "danger")
+            return render_template('forgot_password.html', email=email, active_role=role_param)
+
+        ok, token = auth_service.generate_password_reset_token(email)
+        # Always display friendly non-leaking message
+        flash("If an account exists with this email address, a password reset link has been generated.", "info")
+        test_url = url_for('reset_password_view', token=token, _external=True) if ok else None
+        return render_template('forgot_password.html', email=email, active_role=role_param, test_reset_url=test_url)
+
+    return render_template('forgot_password.html', active_role=role_param)
+
+@app.route('/reset-password/<token>', methods=['GET', 'POST'])
+def reset_password_view(token):
+    if request.method == 'POST':
+        new_password = request.form.get('password', '')
+        confirm_password = request.form.get('confirm_password', '')
+
+        if not new_password or len(new_password) < 6:
+            flash("Password must be at least 6 characters long.", "danger")
+            return render_template('reset_password.html', token=token)
+
+        if new_password != confirm_password:
+            flash("Passwords do not match.", "danger")
+            return render_template('reset_password.html', token=token)
+
+        ok, msg = auth_service.reset_password_with_token(token, new_password)
+        if ok:
+            flash("Your password has been reset successfully! Please log in with your new password.", "success")
+            return redirect(url_for('login'))
+        else:
+            flash(msg or "Invalid or expired password reset link.", "danger")
+            return render_template('reset_password.html', token=token)
+
+    return render_template('reset_password.html', token=token)
+
+# ==========================================
+# REST API Authentication Endpoints
+# ==========================================
+
+@app.route('/api/auth/register/farmer', methods=['POST'])
+def api_register_farmer():
+    data = request.get_json(silent=True) or request.form
+    ok, err, user = _perform_registration(data, 'farmer')
+    if not ok:
+        return jsonify({'success': False, 'error': err}), 400
+    token = auth_service.generate_jwt_token(user['id'], user['email'], 'farmer', days=7)
+    session['user_id'] = user['id']
+    session['user_name'] = user['name']
+    session['user_role'] = 'farmer'
+    resp = make_response(jsonify({
+        'success': True,
+        'message': 'Farmer registered successfully',
+        'token': token,
+        'user': {
+            'id': user['id'],
+            'name': user['name'],
+            'email': user['email'],
+            'role': 'farmer',
+            'phone': user['phone']
+        },
+        'redirect': url_for('farmer_dashboard')
+    }), 201)
+    resp.set_cookie('farmfresh_auth_token', token, max_age=60*60*24*7, httponly=True, samesite='Lax')
+    return resp
+
+@app.route('/api/auth/register/buyer', methods=['POST'])
+def api_register_buyer():
+    data = request.get_json(silent=True) or request.form
+    ok, err, user = _perform_registration(data, 'buyer')
+    if not ok:
+        return jsonify({'success': False, 'error': err}), 400
+    token = auth_service.generate_jwt_token(user['id'], user['email'], 'buyer', days=7)
+    session['user_id'] = user['id']
+    session['user_name'] = user['name']
+    session['user_role'] = 'buyer'
+    resp = make_response(jsonify({
+        'success': True,
+        'message': 'Buyer registered successfully',
+        'token': token,
+        'user': {
+            'id': user['id'],
+            'name': user['name'],
+            'email': user['email'],
+            'role': 'buyer',
+            'phone': user['phone']
+        },
+        'redirect': url_for('buyer_dashboard')
+    }), 201)
+    resp.set_cookie('farmfresh_auth_token', token, max_age=60*60*24*7, httponly=True, samesite='Lax')
+    return resp
+
+@app.route('/api/auth/login/farmer', methods=['POST'])
+def api_login_farmer():
+    data = request.get_json(silent=True) or request.form
+    email = data.get('email', '').strip().lower()
+    password = data.get('password', '')
+    remember_me = bool(data.get('remember_me'))
+    ok, err, user = _authenticate_credentials(email, password, 'farmer')
+    if not ok:
+        return jsonify({'success': False, 'error': err}), 401
+    token = auth_service.generate_jwt_token(user['id'], user['email'], 'farmer', days=30 if remember_me else 7)
+    session['user_id'] = user['id']
+    session['user_name'] = user['name']
+    session['user_role'] = 'farmer'
+    resp = make_response(jsonify({
+        'success': True,
+        'message': 'Farmer authenticated successfully',
+        'token': token,
+        'user': {
+            'id': user['id'],
+            'name': user['name'],
+            'email': user['email'],
+            'role': 'farmer',
+            'phone': user['phone']
+        },
+        'redirect': url_for('farmer_dashboard')
+    }))
+    max_age = 60 * 60 * 24 * (30 if remember_me else 7)
+    resp.set_cookie('farmfresh_auth_token', token, max_age=max_age, httponly=True, samesite='Lax')
+    return resp
+
+@app.route('/api/auth/login/buyer', methods=['POST'])
+def api_login_buyer():
+    data = request.get_json(silent=True) or request.form
+    email = data.get('email', '').strip().lower()
+    password = data.get('password', '')
+    remember_me = bool(data.get('remember_me'))
+    ok, err, user = _authenticate_credentials(email, password, 'buyer')
+    if not ok:
+        return jsonify({'success': False, 'error': err}), 401
+    token = auth_service.generate_jwt_token(user['id'], user['email'], 'buyer', days=30 if remember_me else 7)
+    session['user_id'] = user['id']
+    session['user_name'] = user['name']
+    session['user_role'] = 'buyer'
+    resp = make_response(jsonify({
+        'success': True,
+        'message': 'Buyer authenticated successfully',
+        'token': token,
+        'user': {
+            'id': user['id'],
+            'name': user['name'],
+            'email': user['email'],
+            'role': 'buyer',
+            'phone': user['phone']
+        },
+        'redirect': url_for('buyer_dashboard')
+    }))
+    max_age = 60 * 60 * 24 * (30 if remember_me else 7)
+    resp.set_cookie('farmfresh_auth_token', token, max_age=max_age, httponly=True, samesite='Lax')
+    return resp
+
+@app.route('/api/auth/login/admin', methods=['POST'])
+def api_login_admin():
+    data = request.get_json(silent=True) or request.form
+    email = data.get('email', '').strip().lower()
+    password = data.get('password', '')
+    remember_me = bool(data.get('remember_me'))
+    ok, err, user = _authenticate_credentials(email, password, 'admin')
+    if not ok:
+        return jsonify({'success': False, 'error': err}), 401
+    token = auth_service.generate_jwt_token(user['id'], user['email'], 'admin', days=30 if remember_me else 7)
+    session['user_id'] = user['id']
+    session['user_name'] = user['name']
+    session['user_role'] = 'admin'
+    resp = make_response(jsonify({
+        'success': True,
+        'message': 'Administrator authenticated successfully',
+        'token': token,
+        'user': {
+            'id': user['id'],
+            'name': user['name'],
+            'email': user['email'],
+            'role': 'admin'
+        },
+        'redirect': url_for('admin_dashboard')
+    }))
+    max_age = 60 * 60 * 24 * (30 if remember_me else 7)
+    resp.set_cookie('farmfresh_auth_token', token, max_age=max_age, httponly=True, samesite='Lax')
+    return resp
+
+@app.route('/api/auth/logout', methods=['POST'])
+def api_logout():
+    session.clear()
+    resp = make_response(jsonify({
+        'success': True,
+        'message': 'Logged out successfully',
+        'redirect': url_for('login')
+    }))
+    resp.delete_cookie('farmfresh_auth_token')
+    return resp
+
+@app.route('/api/auth/me', methods=['GET'])
+def api_auth_me():
+    if not g.user:
+        return jsonify({'authenticated': False, 'user': None}), 401
+    return jsonify({
+        'authenticated': True,
+        'user': {
+            'id': g.user['id'],
+            'name': g.user['name'],
+            'email': g.user['email'],
+            'role': g.user['role'],
+            'phone': g.user['phone'],
+            'location': g.user['location'],
+            'user_type': g.user.get('user_type', '')
+        }
+    })
+
+@app.route('/api/auth/forgot-password', methods=['POST'])
+def api_forgot_password():
+    data = request.get_json(silent=True) or request.form
+    email = data.get('email', '').strip().lower()
+    if not email or '@' not in email:
+        return jsonify({'error': 'Valid email is required'}), 400
+    ok, token = auth_service.generate_password_reset_token(email)
+    return jsonify({
+        'success': True,
+        'message': 'If the email exists, a password reset token has been generated.',
+        'token': token if ok else None
+    })
+
+@app.route('/api/auth/reset-password', methods=['POST'])
+def api_reset_password():
+    data = request.get_json(silent=True) or request.form
+    token = data.get('token', '').strip()
+    new_pw = data.get('password', '')
+    if not token or not new_pw or len(new_pw) < 6:
+        return jsonify({'error': 'Token and new password (min 6 characters) required'}), 400
+    ok, msg = auth_service.reset_password_with_token(token, new_pw)
+    if not ok:
+        return jsonify({'success': False, 'error': msg}), 400
+    return jsonify({'success': True, 'message': 'Password has been updated successfully'})
 
 # ==========================================
 # Farmer Listings CRUD Routes
@@ -1743,9 +2175,14 @@ def submit_order():
 
     # Find or associate buyer_id
     if not buyer_id:
-        cursor.execute("SELECT id FROM users WHERE email = ?", (buyer_email,))
+        cursor.execute("SELECT id FROM users WHERE LOWER(email) = ?", (buyer_email.lower(),))
         existing_user = cursor.fetchone()
-        buyer_id = existing_user['id'] if existing_user else 1
+        if existing_user:
+            buyer_id = existing_user['id']
+        else:
+            cursor.execute("SELECT id FROM users WHERE role = 'buyer' AND is_active = 1 LIMIT 1")
+            first_buyer = cursor.fetchone()
+            buyer_id = first_buyer['id'] if first_buyer else None
 
     cursor.execute('''
         INSERT INTO enquiries (
@@ -2310,8 +2747,9 @@ def analytics_view():
 # ==========================================
 
 @app.route('/farmer/dashboard')
+@app.route('/dashboard/farmer')
 @login_required
-@role_required(['farmer', 'admin'])
+@farmer_required
 def farmer_dashboard():
     """
     Farmer Dashboard AI 2.0 with real calculated metrics:
@@ -2500,8 +2938,9 @@ def farmer_dashboard():
     )
 
 @app.route('/buyer/dashboard')
+@app.route('/dashboard/buyer')
 @login_required
-@role_required(['buyer', 'admin'])
+@buyer_required
 def buyer_dashboard():
     conn = get_db()
     cursor = conn.cursor()
@@ -2618,8 +3057,9 @@ def buyer_dashboard():
     )
 
 @app.route('/admin/dashboard')
+@app.route('/dashboard/admin')
 @login_required
-@role_required('admin')
+@admin_required
 def admin_dashboard():
     conn = get_db()
     cursor = conn.cursor()
@@ -2739,7 +3179,7 @@ def admin_dashboard():
 
 @app.route('/admin/toggle-user-status/<int:user_id>', methods=['POST'])
 @login_required
-@role_required('admin')
+@admin_required
 def admin_toggle_user_status(user_id):
     if user_id == g.user['id']:
         flash("You cannot deactivate your own admin account.", "danger")
@@ -2765,7 +3205,7 @@ def admin_toggle_user_status(user_id):
 
 @app.route('/admin/delete-user/<int:user_id>', methods=['POST'])
 @login_required
-@role_required('admin')
+@admin_required
 def admin_delete_user(user_id):
     if user_id == g.user['id']:
         flash("You cannot delete your own admin account.", "danger")
@@ -2789,7 +3229,7 @@ def admin_delete_user(user_id):
 
 @app.route('/admin/sample-data/remove', methods=['POST'])
 @login_required
-@role_required('admin')
+@admin_required
 def admin_remove_sample_data():
     try:
         from seed_vegetables import remove_sample_data
@@ -2802,7 +3242,7 @@ def admin_remove_sample_data():
 
 @app.route('/admin/sample-data/reset', methods=['POST'])
 @login_required
-@role_required('admin')
+@admin_required
 def admin_reset_sample_data():
     try:
         from seed_vegetables import reset_sample_data
@@ -3218,7 +3658,7 @@ def api_request_refund():
 
 @app.route('/api/admin/refund/<int:payment_id>', methods=['POST'])
 @login_required
-@role_required('admin')
+@admin_required
 def api_admin_process_refund(payment_id):
     if request.is_json:
         data = request.get_json(silent=True) or {}

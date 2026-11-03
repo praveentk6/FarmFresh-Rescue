@@ -34,7 +34,13 @@ class TestRealTimeAndPayment(unittest.TestCase):
 
     def set_admin_session(self):
         with self.client.session_transaction() as sess:
-            sess['user_id'] = 1
+            from database import get_db
+            conn = get_db()
+            c = conn.cursor()
+            c.execute("SELECT id FROM users WHERE role = 'admin' LIMIT 1")
+            row = c.fetchone()
+            conn.close()
+            sess['user_id'] = row['id'] if row else 103
             sess['user_role'] = 'admin'
 
     def clear_session(self):

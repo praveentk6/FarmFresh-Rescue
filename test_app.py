@@ -1,5 +1,6 @@
 import unittest
 import json
+import auth_service
 from app import app
 from database import get_db
 
@@ -8,6 +9,8 @@ class TestFarmFreshRescue(unittest.TestCase):
         self.app = app
         self.app.config['TESTING'] = True
         self.client = self.app.test_client()
+        admin = auth_service.get_user_by_email('pp274142@gmail.com')
+        self.admin_id = admin['id'] if admin else 103
 
     def test_01_public_routes(self):
         routes = [
@@ -22,21 +25,22 @@ class TestFarmFreshRescue(unittest.TestCase):
             '/register'
         ]
         for r in routes:
-            res = self.client.get(r)
-            self.assertEqual(res.status_code, 200, f"Route {r} failed with status {res.status_code}")
+            res = self.client.get(r, follow_redirects=False)
+            expected_status = 302 if r == '/' else 200
+            self.assertEqual(res.status_code, expected_status, f"Route {r} failed with status {res.status_code}")
 
     def test_02_language_switching(self):
         # Switch to Tamil
         res = self.client.get('/set-language/ta', follow_redirects=True)
         self.assertEqual(res.status_code, 200)
         # Check cookie or session
-        res_home = self.client.get('/')
+        res_home = self.client.get('/', follow_redirects=True)
         self.assertIn(b'lang-ta', res_home.data)
 
         # Switch back to English
         res = self.client.get('/set-language/en', follow_redirects=True)
         self.assertEqual(res.status_code, 200)
-        res_home = self.client.get('/')
+        res_home = self.client.get('/', follow_redirects=True)
         self.assertIn(b'lang-en', res_home.data)
 
     def test_03_farmer_dashboard_and_kpis(self):
@@ -64,7 +68,7 @@ class TestFarmFreshRescue(unittest.TestCase):
 
     def test_05_admin_dashboard(self):
         with self.client.session_transaction() as sess:
-            sess['user_id'] = 1 # Admin
+            sess['user_id'] = self.admin_id
             sess['user_role'] = 'admin'
 
         res = self.client.get('/admin/dashboard')
@@ -170,7 +174,7 @@ class TestFarmFreshRescue(unittest.TestCase):
 
     def test_11_admin_sample_data_workflow(self):
         with self.client.session_transaction() as sess:
-            sess['user_id'] = 1  # Admin
+            sess['user_id'] = self.admin_id
             sess['user_role'] = 'admin'
 
         # 1. Admin dashboard shows sample data section
@@ -280,7 +284,7 @@ class TestFarmFreshRescue(unittest.TestCase):
 
     def test_18_order_tracking_and_timeline(self):
         with self.client.session_transaction() as sess:
-            sess['user_id'] = 1  # Admin
+            sess['user_id'] = self.admin_id
             sess['user_role'] = 'admin'
 
         # Order 1 tracking page

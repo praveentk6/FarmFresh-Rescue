@@ -3350,3 +3350,483 @@ textarea.form-control {
   }
 }
 
+
+
+/* ===================================================================
+   FarmFresh Rescue - Comprehensive Role-Based Authentication System
+   Farmer, Buyer, and Admin Themed Portals
+   =================================================================== */
+
+.auth-page-wrapper {
+  min-height: calc(100vh - 140px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2.5rem 1rem;
+  background: radial-gradient(circle at top right, #f0fdf4 0%, #f8faf8 60%, #fef7ee 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-page-wrapper::before {
+  content: "";
+  position: absolute;
+  top: -100px;
+  right: -100px;
+  width: 350px;
+  height: 350px;
+  border-radius: 50%;
+  background: rgba(34, 197, 94, 0.08);
+  filter: blur(60px);
+  pointer-events: none;
+}
+
+.auth-page-wrapper::after {
+  content: "";
+  position: absolute;
+  bottom: -80px;
+  left: -80px;
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: rgba(217, 119, 6, 0.07);
+  filter: blur(55px);
+  pointer-events: none;
+}
+
+.auth-card {
+  position: relative;
+  z-index: 2;
+  background: #ffffff;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 20px;
+  box-shadow: 0 12px 36px -4px rgba(20, 83, 45, 0.08), 0 4px 12px rgba(0, 0, 0, 0.03);
+  padding: 2.25rem 2.25rem 2rem 2.25rem;
+  width: 100%;
+  transition: transform var(--transition-normal), box-shadow var(--transition-normal);
+}
+
+.auth-login-card {
+  max-width: 520px;
+}
+
+.auth-register-card {
+  max-width: 680px;
+}
+
+.auth-header {
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+
+.auth-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #ecfdf5, #dcfce7);
+  border: 2px solid #bbf7d0;
+  box-shadow: 0 4px 12px rgba(22, 163, 74, 0.15);
+  margin-bottom: 0.85rem;
+}
+
+.auth-logo-badge .auth-leaf {
+  font-size: 1.9rem;
+  line-height: 1;
+}
+
+.auth-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #14532d;
+  margin-bottom: 0.35rem;
+  letter-spacing: -0.02em;
+}
+
+.auth-subtitle {
+  font-size: 0.875rem;
+  color: #64748b;
+  line-height: 1.45;
+  margin-bottom: 0;
+}
+
+/* Role Segmented Switcher */
+.auth-role-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.35rem;
+  background: #f1f5f9;
+  padding: 0.35rem;
+  border-radius: 14px;
+  margin-bottom: 1.25rem;
+  border: 1px solid #e2e8f0;
+}
+
+.auth-register-card .auth-role-tabs {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.auth-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  padding: 0.7rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #64748b;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.auth-tab:hover {
+  color: #0f172a;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.auth-tab.active {
+  background: #ffffff;
+  color: #15803d;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+#tabBuyer.active, #tabRegBuyer.active {
+  color: #0284c7;
+}
+
+#tabAdmin.active {
+  color: #b91c1c;
+}
+
+.tab-icon {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+/* Demo quick-fill banner */
+.demo-accounts-box {
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 1.25rem;
+}
+
+.demo-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.demo-pill {
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.3rem 0.65rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.demo-pill.pill-farmer {
+  color: #166534;
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+}
+
+.demo-pill.pill-farmer:hover {
+  background: #dcfce7;
+}
+
+.demo-pill.pill-buyer {
+  color: #0369a1;
+  border-color: #bae6fd;
+  background: #f0f9ff;
+}
+
+.demo-pill.pill-buyer:hover {
+  background: #e0f2fe;
+}
+
+.demo-pill.pill-admin {
+  color: #b91c1c;
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.demo-pill.pill-admin:hover {
+  background: #fee2e2;
+}
+
+/* Role Banner / Badge */
+.role-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 10px;
+  font-size: 0.825rem;
+  font-weight: 600;
+  margin-bottom: 1.25rem;
+}
+
+.role-badge-farmer {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
+.role-badge-buyer {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+}
+
+.role-badge-admin {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.admin-notice-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #b91c1c;
+  border-radius: 8px;
+  padding: 0.65rem 0.85rem;
+  margin-bottom: 1.25rem;
+  font-size: 0.8rem;
+  color: #475569;
+  line-height: 1.4;
+}
+
+/* Forms and Tabs display toggle */
+.auth-role-pane {
+  display: none;
+}
+
+.auth-role-pane.active {
+  display: block;
+  animation: authPaneFade 0.25s ease-out;
+}
+
+@keyframes authPaneFade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-form .form-group {
+  margin-bottom: 1.15rem;
+}
+
+.auth-input {
+  border-radius: 10px;
+  font-size: 0.925rem;
+  padding: 0.7rem 0.9rem;
+  transition: all 0.2s ease;
+  border: 1.5px solid #cbd5e1;
+}
+
+.auth-input:focus {
+  border-color: #16a34a;
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.15);
+}
+
+.input-with-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-with-icon .input-icon {
+  position: absolute;
+  left: 0.85rem;
+  font-size: 1rem;
+  color: #94a3b8;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.input-with-icon .form-control {
+  padding-left: 2.45rem;
+}
+
+/* Password Input with Show/Hide Toggle */
+.password-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-wrap input {
+  padding-right: 2.75rem;
+  width: 100%;
+}
+
+.btn-toggle-pw {
+  position: absolute;
+  right: 0.6rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  font-size: 1rem;
+  color: #64748b;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.btn-toggle-pw:hover {
+  background: #f1f5f9;
+}
+
+/* Password Strength Meter */
+.pw-strength-meter {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+  margin-top: 0.4rem;
+  height: 4px;
+}
+
+.pw-strength-meter .bar {
+  background: #e2e8f0;
+  border-radius: 2px;
+  transition: background 0.25s ease;
+}
+
+.pw-strength-meter.weak .bar-1 {
+  background: #dc2626;
+}
+
+.pw-strength-meter.fair .bar-1,
+.pw-strength-meter.fair .bar-2 {
+  background: #ea580c;
+}
+
+.pw-strength-meter.good .bar-1,
+.pw-strength-meter.good .bar-2,
+.pw-strength-meter.good .bar-3 {
+  background: #0284c7;
+}
+
+.pw-strength-meter.strong .bar-1,
+.pw-strength-meter.strong .bar-2,
+.pw-strength-meter.strong .bar-3,
+.pw-strength-meter.strong .bar-4 {
+  background: #16a34a;
+}
+
+.pw-strength-label {
+  font-size: 0.725rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+  font-weight: 500;
+}
+
+/* Remember Me and Forgot Password */
+.remember-forgot-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.25rem;
+  font-size: 0.85rem;
+}
+
+.remember-forgot-row .checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  cursor: pointer;
+  color: #475569;
+  user-select: none;
+}
+
+.forgot-link {
+  color: #15803d;
+  font-weight: 600;
+  text-decoration: none;
+  font-size: 0.85rem;
+  transition: color 0.15s ease;
+}
+
+.forgot-link:hover {
+  text-decoration: underline;
+  color: #14532d;
+}
+
+/* Submit Button & Links */
+.auth-submit-btn {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 700;
+  font-size: 1.025rem;
+  padding: 0.85rem 1.25rem;
+  border-radius: 12px;
+  letter-spacing: 0.01em;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.25);
+  transition: all 0.2s ease;
+}
+
+.auth-submit-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(22, 163, 74, 0.32);
+}
+
+.auth-card-footer {
+  text-align: center;
+  margin-top: 1.25rem;
+  font-size: 0.85rem;
+  color: #64748b;
+}
+
+.auth-link-highlight {
+  font-weight: 700;
+  color: var(--primary);
+  text-decoration: underline;
+  margin-left: 0.25rem;
+}
+
+.terms-group {
+  margin: 1rem 0;
+  padding: 0.75rem 0.85rem;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+@media (max-width: 640px) {
+  .auth-card {
+    padding: 1.5rem 1.15rem;
+    border-radius: 16px;
+  }
+  .auth-role-tabs {
+    font-size: 0.775rem;
+  }
+  .auth-tab {
+    padding: 0.55rem 0.35rem;
+    font-size: 0.775rem;
+  }
+  .tab-icon {
+    font-size: 0.95rem;
+  }
+  .auth-title {
+    font-size: 1.45rem;
+  }
+}

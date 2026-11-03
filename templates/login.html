@@ -3,60 +3,236 @@
 {% block title %}Log In - FarmFresh Rescue{% endblock %}
 
 {% block content %}
-<div class="container">
-  <div class="form-card" style="max-width: 480px; margin: 3.5rem auto;">
-    
-    <div style="text-align: center; margin-bottom: 2rem;">
-      <div style="width: 56px; height: 56px; background: #dcfce7; color: #166534; font-size: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1rem;">
-        🌾
+<div class="auth-page-wrapper">
+  <div class="auth-card auth-login-card">
+
+    <!-- Brand Header -->
+    <div class="auth-header">
+      <div class="auth-logo-badge">
+        <span class="auth-leaf">🌾</span>
       </div>
-      <h1 class="form-title">Log In to FarmFresh</h1>
-      <p class="form-subtitle" style="margin-bottom: 0;">Access your farmer or buyer account</p>
+      <h1 class="auth-title">Welcome to FarmFresh</h1>
+      <p class="auth-subtitle">Tamil Nadu Agricultural Produce Direct Marketplace &bull; Zero Waste</p>
     </div>
 
-    <!-- Demo 1-Click Fast Fill Pill Box -->
+    <!-- Role Selection Tabs: Farmer, Buyer, Admin -->
+    <div class="auth-role-tabs" role="tablist" aria-label="Role Login Options">
+      <button type="button" class="auth-tab {% if active_role == 'farmer' or not active_role %}active{% endif %}" id="tabFarmer" onclick="switchLoginRole('farmer')" role="tab" aria-selected="true" aria-controls="formFarmer">
+        <span class="tab-icon">👨‍🌾</span>
+        <span class="tab-text">Farmer Login</span>
+      </button>
+      <button type="button" class="auth-tab {% if active_role == 'buyer' %}active{% endif %}" id="tabBuyer" onclick="switchLoginRole('buyer')" role="tab" aria-selected="false" aria-controls="formBuyer">
+        <span class="tab-icon">🛒</span>
+        <span class="tab-text">Buyer Login</span>
+      </button>
+      <button type="button" class="auth-tab {% if active_role == 'admin' %}active{% endif %}" id="tabAdmin" onclick="switchLoginRole('admin')" role="tab" aria-selected="false" aria-controls="formAdmin">
+        <span class="tab-icon">🛡️</span>
+        <span class="tab-text">Admin Login</span>
+      </button>
+    </div>
+
+    <!-- Quick Demo Accounts Bar -->
     <div class="demo-accounts-box">
-      <div style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.825rem; font-weight: 700; color: #1e293b;">
-        <span>⚡ Quick Test Login (Click to Auto-Fill):</span>
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.35rem;">
+        <span style="font-size: 0.8rem; font-weight: 700; color: #166534;">⚡ 1-Click Quick Fill (Testing):</span>
+        <span style="font-size: 0.725rem; color: #64748b;">Click role to test</span>
       </div>
       <div class="demo-pills">
-        <button type="button" class="demo-pill" data-email="selvi.farms@gmail.com" data-role="farmer">
-          👨‍🌾 Farmer (Selvi)
+        <button type="button" class="demo-pill pill-farmer" onclick="autoFillLogin('farmer', 'selvi.farms@gmail.com', 'farmer123')">
+          👨‍🌾 Selvi (Farmer)
         </button>
-        <button type="button" class="demo-pill" data-email="saravana.hotel@gmail.com" data-role="buyer">
-          🏪 Buyer (Saravana Hotel)
+        <button type="button" class="demo-pill pill-buyer" onclick="autoFillLogin('buyer', 'saravana.hotel@gmail.com', 'buyer123')">
+          🛒 Saravana Hotel (Buyer)
         </button>
-        <button type="button" class="demo-pill" data-email="admin@farmfresh.org" data-role="admin">
-          🛡️ Admin
+        <button type="button" class="demo-pill pill-admin" onclick="autoFillLogin('admin', 'Pp274142@gmail.com', 'praveen16')">
+          🛡️ Admin (Praveen)
         </button>
       </div>
-      <small style="color: #64748b; font-size: 0.725rem; display: block; margin-top: 0.35rem;">
-        Passwords default to role + 123 (e.g. <code>farmer123</code>, <code>buyer123</code>, <code>admin123</code>)
-      </small>
     </div>
 
-    <!-- Login Form -->
-    <form action="{{ url_for('login', next=request.args.get('next')) }}" method="POST">
-      <div class="form-group">
-        <label class="form-label">Email Address <span class="required">*</span></label>
-        <input type="email" name="email" id="loginEmail" value="{{ email or '' }}" class="form-control" placeholder="name@domain.com" required autofocus>
+    <!-- 1. FARMER LOGIN FORM -->
+    <div class="auth-role-pane {% if active_role == 'farmer' or not active_role %}active{% endif %}" id="paneFarmer">
+      <div class="role-badge role-badge-farmer">
+        <span>👨‍🌾</span>
+        <span>Farmer Portal &bull; Sell fresh surplus crops directly</span>
+      </div>
+      <form action="{{ url_for('login_post') }}" method="POST" class="auth-form" id="formFarmer">
+        <input type="hidden" name="role" value="farmer">
+        <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+
+        <div class="form-group">
+          <label class="form-label" for="farmerEmail">Farmer Email Address <span class="required">*</span></label>
+          <div class="input-with-icon">
+            <span class="input-icon">✉️</span>
+            <input type="email" name="email" id="farmerEmail" class="form-control auth-input" placeholder="e.g. muthu.farmer@gmail.com" required autofocus value="{{ email if active_role == 'farmer' else '' }}">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="farmerPassword">Password <span class="required">*</span></label>
+          <div class="password-input-wrap">
+            <input type="password" name="password" id="farmerPassword" class="form-control auth-input" placeholder="••••••••" required>
+            <button type="button" class="btn-toggle-pw" onclick="togglePasswordVisibility('farmerPassword', this)" aria-label="Toggle password visibility">👁️</button>
+          </div>
+        </div>
+
+        <div class="remember-forgot-row">
+          <label class="checkbox-label">
+            <input type="checkbox" name="remember_me" value="1">
+            <span>Remember Me</span>
+          </label>
+          <a href="{{ url_for('forgot_password', role='farmer') }}" class="forgot-link">Forgot Password?</a>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg auth-submit-btn" id="btnFarmerLogin">
+          <span>Sign In as Farmer</span> &rarr;
+        </button>
+
+        <div class="auth-card-footer">
+          New Farmer? <a href="{{ url_for('register_farmer') }}" class="auth-link-highlight">+ Register Farmer Account</a>
+        </div>
+      </form>
+    </div>
+
+    <!-- 2. BUYER LOGIN FORM -->
+    <div class="auth-role-pane {% if active_role == 'buyer' %}active{% endif %}" id="paneBuyer">
+      <div class="role-badge role-badge-buyer">
+        <span>🛒</span>
+        <span>Buyer Portal &bull; Procure fresh harvests from local farmers</span>
+      </div>
+      <form action="{{ url_for('login_post') }}" method="POST" class="auth-form" id="formBuyer">
+        <input type="hidden" name="role" value="buyer">
+        <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+
+        <div class="form-group">
+          <label class="form-label" for="buyerEmail">Buyer Email Address <span class="required">*</span></label>
+          <div class="input-with-icon">
+            <span class="input-icon">✉️</span>
+            <input type="email" name="email" id="buyerEmail" class="form-control auth-input" placeholder="e.g. saravana.hotel@gmail.com" required value="{{ email if active_role == 'buyer' else '' }}">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="buyerPassword">Password <span class="required">*</span></label>
+          <div class="password-input-wrap">
+            <input type="password" name="password" id="buyerPassword" class="form-control auth-input" placeholder="••••••••" required>
+            <button type="button" class="btn-toggle-pw" onclick="togglePasswordVisibility('buyerPassword', this)" aria-label="Toggle password visibility">👁️</button>
+          </div>
+        </div>
+
+        <div class="remember-forgot-row">
+          <label class="checkbox-label">
+            <input type="checkbox" name="remember_me" value="1">
+            <span>Remember Me</span>
+          </label>
+          <a href="{{ url_for('forgot_password', role='buyer') }}" class="forgot-link">Forgot Password?</a>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg auth-submit-btn" id="btnBuyerLogin" style="background: linear-gradient(135deg, #0284c7, #0369a1);">
+          <span>Sign In as Buyer</span> &rarr;
+        </button>
+
+        <div class="auth-card-footer">
+          New Buyer? <a href="{{ url_for('register_buyer') }}" class="auth-link-highlight" style="color: #0284c7;">+ Register Buyer Account</a>
+        </div>
+      </form>
+    </div>
+
+    <!-- 3. ADMIN LOGIN FORM -->
+    <div class="auth-role-pane {% if active_role == 'admin' %}active{% endif %}" id="paneAdmin">
+      <div class="role-badge role-badge-admin">
+        <span>🛡️</span>
+        <span>Administrator &bull; Platform Waste Oversight &amp; Audit</span>
+      </div>
+      <div class="admin-notice-box">
+        <span class="notice-icon">🔒</span>
+        <span class="notice-text">Restricted Platform Control Center. Only authorized administrator access permitted. Public admin registration is disabled.</span>
       </div>
 
-      <div class="form-group">
-        <label class="form-label">Password <span class="required">*</span></label>
-        <input type="password" name="password" id="loginPassword" class="form-control" placeholder="••••••••" required>
-      </div>
+      <form action="{{ url_for('login_post') }}" method="POST" class="auth-form" id="formAdmin">
+        <input type="hidden" name="role" value="admin">
+        <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
 
-      <button type="submit" class="btn btn-primary btn-block btn-lg" style="margin-top: 1rem;">
-        Sign In to Platform
-      </button>
-    </form>
+        <div class="form-group">
+          <label class="form-label" for="adminEmail">Authorized Admin Email <span class="required">*</span></label>
+          <div class="input-with-icon">
+            <span class="input-icon">🛡️</span>
+            <input type="email" name="email" id="adminEmail" class="form-control auth-input" placeholder="Pp274142@gmail.com" required value="{{ email if active_role == 'admin' else '' }}">
+          </div>
+        </div>
 
-    <div style="text-align: center; margin-top: 1.75rem; padding-top: 1.5rem; border-top: 1px solid var(--border-subtle); font-size: 0.9rem; color: #64748b;">
-      Don't have an account yet? 
-      <a href="{{ url_for('register') }}" style="font-weight: 700; color: var(--primary);">Register Now</a>
+        <div class="form-group">
+          <label class="form-label" for="adminPassword">Admin Master Password <span class="required">*</span></label>
+          <div class="password-input-wrap">
+            <input type="password" name="password" id="adminPassword" class="form-control auth-input" placeholder="••••••••" required>
+            <button type="button" class="btn-toggle-pw" onclick="togglePasswordVisibility('adminPassword', this)" aria-label="Toggle password visibility">👁️</button>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-danger btn-block btn-lg auth-submit-btn" id="btnAdminLogin" style="background: linear-gradient(135deg, #b91c1c, #991b1b);">
+          <span>Access Admin Control Center</span> &rarr;
+        </button>
+
+        <div class="auth-card-footer" style="color: #64748b; font-size: 0.8rem;">
+          Protected by bcrypt hashing &amp; signed JWT tokens. Unauthorized access attempts are monitored and logged.
+        </div>
+      </form>
     </div>
 
   </div>
 </div>
+
+<script>
+function switchLoginRole(role) {
+  // Update Tabs
+  document.getElementById('tabFarmer').classList.toggle('active', role === 'farmer');
+  document.getElementById('tabBuyer').classList.toggle('active', role === 'buyer');
+  document.getElementById('tabAdmin').classList.toggle('active', role === 'admin');
+
+  // Update Panes
+  document.getElementById('paneFarmer').classList.toggle('active', role === 'farmer');
+  document.getElementById('paneBuyer').classList.toggle('active', role === 'buyer');
+  document.getElementById('paneAdmin').classList.toggle('active', role === 'admin');
+
+  // Update URL hash without reload
+  if (history.replaceState) {
+    history.replaceState(null, null, '#' + role);
+  }
+}
+
+function togglePasswordVisibility(inputId, btn) {
+  const el = document.getElementById(inputId);
+  if (el) {
+    if (el.type === 'password') {
+      el.type = 'text';
+      btn.textContent = '🙈';
+    } else {
+      el.type = 'password';
+      btn.textContent = '👁️';
+    }
+  }
+}
+
+function autoFillLogin(role, email, pw) {
+  switchLoginRole(role);
+  if (role === 'farmer') {
+    document.getElementById('farmerEmail').value = email;
+    document.getElementById('farmerPassword').value = pw;
+  } else if (role === 'buyer') {
+    document.getElementById('buyerEmail').value = email;
+    document.getElementById('buyerPassword').value = pw;
+  } else if (role === 'admin') {
+    document.getElementById('adminEmail').value = email;
+    document.getElementById('adminPassword').value = pw;
+  }
+}
+
+// Check initial hash on page load
+document.addEventListener('DOMContentLoaded', () => {
+  const hash = window.location.hash.replace('#', '');
+  if (hash === 'buyer' || hash === 'admin' || hash === 'farmer') {
+    switchLoginRole(hash);
+  }
+});
+</script>
 {% endblock %}
