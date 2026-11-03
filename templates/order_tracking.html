@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
-{% block title %}Track Order #{{ order['id'] }} - {{ _t('brand_name') }}{% endblock %}
-{% block meta_desc %}Real-time smart delivery route logistics and live milestone tracking for agricultural order #{{ order['id'] }} across Tamil Nadu.{% endblock %}
+{% block title %}Track Order #{{ order['order_code'] or order['id'] }} - {{ _t('brand_name') }}{% endblock %}
+{% block meta_desc %}Real-time 11-stage agricultural order tracking, harvest quality verification, live route logistics and handover verification across Tamil Nadu.{% endblock %}
 
 {% block content %}
 <div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
@@ -14,252 +14,518 @@
     {% else %}
       <a href="{{ url_for('buyer_dashboard') }}">{{ _t('my_orders') }}</a> &bull;
     {% endif %}
-    <span>Track Order #{{ order['id'] }}</span>
+    <span>Track Order {{ order['order_code'] or ('#' ~ order['id']) }}</span>
   </div>
 
-  <!-- Header Banner -->
-  <div class="dashboard-header" style="margin-bottom: 2rem;">
+  <!-- Header Banner & Summary (Section 9) -->
+  <div class="dashboard-header" style="margin-bottom: 2rem; background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); padding: 1.5rem 2rem; box-shadow: var(--shadow-sm); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
     <div>
-      <div style="font-size: 0.85rem; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
-        🚚 Smart Delivery & Location Logistics &bull; Tamil Nadu
+      <div style="font-size: 0.8rem; color: #166534; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 0.4rem;">
+        <span>🌾 Order Code: {{ order['order_code'] or ('ORD-2026-' ~ order['id']) }}</span>
+        <span style="color: #94a3b8;">&bull;</span>
+        <span>ID #{{ order['id'] }}</span>
       </div>
-      <h1 style="font-size: 2.25rem; font-weight: 800; margin-top: 0.25rem;">
-        Track Order #{{ order['id'] }}: {{ order['crop_name'] }}
+      <h1 style="font-size: 2.2rem; font-weight: 800; margin: 0.25rem 0; color: #0f172a;">
+        {{ order['crop_name'] }}
       </h1>
-      <p style="color: var(--text-muted); font-size: 0.95rem;">
-        Quantity: <strong>{{ order['requested_quantity'] }} {{ order['unit'] }}</strong> &bull; Total: <strong>₹{{ "{:,.0f}".format(order['total_price']) }}</strong> &bull; Farmer: <strong>{{ order['farmer_name'] }}</strong>
+      <p style="color: var(--text-muted); font-size: 0.95rem; margin: 0;">
+        Agreed Quantity: <strong style="color: #0f172a;">{{ order['requested_quantity'] }} {{ order['unit'] }}</strong> &bull; 
+        Rate: <strong style="color: #0f172a;">₹{{ "%.0f"|format(order['offered_price'] or order['price_per_unit']) }} / {{ order['unit'] }}</strong> &bull; 
+        Total Value: <strong style="color: #15803d; font-size: 1.15rem;">₹{{ "{:,.0f}".format(order['total_price']) }}</strong>
       </p>
     </div>
 
-    <!-- Quick Status Badge -->
-    <div>
-      <span class="{% if order['status'] in ['Completed', 'Delivered'] %}badge-available{% elif order['status'] in ['Accepted', 'Packed', 'Shipped', 'Ready for Collection'] %}badge-category{% else %}badge-urgent{% endif %}" style="font-size: 1.1rem; padding: 0.5rem 1.25rem; font-weight: 800;">
+    <!-- Quick Status Badges & Invoice -->
+    <div style="display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap;">
+      <span class="{% if order['status'] in ['Completed', 'Delivered'] %}badge-available{% elif order['status'] in ['Confirmed', 'Accepted', 'Packed', 'Shipped', 'Ready for Pickup', 'In Transit'] %}badge-category{% else %}badge-urgent{% endif %}" style="font-size: 1rem; padding: 0.5rem 1rem; font-weight: 800;">
         {{ order['status'] }}
       </span>
+
+      {% if order['payment_status'] in ['Paid', 'Payment Verified'] %}
+        <span style="background: #dcfce7; color: #15803d; font-size: 0.85rem; font-weight: 800; padding: 0.5rem 0.85rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.35rem;">
+          ✓ Payment Verified
+        </span>
+      {% else %}
+        <span style="background: #fef3c7; color: #92400e; font-size: 0.85rem; font-weight: 800; padding: 0.5rem 0.85rem; border-radius: 9999px;">
+          Payment Pending
+        </span>
+      {% endif %}
+
+      <a href="{{ url_for('view_invoice', order_id=order['id']) }}" class="btn btn-outline-primary btn-sm" style="display: inline-flex; align-items: center; gap: 0.35rem; font-weight: 700; height: 38px;">
+        🧾 Download Tax Invoice
+      </a>
     </div>
   </div>
 
-  <!-- 5-Stage Live Order Workflow Progress Bar -->
-  <div class="data-table-card" style="padding: 2rem 1.5rem; margin-bottom: 2rem;">
-    <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 1.5rem; color: #0f172a;">
-      📍 Delivery Milestone Progress
-    </h3>
-
-    {% set steps = ['Pending', 'Accepted', 'Packed', 'Shipped', 'Delivered'] %}
-    {% set current_index = 0 %}
-    {% if order['status'] == 'Accepted' %}
-      {% set current_index = 1 %}
-    {% elif order['status'] in ['Packed', 'Ready for Collection'] %}
-      {% set current_index = 2 %}
-    {% elif order['status'] == 'Shipped' %}
-      {% set current_index = 3 %}
-    {% elif order['status'] in ['Delivered', 'Completed'] %}
-      {% set current_index = 4 %}
-    {% endif %}
-
-    <div class="stepper-wrapper" style="display: flex; justify-content: space-between; position: relative; margin: 1rem 0 2rem;">
-      <div style="position: absolute; top: 20px; left: 5%; right: 5%; height: 4px; background: #e2e8f0; z-index: 1;">
-        <div style="background: #16a34a; height: 100%; width: {{ (current_index / 4 * 100)|int }}%; transition: width 0.5s ease;"></div>
-      </div>
-
-      <!-- Step 1: Pending -->
-      <div class="step-item" style="text-align: center; position: relative; z-index: 2; width: 20%;">
-        <div style="width: 42px; height: 42px; border-radius: 9999px; background: {% if current_index >= 0 %}#16a34a{% else %}#e2e8f0{% endif %}; color: white; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem; font-weight: 700; box-shadow: var(--shadow-sm);">
-          ✓
+  <!-- ACTION ALERTS / WORKFLOW NOTICES -->
+  <!-- Buyer: Quality Check Banner -->
+  {% if is_buyer and order['harvest_status'] == 'Ready for Quality Check' %}
+    <div style="background: #fefce8; border: 1px solid #fef08a; border-left: 5px solid #eab308; border-radius: var(--radius-md); padding: 1.25rem 1.5rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <h4 style="margin: 0; font-size: 1.1rem; font-weight: 800; color: #854d0e;">
+          🔍 Action Required: Farmer Ready for Quality Check
+        </h4>
+        <div style="font-size: 0.9rem; color: #713f12; margin-top: 0.25rem;">
+          Farmer <strong>{{ order['farmer_name'] }}</strong> has harvested <strong>{{ order['harvested_quantity'] or order['requested_quantity'] }} kg</strong> of fresh {{ order['crop_name'] }}. Please review the harvest inspection details and approve or report an issue.
         </div>
-        <div style="font-size: 0.85rem; font-weight: 700; color: #0f172a;">Order Placed</div>
-        <div style="font-size: 0.75rem; color: #64748b;">Pending Review</div>
       </div>
-
-      <!-- Step 2: Accepted -->
-      <div class="step-item" style="text-align: center; position: relative; z-index: 2; width: 20%;">
-        <div style="width: 42px; height: 42px; border-radius: 9999px; background: {% if current_index >= 1 %}#16a34a{% else %}#e2e8f0{% endif %}; color: white; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem; font-weight: 700; box-shadow: var(--shadow-sm);">
-          {% if current_index >= 1 %}✓{% else %}2{% endif %}
-        </div>
-        <div style="font-size: 0.85rem; font-weight: 700; color: #0f172a;">Accepted</div>
-        <div style="font-size: 0.75rem; color: #64748b;">Farmer Confirmed</div>
-      </div>
-
-      <!-- Step 3: Packed -->
-      <div class="step-item" style="text-align: center; position: relative; z-index: 2; width: 20%;">
-        <div style="width: 42px; height: 42px; border-radius: 9999px; background: {% if current_index >= 2 %}#16a34a{% else %}#e2e8f0{% endif %}; color: white; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem; font-weight: 700; box-shadow: var(--shadow-sm);">
-          {% if current_index >= 2 %}✓{% else %}3{% endif %}
-        </div>
-        <div style="font-size: 0.85rem; font-weight: 700; color: #0f172a;">Packed / Crated</div>
-        <div style="font-size: 0.75rem; color: #64748b;">Ready at Farmgate</div>
-      </div>
-
-      <!-- Step 4: Shipped -->
-      <div class="step-item" style="text-align: center; position: relative; z-index: 2; width: 20%;">
-        <div style="width: 42px; height: 42px; border-radius: 9999px; background: {% if current_index >= 3 %}#16a34a{% else %}#e2e8f0{% endif %}; color: white; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem; font-weight: 700; box-shadow: var(--shadow-sm);">
-          {% if current_index >= 3 %}✓{% else %}4{% endif %}
-        </div>
-        <div style="font-size: 0.85rem; font-weight: 700; color: #0f172a;">In Transit</div>
-        <div style="font-size: 0.75rem; color: #64748b;">On Vehicle / Tempo</div>
-      </div>
-
-      <!-- Step 5: Delivered -->
-      <div class="step-item" style="text-align: center; position: relative; z-index: 2; width: 20%;">
-        <div style="width: 42px; height: 42px; border-radius: 9999px; background: {% if current_index >= 4 %}#16a34a{% else %}#e2e8f0{% endif %}; color: white; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.5rem; font-weight: 700; box-shadow: var(--shadow-sm);">
-          {% if current_index >= 4 %}✓{% else %}5{% endif %}
-        </div>
-        <div style="font-size: 0.85rem; font-weight: 700; color: #0f172a;">Delivered</div>
-        <div style="font-size: 0.75rem; color: #64748b;">Verified Rescued</div>
+      <div style="display: flex; gap: 0.5rem;">
+        <form action="{{ url_for('order_quality_decision', order_id=order['id']) }}" method="POST">
+          <input type="hidden" name="decision" value="approve">
+          <button type="submit" class="btn btn-success" style="background: #16a34a; font-weight: 700;">
+            ✓ Approve Quality
+          </button>
+        </form>
+        <form action="{{ url_for('order_quality_decision', order_id=order['id']) }}" method="POST" onsubmit="const r = prompt('Please specify quality concern / issue:'); if (!r) return false; this.notes.value = r;">
+          <input type="hidden" name="decision" value="issue">
+          <input type="hidden" name="notes" value="">
+          <button type="submit" class="btn btn-outline-danger" style="font-weight: 700;">
+            ⚠️ Raise Quality Concern
+          </button>
+        </form>
       </div>
     </div>
+  {% endif %}
 
-    <!-- Quick Status Update Actions for Farmer -->
-    {% if is_farmer and order['status'] not in ['Delivered', 'Completed', 'Cancelled'] %}
-      <div style="background: #f8fafc; border-radius: var(--radius-md); padding: 1rem 1.25rem; border: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.75rem;">
+  <!-- Farmer: Harvest Update Alert -->
+  {% if is_farmer and order['status'] in ['Confirmed', 'Accepted'] and order['harvest_status'] in ['Harvest Pending', 'Harvesting in Progress'] %}
+    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-left: 5px solid #16a34a; border-radius: var(--radius-md); padding: 1.25rem 1.5rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <h4 style="margin: 0; font-size: 1.1rem; font-weight: 800; color: #166534;">
+          🌾 Next Step: Update Harvest Progress
+        </h4>
+        <div style="font-size: 0.9rem; color: #15803d; margin-top: 0.25rem;">
+          Harvest {{ order['requested_quantity'] }} kg of {{ order['crop_name'] }} and mark ready for buyer inspection.
+        </div>
+      </div>
+      <button type="button" class="btn btn-primary" id="btnOpenHarvestUpdate" style="background: #16a34a; font-weight: 700;">
+        Update Harvest Status & Photos
+      </button>
+    </div>
+  {% endif %}
+
+  <!-- 2-Column Workflow Layout: Left = 11-Stage Timeline; Right = Verification, Logistics & Map -->
+  <div style="display: grid; grid-template-columns: minmax(320px, 420px) 1fr; gap: 2rem; align-items: flex-start;">
+
+    <!-- ======================================================== -->
+    <!-- LEFT: 11-STAGE VERTICAL PROGRESS TIMELINE (Section 9) -->
+    <!-- ======================================================== -->
+    <div class="data-table-card" style="padding: 1.75rem; background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm);">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.75rem;">
         <div>
-          <strong style="color: #0f172a;">Farmer Quick Update:</strong>
-          <span style="font-size: 0.85rem; color: #64748b; margin-left: 0.5rem;">Update the buyer as produce progresses through packaging and shipping.</span>
+          <h3 style="font-size: 1.2rem; font-weight: 800; color: #0f172a; margin: 0;">
+            📋 11-Stage Order Lifecycle
+          </h3>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">Real-time farmer-to-buyer progression</span>
         </div>
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
-          {% if order['status'] == 'Pending' %}
-            <form action="{{ url_for('update_order_status', order_id=order['id']) }}" method="POST">
-              <input type="hidden" name="status" value="Accepted">
-              <button type="submit" class="btn btn-success btn-sm">Accept Request</button>
-            </form>
-          {% elif order['status'] == 'Accepted' %}
-            <form action="{{ url_for('update_order_status', order_id=order['id']) }}" method="POST">
-              <input type="hidden" name="status" value="Packed">
-              <button type="submit" class="btn btn-primary btn-sm">📦 Mark Packed</button>
-            </form>
-          {% elif order['status'] in ['Packed', 'Ready for Collection'] %}
-            <form action="{{ url_for('update_order_status', order_id=order['id']) }}" method="POST">
-              <input type="hidden" name="status" value="Shipped">
-              <button type="submit" class="btn btn-primary btn-sm">🚚 Dispatch / Shipped</button>
-            </form>
-          {% elif order['status'] == 'Shipped' %}
-            <form action="{{ url_for('update_order_status', order_id=order['id']) }}" method="POST">
-              <input type="hidden" name="status" value="Delivered">
-              <button type="submit" class="btn btn-accent btn-sm">✓ Mark Delivered & Rescued</button>
-            </form>
-          {% endif %}
-        </div>
-      </div>
-    {% endif %}
-  </div>
-
-  <!-- 2-Column: Map & Logistics Details -->
-  <div class="tracking-grid">
-
-    <!-- Left: Interactive Leaflet Delivery Map -->
-    <div class="data-table-card" style="padding: 1.5rem;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
-        <h3 style="font-size: 1.15rem; font-weight: 700; color: #0f172a; margin: 0;">
-          🗺️ Live Delivery Route & Transit Map
-        </h3>
-        <button type="button" class="btn btn-sm btn-outline-primary" id="btnRecenterMap">
-          📍 Recenter Route
-        </button>
+        <span style="font-size: 0.75rem; background: #ecfdf5; color: #166534; font-weight: 700; padding: 0.2rem 0.5rem; border-radius: 9999px;">
+          Live Synced
+        </span>
       </div>
 
-      <!-- Map Container -->
-      <div id="deliveryMap" style="height: 380px; width: 100%; border-radius: var(--radius-md); border: 1px solid #cbd5e1; z-index: 1;"></div>
+      <!-- Vertical Timeline Component -->
+      <div class="vertical-timeline" style="position: relative; padding-left: 28px;">
+        <!-- Continuous background connector line -->
+        <div style="position: absolute; left: 14px; top: 12px; bottom: 20px; width: 3px; background: #e2e8f0; z-index: 1;"></div>
 
-      <!-- Distance & Transit KPI Cards below Map -->
-      <div class="tracking-kpi-subgrid">
-        <div style="background: #f0fdf4; padding: 0.85rem 1rem; border-radius: var(--radius-sm); border: 1px solid #bbf7d0;">
-          <div style="font-size: 0.75rem; font-weight: 700; color: #166534; text-transform: uppercase;">Road Transport Distance</div>
-          <div style="font-size: 1.35rem; font-weight: 800; color: #166534; margin-top: 0.2rem;">
-            {{ distance_info['distance_km'] }} km
-          </div>
-          <div style="font-size: 0.75rem; color: #475569;">via State / National Highway corridor</div>
-        </div>
+        {% for stage in stage_timeline %}
+          <div class="timeline-node {% if stage.is_current %}timeline-node-active{% endif %}" style="position: relative; margin-bottom: 1.75rem;">
+            
+            <!-- Node Pin Icon -->
+            <div style="position: absolute; left: -28px; top: 0; width: 30px; height: 30px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; font-size: 0.85rem; font-weight: 800; z-index: 2; transition: all 0.3s ease;
+                        {% if stage.is_completed %}
+                          background: #16a34a; color: white; box-shadow: 0 0 0 4px #dcfce7;
+                        {% elif stage.is_current %}
+                          background: #0284c7; color: white; box-shadow: 0 0 0 5px #bae6fd; animation: activeStagePulse 2s infinite;
+                        {% else %}
+                          background: #f1f5f9; color: #94a3b8; border: 2px solid #cbd5e1;
+                        {% endif %}">
+              {% if stage.is_completed %}✓{% else %}{{ stage.step_num }}{% endif %}
+            </div>
 
-        <div style="background: #f0f9ff; padding: 0.85rem 1rem; border-radius: var(--radius-sm); border: 1px solid #bae6fd;">
-          <div style="font-size: 0.75rem; font-weight: 700; color: #0369a1; text-transform: uppercase;">Estimated Transit Time</div>
-          <div style="font-size: 1.35rem; font-weight: 800; color: #0369a1; margin-top: 0.2rem;">
-            {{ distance_info['transit_text'] }}
+            <!-- Content Details -->
+            <div style="margin-left: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <h4 style="margin: 0; font-size: 0.95rem; font-weight: 800; color: {% if stage.is_completed or stage.is_current %}#0f172a{% else %}#94a3b8{% endif %};">
+                  {{ stage.icon }} {{ stage.name }}
+                </h4>
+                <span style="font-size: 0.72rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px;
+                             {% if stage.is_completed %}background: #ecfdf5; color: #166534;
+                             {% elif stage.is_current %}background: #e0f2fe; color: #0369a1;
+                             {% else %}background: #f8fafc; color: #94a3b8;{% endif %}">
+                  {{ stage.actor }}
+                </span>
+              </div>
+
+              <!-- Notes / Description -->
+              <div style="font-size: 0.8rem; color: {% if stage.is_completed or stage.is_current %}#475569{% else %}#94a3b8{% endif %}; margin-top: 0.2rem; line-height: 1.4;">
+                {{ stage.note }}
+              </div>
+
+              <!-- Timestamp -->
+              {% if stage.timestamp and stage.is_completed %}
+                <div style="font-size: 0.725rem; color: #64748b; margin-top: 0.25rem;">
+                  🕒 {{ stage.timestamp }}
+                </div>
+              {% elif stage.is_current %}
+                <div style="font-size: 0.725rem; color: #0284c7; font-weight: 700; margin-top: 0.25rem; display: flex; align-items: center; gap: 0.3rem;">
+                  <span style="width: 6px; height: 6px; border-radius: 9999px; background: #0284c7; display: inline-block;"></span>
+                  Active stage in progress
+                </div>
+              {% endif %}
+            </div>
+
           </div>
-          <div style="font-size: 0.75rem; color: #475569;">Commercial Tempo @ 45 km/h avg</div>
-        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Quick Action Controls for Counterparties -->
+      <div style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #f1f5f9;">
+        {% if is_farmer and order['status'] not in ['Delivered', 'Completed', 'Cancelled'] %}
+          <div style="font-size: 0.8rem; font-weight: 700; color: #475569; margin-bottom: 0.5rem;">Farmer Status Transition:</div>
+          <form action="{{ url_for('update_order_status', order_id=order['id']) }}" method="POST" style="display: flex; gap: 0.5rem;">
+            <select name="status" class="filter-select" style="font-size: 0.85rem; height: 38px; flex: 1;">
+              <option value="Confirmed" {% if order['status'] == 'Confirmed' %}selected{% endif %}>Confirmed</option>
+              <option value="Accepted" {% if order['status'] == 'Accepted' %}selected{% endif %}>Accepted</option>
+              <option value="Packed" {% if order['status'] in ['Packed', 'Ready for Collection'] %}selected{% endif %}>Packed / Ready</option>
+              <option value="Shipped" {% if order['status'] in ['Shipped', 'In Transit'] %}selected{% endif %}>In Transit</option>
+              <option value="Delivered" {% if order['status'] in ['Delivered', 'Completed'] %}selected{% endif %}>Delivered</option>
+            </select>
+            <button type="submit" class="btn btn-secondary btn-sm" style="font-weight: 700;">Update</button>
+          </form>
+        {% endif %}
       </div>
     </div>
 
-    <!-- Right: Logistics Summary & Audit Timeline -->
-    <div>
-      <!-- Location Details Card -->
-      <div class="data-table-card" style="padding: 1.5rem; margin-bottom: 1.5rem;">
-        <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 1rem; color: #0f172a;">
-          📦 Origin & Destination Logistics
-        </h3>
+    <!-- ======================================================== -->
+    <!-- RIGHT: HANDOVER VERIFICATION, PAYMENT & LOGISTICS -->
+    <!-- ======================================================== -->
+    <div style="display: flex; flex-direction: column; gap: 1.75rem;">
 
-        <!-- Origin: Farmgate -->
-        <div style="margin-bottom: 1.25rem; display: flex; gap: 0.75rem; align-items: flex-start;">
-          <span style="font-size: 1.5rem; line-height: 1;">🌾</span>
+      <!-- SECTION 7: SECURE PRODUCT HANDOVER VERIFICATION -->
+      <div class="data-table-card" style="padding: 1.5rem; background: white; border-radius: var(--radius-lg); border: 2px solid {% if order['handover_verified'] %}#16a34a{% else %}#0284c7{% endif %}; box-shadow: var(--shadow-sm);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.65rem;">
           <div>
-            <div style="font-size: 0.75rem; font-weight: 700; color: #166534; text-transform: uppercase;">Farmgate Origin</div>
-            <div style="font-weight: 700; color: #0f172a;">{{ order['farmer_name'] }}</div>
-            <div style="font-size: 0.85rem; color: #475569;">
-              📍 {{ order['farm_village'] }}, {{ order['farm_district'] }}, Tamil Nadu
-            </div>
-            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
-              📞 {{ order['farmer_phone'] }}
-            </div>
+            <h3 style="font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0;">
+              🔐 Section 7: Product Handover Verification
+            </h3>
+            <span style="font-size: 0.8rem; color: #64748b;">Tamper-proof OTP & QR Code delivery sign-off</span>
           </div>
-        </div>
-
-        <!-- Destination: Buyer -->
-        <div style="margin-bottom: 1.25rem; display: flex; gap: 0.75rem; align-items: flex-start;">
-          <span style="font-size: 1.5rem; line-height: 1;">🏢</span>
-          <div>
-            <div style="font-size: 0.75rem; font-weight: 700; color: #0284c7; text-transform: uppercase;">Delivery Destination</div>
-            <div style="font-weight: 700; color: #0f172a;">{{ order['buyer_name'] }}</div>
-            <div style="font-size: 0.85rem; color: #475569;">
-              📍 {{ order['delivery_preference'] }} &bull; {{ order['buyer_email'] }}
-            </div>
-            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.2rem;">
-              📞 {{ order['buyer_phone'] }}
-            </div>
-          </div>
-        </div>
-
-        <!-- Direct Contact Actions -->
-        <div style="display: flex; gap: 0.5rem; border-top: 1px solid #f1f5f9; padding-top: 1rem;">
-          {% if is_farmer %}
-            <a href="tel:{{ order['buyer_phone'] }}" class="btn btn-outline-primary btn-sm btn-block">📞 Call Buyer</a>
-            {% set clean_phone = order['buyer_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
-            <a href="https://wa.me/91{{ clean_phone }}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm btn-block">💬 WhatsApp</a>
+          {% if order['handover_verified'] %}
+            <span style="background: #dcfce7; color: #166534; font-weight: 800; font-size: 0.8rem; padding: 0.25rem 0.65rem; border-radius: 9999px;">
+              ✓ Verified & Delivered
+            </span>
           {% else %}
-            <a href="tel:{{ order['farmer_phone'] }}" class="btn btn-outline-primary btn-sm btn-block">📞 Call Farmer</a>
-            {% set clean_phone = order['farmer_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
-            <a href="https://wa.me/91{{ clean_phone }}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm btn-block">💬 WhatsApp</a>
+            <span style="background: #e0f2fe; color: #0369a1; font-weight: 800; font-size: 0.8rem; padding: 0.25rem 0.65rem; border-radius: 9999px;">
+              Awaiting Handover Sign-off
+            </span>
           {% endif %}
         </div>
-      </div>
 
-      <!-- Status Audit Timeline -->
-      <div class="data-table-card" style="padding: 1.5rem;">
-        <h3 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 1rem; color: #0f172a;">
-          🕒 Order History & Logs
-        </h3>
-
-        <div class="timeline-stream" style="display: flex; flex-direction: column; gap: 0.85rem;">
-          {% for t in timeline %}
-            <div style="display: flex; gap: 0.75rem; align-items: flex-start;">
-              <div style="width: 10px; height: 10px; border-radius: 9999px; background: #16a34a; margin-top: 0.35rem; flex-shrink: 0;"></div>
-              <div>
-                <div style="font-size: 0.85rem; font-weight: 700; color: #0f172a;">{{ t['status'] }}</div>
-                <div style="font-size: 0.8rem; color: #475569;">{{ t['note'] }}</div>
-                <div style="font-size: 0.725rem; color: #94a3b8; margin-top: 0.15rem;">{{ t['timestamp'] }}</div>
+        {% if order['handover_verified'] %}
+          <!-- Verified Success Seal -->
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-md); padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+            <div style="width: 48px; height: 48px; border-radius: 9999px; background: #16a34a; color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 800; flex-shrink: 0;">
+              ✓
+            </div>
+            <div>
+              <div style="font-size: 1rem; font-weight: 800; color: #166534;">
+                Handover Successfully Verified
+              </div>
+              <div style="font-size: 0.85rem; color: #334155; margin-top: 0.2rem;">
+                Delivered Quantity: <strong>{{ order['delivered_quantity'] or order['requested_quantity'] }} kg</strong> &bull; Verified Timestamp: <strong>{{ order['handover_at'] }}</strong>
+              </div>
+              <div style="font-size: 0.775rem; color: #64748b; margin-top: 0.2rem;">
+                Both parties have authenticated delivery. Produce successfully rescued from agricultural waste.
               </div>
             </div>
-          {% endfor %}
+          </div>
+        {% else %}
+          <!-- Unverified: Display OTP & QR Code + Verification Form -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; align-items: center; margin-bottom: 1.25rem;">
+            <!-- Left: 6-Digit OTP Box -->
+            <div style="background: #f8fafc; border: 2px dashed #cbd5e1; border-radius: var(--radius-md); padding: 1.25rem; text-align: center;">
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">6-Digit Handover OTP</div>
+              <div style="font-size: 2.2rem; font-weight: 900; letter-spacing: 4px; color: #0f172a; font-family: monospace; margin: 0.35rem 0;">
+                {{ order['handover_otp'] }}
+              </div>
+              <div style="font-size: 0.75rem; color: #64748b;">
+                Share with counterparty during farmgate loading or delivery arrival.
+              </div>
+            </div>
+
+            <!-- Right: Handover QR Code -->
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: var(--radius-md); padding: 1rem; text-align: center;">
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 0.35rem;">Scan to Verify</div>
+              <img src="{{ url_for('order_handover_qr', order_id=order['id']) }}" alt="Handover QR Code" style="width: 100px; height: 100px; border-radius: 6px; border: 1px solid #cbd5e1; margin: 0 auto; display: block;">
+              <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.35rem;">Token: {{ order['handover_qr_token'][:8] }}...</div>
+            </div>
+          </div>
+
+          <!-- Direct Handover Verification Form -->
+          <form action="{{ url_for('verify_handover', order_id=order['id']) }}" method="POST" style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-md); padding: 1.25rem;">
+            <div style="font-size: 0.85rem; font-weight: 800; color: #166534; margin-bottom: 0.75rem;">
+              ✍️ Enter Handover OTP / Scan Token to Confirm Receipt:
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 0.75rem; align-items: flex-end;">
+              <div>
+                <label style="font-size: 0.75rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.25rem;">Handover OTP *</label>
+                <input type="text" name="otp" required placeholder="6-digit OTP" maxlength="6" style="width: 100%; height: 38px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.4rem 0.6rem; font-weight: 700; font-family: monospace;">
+              </div>
+              <div>
+                <label style="font-size: 0.75rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.25rem;">Delivered Quantity (kg) *</label>
+                <input type="number" step="any" min="1" name="delivered_quantity" value="{{ order['harvested_quantity'] or order['requested_quantity'] }}" required style="width: 100%; height: 38px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 0.4rem 0.6rem; font-weight: 700;">
+              </div>
+              <button type="submit" class="btn btn-primary" style="background: #16a34a; font-weight: 800; height: 38px; padding: 0 1.25rem;">
+                ✓ Confirm Handover
+              </button>
+            </div>
+          </form>
+        {% endif %}
+      </div>
+
+      <!-- SECTION 8: PAYMENT MANAGEMENT & INVOICE -->
+      <div class="data-table-card" style="padding: 1.5rem; background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 0.65rem;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0;">
+              💳 Section 8: Payment & Billing Management
+            </h3>
+            <span style="font-size: 0.8rem; color: #64748b;">Direct Razorpay settlement & invoice generation</span>
+          </div>
+          <span style="font-size: 1.15rem; font-weight: 900; color: #166534;">
+            ₹{{ "{:,.0f}".format(order['total_price']) }}
+          </span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.25rem;">
+          <div style="background: #f8fafc; padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid #e2e8f0;">
+            <div style="font-size: 0.725rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Payment Status</div>
+            <div style="font-size: 1rem; font-weight: 800; margin-top: 0.2rem;
+                        color: {% if order['payment_status'] in ['Paid', 'Payment Verified'] %}#16a34a{% else %}#d97706{% endif %};">
+              {{ order['payment_status'] or 'Unpaid' }}
+            </div>
+          </div>
+          <div style="background: #f8fafc; padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid #e2e8f0;">
+            <div style="font-size: 0.725rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Payment Method</div>
+            <div style="font-size: 1rem; font-weight: 800; color: #0f172a; margin-top: 0.2rem;">
+              {{ order['payment_method'] or 'Razorpay / COD' }}
+            </div>
+          </div>
+          <div style="background: #f8fafc; padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid #e2e8f0;">
+            <div style="font-size: 0.725rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Transaction ID</div>
+            <div style="font-size: 0.85rem; font-weight: 700; color: #0f172a; margin-top: 0.2rem; font-family: monospace;">
+              {{ payment['transaction_id'] if payment else 'TXN-PENDING' }}
+            </div>
+          </div>
+        </div>
+
+        <!-- Payment Actions -->
+        <div style="display: flex; gap: 0.75rem; justify-content: space-between; align-items: center; flex-wrap: wrap;">
+          <div>
+            {% if is_buyer and order['payment_status'] not in ['Paid', 'Payment Verified'] %}
+              <a href="{{ url_for('checkout_order', order_id=order['id']) }}" class="btn btn-success" style="background: #16a34a; font-weight: 800;">
+                💳 Pay Now via Razorpay (₹{{ "{:,.0f}".format(order['total_price']) }})
+              </a>
+            {% elif order['payment_status'] in ['Paid', 'Payment Verified'] %}
+              <span style="color: #166534; font-weight: 700; font-size: 0.9rem;">
+                ✓ Payment settled to farmer escrow account.
+              </span>
+            {% endif %}
+          </div>
+          <a href="{{ url_for('view_invoice', order_id=order['id']) }}" class="btn btn-outline-primary" style="font-weight: 700;">
+            🧾 View Tax Invoice
+          </a>
         </div>
       </div>
 
-      <!-- Privacy Protection Guarantee -->
-      <div style="font-size: 0.75rem; color: #64748b; margin-top: 1rem; line-height: 1.4; padding: 0.5rem 0;">
-        🛡️ <strong>Privacy Protection:</strong> Exact GPS coordinates are only shared between confirmed transaction counterparties. Sensitive personal location data is strictly restricted.
+      <!-- SECTION 6: PICKUP & DELIVERY LOGISTICS AND LIVE ROUTE MAP -->
+      <div class="data-table-card" style="padding: 1.5rem; background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0;">
+              🗺️ Section 6: Live Transit Route & Highway Logistics
+            </h3>
+            <span style="font-size: 0.8rem; color: #64748b;">
+              Mode: <strong>{{ order['delivery_mode'] or 'Farmer Pickup' }}</strong> &bull; Status: <strong>{{ order['delivery_status'] or 'Pending' }}</strong>
+            </span>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary" id="btnRecenterMap">
+            📍 Recenter Route
+          </button>
+        </div>
+
+        <!-- Leaflet Map Container -->
+        <div id="deliveryMap" style="height: 340px; width: 100%; border-radius: var(--radius-md); border: 1px solid #cbd5e1; z-index: 1;"></div>
+
+        <!-- Distance & Transit KPI Cards below Map -->
+        <div class="tracking-kpi-subgrid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+          <div style="background: #f0fdf4; padding: 0.85rem 1rem; border-radius: var(--radius-sm); border: 1px solid #bbf7d0;">
+            <div style="font-size: 0.75rem; font-weight: 700; color: #166534; text-transform: uppercase;">Transport Distance</div>
+            <div style="font-size: 1.35rem; font-weight: 800; color: #166534; margin-top: 0.2rem;">
+              {{ distance_info['distance_km'] }} km
+            </div>
+            <div style="font-size: 0.75rem; color: #475569;">via State / National Highway corridor</div>
+          </div>
+
+          <div style="background: #f0f9ff; padding: 0.85rem 1rem; border-radius: var(--radius-sm); border: 1px solid #bae6fd;">
+            <div style="font-size: 0.75rem; font-weight: 700; color: #0369a1; text-transform: uppercase;">Estimated Transit Time</div>
+            <div style="font-size: 1.35rem; font-weight: 800; color: #0369a1; margin-top: 0.2rem;">
+              {{ distance_info['transit_text'] }}
+            </div>
+            <div style="font-size: 0.75rem; color: #475569;">Commercial Tempo @ 45 km/h avg</div>
+          </div>
+        </div>
+
+        <!-- Schedule Delivery Button -->
+        <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #f1f5f9; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+          <div style="font-size: 0.825rem; color: #475569;">
+            Scheduled Pickup: <strong>{{ order['pickup_datetime'] or 'Pending Scheduling' }}</strong> &bull; Partner: <strong>{{ order['delivery_partner'] or 'Platform Assigned' }}</strong>
+          </div>
+          <button type="button" class="btn btn-secondary btn-sm" id="btnOpenScheduleModal" style="font-weight: 700;">
+            📅 Update Delivery Logistics
+          </button>
+        </div>
       </div>
+
+      <!-- COUNTERPARTY CONTACTS -->
+      <div class="data-table-card" style="padding: 1.5rem; background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); box-shadow: var(--shadow-sm);">
+        <h4 style="font-size: 1rem; font-weight: 800; color: #0f172a; margin-bottom: 1rem;">
+          🤝 Counterparty Contacts
+        </h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem;">
+          <!-- Farmer Details -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.85rem;">
+            <div style="font-size: 0.725rem; font-weight: 700; color: #166534; text-transform: uppercase;">Farmer Origin</div>
+            <div style="font-weight: 800; color: #0f172a; margin-top: 0.2rem;">{{ order['farmer_name'] }}</div>
+            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.15rem;">📍 {{ order['farm_village'] }}, {{ order['farm_district'] }}</div>
+            <div style="margin-top: 0.5rem; display: flex; gap: 0.4rem;">
+              <a href="tel:{{ order['farmer_phone'] }}" class="btn btn-secondary btn-sm" style="flex: 1; padding: 0.2rem 0.4rem; font-size: 0.75rem;">📞 Call</a>
+              {% set clean_fphone = order['farmer_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
+              <a href="https://wa.me/91{{ clean_fphone }}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="flex: 1; padding: 0.2rem 0.4rem; font-size: 0.75rem;">💬 WA</a>
+            </div>
+          </div>
+
+          <!-- Buyer Details -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.85rem;">
+            <div style="font-size: 0.725rem; font-weight: 700; color: #0284c7; text-transform: uppercase;">Buyer Destination</div>
+            <div style="font-weight: 800; color: #0f172a; margin-top: 0.2rem;">{{ order['buyer_name'] }}</div>
+            <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.15rem;">📍 {{ order['buyer_email'] }}</div>
+            <div style="margin-top: 0.5rem; display: flex; gap: 0.4rem;">
+              <a href="tel:{{ order['buyer_phone'] }}" class="btn btn-secondary btn-sm" style="flex: 1; padding: 0.2rem 0.4rem; font-size: 0.75rem;">📞 Call</a>
+              {% set clean_bphone = order['buyer_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
+              <a href="https://wa.me/91{{ clean_bphone }}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="flex: 1; padding: 0.2rem 0.4rem; font-size: 0.75rem;">💬 WA</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
 
   </div>
 
 </div>
+
+<!-- ======================================================== -->
+<!-- MODAL: SCHEDULE DELIVERY LOGISTICS (Section 6) -->
+<!-- ======================================================== -->
+<div id="scheduleDeliveryModal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px);">
+  <div style="background: white; border-radius: var(--radius-lg); max-width: 500px; width: 100%; box-shadow: var(--shadow-lg); overflow: hidden;">
+    <div style="background: #0284c7; color: white; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: white;">Update Delivery Logistics</h3>
+      <button type="button" class="btn-close-schedule" style="background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+    </div>
+    <form action="{{ url_for('schedule_delivery', order_id=order['id']) }}" method="POST" style="padding: 1.25rem;">
+      <div style="margin-bottom: 1rem;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Logistics Mode</label>
+        <select name="delivery_mode" class="filter-select" style="width: 100%; height: 38px;">
+          <option value="Farmer Pickup" {% if order['delivery_mode'] == 'Farmer Pickup' %}selected{% endif %}>Farmer Pickup (Buyer Collects at Farmgate)</option>
+          <option value="Platform Delivery" {% if order['delivery_mode'] == 'Platform Delivery' %}selected{% endif %}>Platform Delivery (Rapid Cargo / Tempo)</option>
+          <option value="Farmer Delivery" {% if order['delivery_mode'] == 'Farmer Delivery' %}selected{% endif %}>Farmer Delivery (Direct Dispatch)</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom: 1rem;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Scheduled Date & Time</label>
+        <input type="datetime-local" name="pickup_datetime" value="{{ order['pickup_datetime'] or '' }}" class="filter-input" style="width: 100%; height: 38px;">
+      </div>
+
+      <div style="margin-bottom: 1rem;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Delivery Partner / Vehicle</label>
+        <input type="text" name="delivery_partner" value="{{ order['delivery_partner'] or 'FarmFresh Express Cargo (Tempo TN-45-A-1234)' }}" class="filter-input" style="width: 100%; height: 38px;">
+      </div>
+
+      <div style="margin-bottom: 1rem;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Delivery Status Milestone</label>
+        <select name="delivery_status" class="filter-select" style="width: 100%; height: 38px;">
+          <option value="Pickup Scheduled" {% if order['delivery_status'] == 'Pickup Scheduled' %}selected{% endif %}>Pickup Scheduled</option>
+          <option value="Ready for Pickup" {% if order['delivery_status'] == 'Ready for Pickup' %}selected{% endif %}>Ready for Pickup</option>
+          <option value="Picked Up" {% if order['delivery_status'] == 'Picked Up' %}selected{% endif %}>Picked Up</option>
+          <option value="In Transit" {% if order['delivery_status'] == 'In Transit' %}selected{% endif %}>In Transit</option>
+          <option value="Out for Delivery" {% if order['delivery_status'] == 'Out for Delivery' %}selected{% endif %}>Out for Delivery</option>
+          <option value="Delivered" {% if order['delivery_status'] == 'Delivered' %}selected{% endif %}>Delivered</option>
+        </select>
+      </div>
+
+      <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary btn-close-schedule">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="background: #0284c7; font-weight: 700;">Save Schedule</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL: HARVEST UPDATE (Section 5) -->
+<!-- ======================================================== -->
+{% if is_farmer %}
+<div id="harvestModal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px);">
+  <div style="background: white; border-radius: var(--radius-lg); max-width: 500px; width: 100%; box-shadow: var(--shadow-lg); overflow: hidden;">
+    <div style="background: #16a34a; color: white; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+      <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: white;">Update Harvest Progress</h3>
+      <button type="button" class="btn-close-harvest" style="background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+    </div>
+    <form action="{{ url_for('update_order_harvest', order_id=order['id']) }}" method="POST" enctype="multipart/form-data" style="padding: 1.25rem;">
+      <div style="margin-bottom: 1rem;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Harvest Progress</label>
+        <select name="harvest_status" class="filter-select" style="width: 100%; height: 38px;">
+          <option value="Harvesting in Progress">🌾 Harvesting in Progress</option>
+          <option value="Ready for Quality Check">🔍 Ready for Quality Check</option>
+          <option value="Quality Approved">✓ Quality Approved</option>
+        </select>
+      </div>
+
+      <div style="margin-bottom: 1rem;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Harvested Weight (kg)</label>
+        <input type="number" step="any" min="1" name="harvested_quantity" value="{{ order['requested_quantity'] }}" class="filter-input" style="width: 100%; height: 38px;">
+      </div>
+
+      <div style="margin-bottom: 1rem;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Fresh Product Photo</label>
+        <input type="file" name="fresh_image" accept="image/*" style="width: 100%; font-size: 0.85rem;">
+      </div>
+
+      <div style="margin-bottom: 1rem;">
+        <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Quality Description</label>
+        <textarea name="harvest_notes" rows="2" class="filter-input" placeholder="Freshly harvested, sorted into crates, Grade A." style="width: 100%; font-family: inherit; font-size: 0.85rem;"></textarea>
+      </div>
+
+      <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary btn-close-harvest">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="background: #16a34a; font-weight: 700;">Submit Harvest Update</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<style>
+@keyframes activeStagePulse {
+  0% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0.6); }
+  70% { box-shadow: 0 0 0 9px rgba(2, 132, 199, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(2, 132, 199, 0); }
+}
+</style>
 {% endblock %}
 
 {% block extra_scripts %}
@@ -276,12 +542,10 @@ document.addEventListener('DOMContentLoaded', function() {
   // Initialize Leaflet Map
   const map = L.map('deliveryMap');
 
-  // OpenStreetMap Tile Layer (Reliable, fast, zero API key requirement)
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors | FarmFresh Logistics'
   }).addTo(map);
 
-  // Custom Farmer Pin Icon
   const farmIcon = L.divIcon({
     className: 'custom-map-pin',
     html: '<div style="background:#15803d; color:white; width:34px; height:34px; border-radius:9999px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; border:2px solid white; box-shadow:0 4px 6px rgba(0,0,0,0.3);">🌾</div>',
@@ -289,7 +553,6 @@ document.addEventListener('DOMContentLoaded', function() {
     iconAnchor: [17, 17]
   });
 
-  // Custom Buyer Pin Icon
   const buyerIcon = L.divIcon({
     className: 'custom-map-pin',
     html: '<div style="background:#0284c7; color:white; width:34px; height:34px; border-radius:9999px; display:flex; align-items:center; justify-content:center; font-size:1.1rem; border:2px solid white; box-shadow:0 4px 6px rgba(0,0,0,0.3);">🏢</div>',
@@ -297,17 +560,15 @@ document.addEventListener('DOMContentLoaded', function() {
     iconAnchor: [17, 17]
   });
 
-  // Markers
   const farmMarker = L.marker([fLat, fLng], {icon: farmIcon}).addTo(map)
     .bindPopup(`<strong>🌾 ${fName} (Farmgate)</strong><br>${crop}<br>📍 {{ order['farm_district'] }}`);
 
   const buyerMarker = L.marker([bLat, bLng], {icon: buyerIcon}).addTo(map)
     .bindPopup(`<strong>🏢 ${bName} (Buyer Destination)</strong><br>📍 {{ b_hub }}`);
 
-  // Route Polyline
   const routePoints = [
     [fLat, fLng],
-    [(fLat + bLat) / 2 + 0.05, (fLng + bLng) / 2 - 0.03], // Realistic slight curve
+    [(fLat + bLat) / 2 + 0.04, (fLng + bLng) / 2 - 0.02],
     [bLat, bLng]
   ];
   const polyline = L.polyline(routePoints, {
@@ -317,15 +578,28 @@ document.addEventListener('DOMContentLoaded', function() {
     dashArray: '6, 8'
   }).addTo(map);
 
-  // Fit Bounds
   const group = new L.featureGroup([farmMarker, buyerMarker, polyline]);
   map.fitBounds(group.getBounds().pad(0.2));
 
-  // Recenter button
   document.getElementById('btnRecenterMap').addEventListener('click', function() {
     map.fitBounds(group.getBounds().pad(0.2));
   });
+
+  // Modal Triggers
+  const scheduleModal = document.getElementById('scheduleDeliveryModal');
+  const harvestModal = document.getElementById('harvestModal');
+
+  const btnOpenSchedule = document.getElementById('btnOpenScheduleModal');
+  if (btnOpenSchedule) {
+    btnOpenSchedule.addEventListener('click', () => scheduleModal.style.display = 'flex');
+  }
+  document.querySelectorAll('.btn-close-schedule').forEach(b => b.addEventListener('click', () => scheduleModal.style.display = 'none'));
+
+  const btnOpenHarvest = document.getElementById('btnOpenHarvestUpdate');
+  if (btnOpenHarvest) {
+    btnOpenHarvest.addEventListener('click', () => harvestModal.style.display = 'flex');
+  }
+  document.querySelectorAll('.btn-close-harvest').forEach(b => b.addEventListener('click', () => harvestModal.style.display = 'none'));
 });
 </script>
 {% endblock %}
-

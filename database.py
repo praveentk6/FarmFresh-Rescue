@@ -112,6 +112,39 @@ def init_db():
     )
     ''')
 
+    # Farmer Offers Table (Section 2 & 3: Farmer Product Offer Workflow)
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS farmer_offers (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        offer_code TEXT UNIQUE NOT NULL,
+        requirement_id INTEGER,
+        farmer_id INTEGER NOT NULL,
+        buyer_id INTEGER NOT NULL,
+        listing_id INTEGER,
+        crop_name TEXT NOT NULL,
+        quantity REAL NOT NULL,
+        unit TEXT NOT NULL DEFAULT 'kg',
+        price_per_kg REAL NOT NULL,
+        harvest_date DATE NOT NULL,
+        quality_description TEXT,
+        photo TEXT,
+        delivery_preference TEXT DEFAULT 'Farmer Pickup',
+        notes TEXT,
+        status TEXT NOT NULL DEFAULT 'Pending Buyer Review' 
+            CHECK(status IN ('Pending Buyer Review', 'Accepted', 'Rejected', 'Counter Offered', 'Cancelled')),
+        counter_price REAL,
+        counter_quantity REAL,
+        counter_notes TEXT,
+        rejection_reason TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (requirement_id) REFERENCES buyer_requirements(id) ON DELETE SET NULL,
+        FOREIGN KEY (farmer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE SET NULL
+    )
+    ''')
+
     # Notifications Table
     cursor.execute('''
     CREATE TABLE IF NOT EXISTS notifications (
@@ -350,12 +383,56 @@ def init_db():
         cursor.execute("ALTER TABLE enquiries ADD COLUMN delivery_lng REAL")
     if 'status_timeline' not in enquiry_cols:
         cursor.execute("ALTER TABLE enquiries ADD COLUMN status_timeline TEXT")
+    if 'order_code' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN order_code TEXT")
+    if 'offer_id' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN offer_id INTEGER")
+    if 'harvest_status' not in enq_cols if 'enq_cols' in locals() else 'order_code' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN harvest_status TEXT DEFAULT 'Harvest Pending'")
+    if 'harvested_quantity' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN harvested_quantity REAL")
+    if 'harvest_notes' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN harvest_notes TEXT")
+    if 'fresh_product_image' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN fresh_product_image TEXT")
+    if 'delivery_mode' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN delivery_mode TEXT DEFAULT 'Farmer Pickup'")
+    if 'pickup_datetime' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN pickup_datetime TEXT")
+    if 'delivery_partner' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN delivery_partner TEXT")
+    if 'delivery_status' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN delivery_status TEXT DEFAULT 'Pending'")
+    if 'handover_otp' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN handover_otp TEXT")
+    if 'handover_qr_token' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN handover_qr_token TEXT")
+    if 'handover_verified' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN handover_verified INTEGER DEFAULT 0")
+    if 'handover_at' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN handover_at TIMESTAMP")
+    if 'delivered_quantity' not in enquiry_cols:
+        cursor.execute("ALTER TABLE enquiries ADD COLUMN delivered_quantity REAL")
 
-    # Migrate enquiries CHECK constraint to include full 6-stage lifecycle
+    # 4. buyer_requirements migrations
+    cursor.execute("PRAGMA table_info(buyer_requirements)")
+    req_cols = [r[1] for r in cursor.fetchall()]
+    if 'required_date' not in req_cols:
+        cursor.execute("ALTER TABLE buyer_requirements ADD COLUMN required_date DATE")
+    if 'is_verified' not in req_cols:
+        cursor.execute("ALTER TABLE buyer_requirements ADD COLUMN is_verified INTEGER DEFAULT 1")
+    if 'payment_terms' not in req_cols:
+        cursor.execute("ALTER TABLE buyer_requirements ADD COLUMN payment_terms TEXT DEFAULT 'Payment on Delivery / Online'")
+
+    cursor.execute("UPDATE buyer_requirements SET required_date = DATE('now', '+4 days') WHERE required_date IS NULL")
+    cursor.execute("UPDATE buyer_requirements SET is_verified = 1 WHERE is_verified IS NULL")
+    cursor.execute("UPDATE buyer_requirements SET payment_terms = 'Payment on Delivery / Online' WHERE payment_terms IS NULL")
+
+    # Migrate enquiries CHECK constraint to include full lifecycle and Confirmed status
     try:
         cursor.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='enquiries'")
         enq_sql_row = cursor.fetchone()
-        if enq_sql_row and "'Packed'" not in enq_sql_row[0]:
+        if enq_sql_row and "'Confirmed'" not in enq_sql_row[0]:
             cursor.execute("PRAGMA foreign_keys = OFF")
             cursor.execute('''
             CREATE TABLE enquiries_migrated (
@@ -370,13 +447,31 @@ def init_db():
                 delivery_preference TEXT DEFAULT 'Direct Pickup / Collection',
                 total_price REAL DEFAULT 0,
                 message TEXT NOT NULL,
-                status TEXT NOT NULL DEFAULT 'Pending' CHECK(status IN ('Pending', 'Accepted', 'Packed', 'Shipped', 'Delivered', 'Completed', 'Ready for Collection', 'Rejected', 'Declined', 'Cancelled')),
+                status TEXT NOT NULL DEFAULT 'Pending' CHECK(status IN ('Pending', 'Confirmed', 'Accepted', 'Packed', 'Shipped', 'Ready for Pickup', 'In Transit', 'Out for Delivery', 'Delivered', 'Completed', 'Ready for Collection', 'Rejected', 'Declined', 'Cancelled', 'Processing', 'Order Placed', 'Order Accepted', 'Order Rejected')),
                 cancelled_reason TEXT,
                 tracking_notes TEXT,
                 delivery_address TEXT,
                 delivery_lat REAL,
                 delivery_lng REAL,
                 status_timeline TEXT,
+                order_code TEXT,
+                offer_id INTEGER,
+                harvest_status TEXT DEFAULT 'Harvest Pending',
+                harvested_quantity REAL,
+                harvest_notes TEXT,
+                fresh_product_image TEXT,
+                delivery_mode TEXT DEFAULT 'Farmer Pickup',
+                pickup_datetime TEXT,
+                delivery_partner TEXT,
+                delivery_status TEXT DEFAULT 'Pending',
+                handover_otp TEXT,
+                handover_qr_token TEXT,
+                handover_verified INTEGER DEFAULT 0,
+                handover_at TIMESTAMP,
+                delivered_quantity REAL,
+                payment_method TEXT DEFAULT 'COD',
+                payment_status TEXT DEFAULT 'Unpaid',
+                delivery_charges REAL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (listing_id) REFERENCES listings(id) ON DELETE CASCADE,
@@ -388,15 +483,34 @@ def init_db():
                 id, listing_id, buyer_id, buyer_name, buyer_phone, buyer_email,
                 offered_price, requested_quantity, delivery_preference, total_price,
                 message, status, cancelled_reason, tracking_notes, delivery_address,
-                delivery_lat, delivery_lng, status_timeline, created_at, updated_at
+                delivery_lat, delivery_lng, status_timeline, order_code, offer_id,
+                harvest_status, harvested_quantity, harvest_notes, fresh_product_image,
+                delivery_mode, pickup_datetime, delivery_partner, delivery_status,
+                handover_otp, handover_qr_token, handover_verified, handover_at,
+                delivered_quantity, payment_method, payment_status, delivery_charges,
+                created_at, updated_at
             )
             SELECT 
                 id, listing_id, buyer_id, buyer_name, buyer_phone, buyer_email,
                 offered_price, requested_quantity, 
                 COALESCE(delivery_preference, 'Direct Pickup / Collection'),
                 COALESCE(total_price, 0),
-                message, status, cancelled_reason,
-                NULL, NULL, NULL, NULL, NULL,
+                message, status, cancelled_reason, tracking_notes, delivery_address,
+                delivery_lat, delivery_lng, status_timeline,
+                COALESCE(order_code, 'ORD-2026-' || SUBSTR('0000' || id, -4)),
+                offer_id,
+                COALESCE(harvest_status, 'Harvest Pending'),
+                harvested_quantity, harvest_notes, fresh_product_image,
+                COALESCE(delivery_mode, 'Farmer Pickup'),
+                pickup_datetime, delivery_partner,
+                COALESCE(delivery_status, 'Pending'),
+                COALESCE(handover_otp, PRINTF('%06d', ABS(RANDOM()) % 900000 + 100000)),
+                COALESCE(handover_qr_token, HEX(RANDOMBLOB(16))),
+                COALESCE(handover_verified, 0),
+                handover_at, delivered_quantity,
+                COALESCE(payment_method, 'COD'),
+                COALESCE(payment_status, 'Unpaid'),
+                COALESCE(delivery_charges, 0),
                 created_at, 
                 COALESCE(updated_at, created_at)
             FROM enquiries
@@ -405,6 +519,14 @@ def init_db():
             cursor.execute("ALTER TABLE enquiries_migrated RENAME TO enquiries")
             cursor.execute("PRAGMA foreign_keys = ON")
     except Exception as e:
+        print(f"Enquiries migration note: {e}")
+
+    try:
+        cursor.execute("UPDATE enquiries SET order_code = 'ORD-2026-' || SUBSTR('0000' || id, -4) WHERE order_code IS NULL")
+        cursor.execute("UPDATE enquiries SET handover_otp = PRINTF('%06d', ABS(RANDOM()) % 900000 + 100000) WHERE handover_otp IS NULL")
+        cursor.execute("UPDATE enquiries SET handover_qr_token = HEX(RANDOMBLOB(16)) WHERE handover_qr_token IS NULL")
+    except Exception as _e:
+        pass
         print(f"Enquiries migration note: {e}")
 
     try:
@@ -698,6 +820,808 @@ def get_order_timeline(order_id):
         return [{'status': row['status'], 'timestamp': str(row['created_at']), 'note': 'Order created'}]
     except Exception:
         return []
+
+# ============================================================================
+# FARMER-TO-BUYER ORDER MANAGEMENT WORKFLOW FUNCTIONS (SECTIONS 1 TO 13)
+# ============================================================================
+
+def create_farmer_offer(farmer_id, buyer_id, crop_name, quantity, price_per_kg,
+                        harvest_date, quality_description=None, photo=None,
+                        delivery_preference='Farmer Pickup', notes=None,
+                        requirement_id=None, listing_id=None):
+    """
+    Save farmer offer to buyer and return (True, offer_dict) or (False, error_msg).
+    Generates unique Offer ID (OFF-2026-XXXX) and notifies the buyer.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        # Verify farmer exists
+        cursor.execute("SELECT id, name, phone, location, district FROM users WHERE id = ?", (farmer_id,))
+        farmer = cursor.fetchone()
+        if not farmer:
+            conn.close()
+            return False, "Farmer account not found"
+
+        # Verify buyer exists
+        cursor.execute("SELECT id, name, email, phone FROM users WHERE id = ?", (buyer_id,))
+        buyer = cursor.fetchone()
+        if not buyer:
+            conn.close()
+            return False, "Buyer account not found"
+
+        offer_code = f"OFF-2026-{uuid.uuid4().hex[:6].upper()}"
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        cursor.execute('''
+            INSERT INTO farmer_offers (
+                offer_code, requirement_id, farmer_id, buyer_id, listing_id,
+                crop_name, quantity, unit, price_per_kg, harvest_date,
+                quality_description, photo, delivery_preference, notes,
+                status, created_at, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, 'kg', ?, ?, ?, ?, ?, ?, 'Pending Buyer Review', ?, ?)
+        ''', (
+            offer_code, requirement_id, farmer_id, buyer_id, listing_id,
+            crop_name, float(quantity), float(price_per_kg), harvest_date,
+            quality_description, photo, delivery_preference or 'Farmer Pickup', notes,
+            now_str, now_str
+        ))
+        offer_id = cursor.lastrowid
+        conn.commit()
+
+        # Create in-app notification for buyer
+        notif_msg = f"Farmer {farmer['name']} has sent a product offer for {quantity} kg of {crop_name} at ₹{price_per_kg}/kg (Offer #{offer_code})."
+        create_notification(buyer_id, f"New Offer for {crop_name} 🌾", notif_msg, notif_type='order', link="/buyer/dashboard#offersSection")
+
+        conn.close()
+        return True, {
+            'id': offer_id,
+            'offer_code': offer_code,
+            'farmer_id': farmer_id,
+            'buyer_id': buyer_id,
+            'crop_name': crop_name,
+            'quantity': quantity,
+            'price_per_kg': price_per_kg,
+            'status': 'Pending Buyer Review'
+        }
+    except Exception as e:
+        return False, str(e)
+
+def get_farmer_offers(farmer_id):
+    """Retrieve all offers submitted by this farmer."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT fo.*, 
+               u.name as buyer_name, u.phone as buyer_phone, u.email as buyer_email,
+               br.business_type, br.target_price as req_target_price, br.required_quantity as req_quantity,
+               e.id as order_id, e.order_code, e.status as order_status,
+               e.delivery_status as order_delivery_status
+        FROM farmer_offers fo
+        JOIN users u ON fo.buyer_id = u.id
+        LEFT JOIN buyer_requirements br ON fo.requirement_id = br.id
+        LEFT JOIN enquiries e ON e.offer_id = fo.id
+        WHERE fo.farmer_id = ?
+        ORDER BY fo.created_at DESC, fo.id DESC
+    ''', (farmer_id,))
+    offers = cursor.fetchall()
+    conn.close()
+    return offers
+
+def get_buyer_received_offers(buyer_id):
+    """Retrieve all incoming offers received by this buyer."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT fo.*,
+               u.name as farmer_name, u.phone as farmer_phone, u.location as farmer_location, u.district as farmer_district,
+               br.business_type, br.crop_name as req_crop_name, br.target_price as req_target_price, br.required_quantity as req_quantity,
+               e.id as order_id, e.order_code, e.status as order_status
+        FROM farmer_offers fo
+        JOIN users u ON fo.farmer_id = u.id
+        LEFT JOIN buyer_requirements br ON fo.requirement_id = br.id
+        LEFT JOIN enquiries e ON e.offer_id = fo.id
+        WHERE fo.buyer_id = ?
+        ORDER BY fo.created_at DESC, fo.id DESC
+    ''', (buyer_id,))
+    offers = cursor.fetchall()
+    conn.close()
+    return offers
+
+def get_offer_by_id(offer_id):
+    """Retrieve a single offer with farmer and buyer details."""
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute('''
+        SELECT fo.*,
+               f.name as farmer_name, f.phone as farmer_phone, f.email as farmer_email, f.location as farmer_location, f.district as farmer_district,
+               b.name as buyer_name, b.phone as buyer_phone, b.email as buyer_email, b.location as buyer_location,
+               e.id as order_id, e.order_code
+        FROM farmer_offers fo
+        JOIN users f ON fo.farmer_id = f.id
+        JOIN users b ON fo.buyer_id = b.id
+        LEFT JOIN enquiries e ON e.offer_id = fo.id
+        WHERE fo.id = ?
+    ''', (offer_id,))
+    offer = cursor.fetchone()
+    conn.close()
+    return offer
+
+def accept_farmer_offer(offer_id, buyer_id):
+    """
+    Buyer accepts farmer offer:
+    - Validates offer and prevents duplicate order creation
+    - Creates unique order in enquiries with ORD-2026-XXXX code
+    - Generates 6-digit Handover OTP and secure QR code token
+    - Initializes the 11-stage status_timeline
+    - Sets order status to Confirmed
+    - Updates offer status to Accepted
+    - Sends notifications to both parties
+    """
+    import random
+    import json
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT * FROM farmer_offers WHERE id = ?", (offer_id,))
+        offer = cursor.fetchone()
+        if not offer:
+            conn.close()
+            return False, "Offer not found", None
+
+        if offer['buyer_id'] != buyer_id:
+            conn.close()
+            return False, "Unauthorized: you can only accept offers sent to you", None
+
+        # Prevent duplicate order creation if already accepted
+        if offer['status'] == 'Accepted':
+            cursor.execute("SELECT id, order_code FROM enquiries WHERE offer_id = ?", (offer_id,))
+            existing = cursor.fetchone()
+            conn.close()
+            if existing:
+                return True, f"Offer already accepted (Order #{existing['order_code'] or existing['id']})", existing['id']
+
+        # Get buyer details
+        cursor.execute("SELECT id, name, phone, email, location FROM users WHERE id = ?", (buyer_id,))
+        buyer = cursor.fetchone()
+
+        # Get farmer details
+        cursor.execute("SELECT id, name, phone, location, district, pin_code FROM users WHERE id = ?", (offer['farmer_id'],))
+        farmer = cursor.fetchone()
+
+        # Ensure valid listing_id for relational integrity with existing modules
+        listing_id = offer['listing_id']
+        if not listing_id:
+            cursor.execute("""
+                SELECT id FROM listings 
+                WHERE farmer_id = ? AND crop_name LIKE ? AND status = 'Available'
+                LIMIT 1
+            """, (offer['farmer_id'], f"%{offer['crop_name']}%"))
+            matched = cursor.fetchone()
+            if matched:
+                listing_id = matched['id']
+            else:
+                farmer_pin = '641001'
+                if farmer and 'pin_code' in farmer.keys() and farmer['pin_code']:
+                    farmer_pin = str(farmer['pin_code'])
+                cursor.execute("""
+                    INSERT INTO listings (
+                        farmer_id, crop_name, category, photo, quantity, unit,
+                        price_per_unit, harvest_date, village_town, district, pin_code,
+                        farmer_name, farmer_phone, description, status
+                    ) VALUES (?, ?, 'Vegetables', ?, ?, 'kg', ?, ?, ?, ?, ?, ?, ?, ?, 'Available')
+                """, (
+                    offer['farmer_id'], offer['crop_name'], offer['photo'],
+                    offer['quantity'], offer['price_per_kg'], offer['harvest_date'],
+                    farmer['location'] or 'Farmgate', farmer['district'] or 'Tamil Nadu',
+                    farmer_pin,
+                    farmer['name'], farmer['phone'],
+                    offer['notes'] or f"Harvest offer {offer['offer_code']}"
+                ))
+                listing_id = cursor.lastrowid
+
+        final_qty = offer['counter_quantity'] if (offer['status'] == 'Counter Offered' and offer['counter_quantity']) else offer['quantity']
+        final_price = offer['counter_price'] if (offer['status'] == 'Counter Offered' and offer['counter_price']) else offer['price_per_kg']
+        total_price = round(float(final_qty) * float(final_price), 2)
+
+        order_code = f"ORD-2026-{uuid.uuid4().hex[:6].upper()}"
+        handover_otp = f"{random.randint(100000, 999999)}"
+        handover_qr_token = str(uuid.uuid4())
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        initial_timeline = [
+            {
+                'status': 'Offer Submitted',
+                'timestamp': str(offer['created_at']),
+                'actor': 'Farmer',
+                'note': f"Farmer submitted offer {offer['offer_code']} for {offer['quantity']} kg @ ₹{offer['price_per_kg']}/kg"
+            },
+            {
+                'status': 'Buyer Accepted',
+                'timestamp': now_str,
+                'actor': 'Buyer',
+                'note': f"Buyer accepted offer. Final terms: {final_qty} kg @ ₹{final_price}/kg"
+            },
+            {
+                'status': 'Order Confirmed',
+                'timestamp': now_str,
+                'actor': 'System',
+                'note': f"Order #{order_code} confirmed. Total value: ₹{total_price:,.2f}"
+            }
+        ]
+        timeline_json = json.dumps(initial_timeline)
+
+        cursor.execute('''
+            INSERT INTO enquiries (
+                listing_id, buyer_id, buyer_name, buyer_phone, buyer_email,
+                offered_price, requested_quantity, delivery_preference, total_price,
+                message, status, order_code, offer_id,
+                harvest_status, delivery_mode, delivery_status,
+                handover_otp, handover_qr_token, handover_verified,
+                payment_method, payment_status, status_timeline,
+                created_at, updated_at
+            ) VALUES (
+                ?, ?, ?, ?, ?,
+                ?, ?, ?, ?,
+                ?, 'Confirmed', ?, ?,
+                'Harvest Pending', ?, 'Pending',
+                ?, ?, 0,
+                'COD', 'Unpaid', ?,
+                ?, ?
+            )
+        ''', (
+            listing_id, buyer['id'], buyer['name'], buyer['phone'], buyer['email'],
+            final_price, final_qty, offer['delivery_preference'] or 'Farmer Pickup', total_price,
+            f"Order confirmed from offer {offer['offer_code']}", order_code, offer['id'],
+            offer['delivery_preference'] or 'Farmer Pickup',
+            handover_otp, handover_qr_token, timeline_json,
+            now_str, now_str
+        ))
+        order_id = cursor.lastrowid
+
+        # Update offer status to Accepted
+        cursor.execute('''
+            UPDATE farmer_offers
+            SET status = 'Accepted', updated_at = ?
+            WHERE id = ?
+        ''', (now_str, offer_id))
+
+        conn.commit()
+
+        # Notify Farmer
+        notif_msg = f"🎉 Great news! Buyer {buyer['name']} accepted your offer for {final_qty} kg of {offer['crop_name']}. Order #{order_code} is confirmed!"
+        create_notification(offer['farmer_id'], "Offer Accepted! 🤝 Order Confirmed", notif_msg, notif_type='order', link=f"/order/track/{order_id}")
+
+        # Notify Buyer
+        buyer_notif = f"Order #{order_code} confirmed with farmer {farmer['name']}. Total: ₹{total_price:,.2f}."
+        create_notification(buyer['id'], f"Order #{order_code} Confirmed ✅", buyer_notif, notif_type='order', link=f"/order/track/{order_id}")
+
+        conn.close()
+        return True, "Offer accepted and order confirmed!", order_id
+    except Exception as e:
+        return False, str(e), None
+
+def reject_farmer_offer(offer_id, buyer_id, rejection_reason):
+    """Buyer rejects a farmer offer with a reason."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM farmer_offers WHERE id = ?", (offer_id,))
+        offer = cursor.fetchone()
+        if not offer or offer['buyer_id'] != buyer_id:
+            conn.close()
+            return False, "Offer not found or unauthorized"
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute('''
+            UPDATE farmer_offers
+            SET status = 'Rejected', rejection_reason = ?, updated_at = ?
+            WHERE id = ?
+        ''', (rejection_reason or 'Buyer declined this offer at this time', now_str, offer_id))
+        conn.commit()
+
+        # Notify farmer
+        create_notification(
+            offer['farmer_id'],
+            f"Offer Update: {offer['crop_name']}",
+            f"Buyer was unable to accept Offer #{offer['offer_code']}. Reason: {rejection_reason or 'Price / Terms mismatch'}.",
+            notif_type='info',
+            link="/farmer/dashboard#offersSection"
+        )
+        conn.close()
+        return True, "Offer rejected"
+    except Exception as e:
+        return False, str(e)
+
+def counter_farmer_offer(offer_id, buyer_id, counter_price, counter_quantity, counter_notes=None):
+    """Buyer proposes a Counter Offer with adjusted price and/or quantity."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM farmer_offers WHERE id = ?", (offer_id,))
+        offer = cursor.fetchone()
+        if not offer or offer['buyer_id'] != buyer_id:
+            conn.close()
+            return False, "Offer not found or unauthorized"
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute('''
+            UPDATE farmer_offers
+            SET status = 'Counter Offered',
+                counter_price = ?,
+                counter_quantity = ?,
+                counter_notes = ?,
+                updated_at = ?
+            WHERE id = ?
+        ''', (float(counter_price), float(counter_quantity), counter_notes, now_str, offer_id))
+        conn.commit()
+
+        # Notify farmer
+        notif_msg = f"Buyer sent a Counter Offer for #{offer['offer_code']}: ₹{counter_price}/kg for {counter_quantity} kg. Review and respond in your dashboard."
+        create_notification(
+            offer['farmer_id'],
+            f"Counter Offer Received: {offer['crop_name']} 💬",
+            notif_msg,
+            notif_type='order',
+            link="/farmer/dashboard#offersSection"
+        )
+        conn.close()
+        return True, "Counter offer sent to farmer"
+    except Exception as e:
+        return False, str(e)
+
+def farmer_respond_counter_offer(offer_id, farmer_id, action):
+    """Farmer accepts or declines a buyer's counter offer."""
+    if action == 'accept':
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM farmer_offers WHERE id = ?", (offer_id,))
+        offer = cursor.fetchone()
+        conn.close()
+        if not offer or offer['farmer_id'] != farmer_id:
+            return False, "Offer not found or unauthorized", None
+        return accept_farmer_offer(offer_id, offer['buyer_id'])
+    else:
+        conn = get_db()
+        cursor = conn.cursor()
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute("UPDATE farmer_offers SET status = 'Rejected', updated_at = ? WHERE id = ? AND farmer_id = ?", (now_str, offer_id, farmer_id))
+        conn.commit()
+        conn.close()
+        return True, "Counter offer declined", None
+
+def update_order_harvest_and_quality(order_id, harvest_status, harvested_qty=None, harvest_notes=None, fresh_image=None, actor='Farmer'):
+    """
+    Farmer updates harvest progress:
+    - 'Harvest Pending'
+    - 'Harvesting in Progress'
+    - 'Ready for Quality Check'
+    - 'Quality Approved'
+    Appends entry to 11-stage status_timeline and notifies buyer.
+    """
+    import json
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM enquiries WHERE id = ?", (order_id,))
+        order = cursor.fetchone()
+        if not order:
+            conn.close()
+            return False, "Order not found"
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        timeline = []
+        if order['status_timeline']:
+            try:
+                timeline = json.loads(order['status_timeline'])
+            except Exception:
+                timeline = []
+
+        timeline_note = harvest_notes or f"Harvest status updated to {harvest_status}"
+        if harvested_qty:
+            timeline_note += f" (Harvested weight: {harvested_qty} kg)"
+
+        milestone_status = harvest_status
+        if harvest_status == 'Harvesting in Progress':
+            milestone_status = 'Harvesting Started'
+
+        timeline.append({
+            'status': milestone_status,
+            'timestamp': now_str,
+            'actor': actor,
+            'note': timeline_note
+        })
+
+        cursor.execute('''
+            UPDATE enquiries
+            SET harvest_status = ?,
+                harvested_quantity = COALESCE(?, harvested_quantity),
+                harvest_notes = COALESCE(?, harvest_notes),
+                fresh_product_image = COALESCE(?, fresh_product_image),
+                status_timeline = ?,
+                updated_at = ?
+            WHERE id = ?
+        ''', (
+            harvest_status,
+            float(harvested_qty) if harvested_qty else None,
+            harvest_notes,
+            fresh_image,
+            json.dumps(timeline),
+            now_str,
+            order_id
+        ))
+        conn.commit()
+
+        # Notify buyer
+        if harvest_status == 'Ready for Quality Check':
+            notif_title = f"Quality Check Ready: Order #{order['order_code'] or order['id']} 🔍"
+            notif_msg = f"Farmer has harvested fresh produce ({harvested_qty or order['requested_quantity']} kg). Please review and approve quality."
+        else:
+            notif_title = f"Harvest Update: Order #{order['order_code'] or order['id']} 🌾"
+            notif_msg = f"Harvest progress: '{harvest_status}'."
+        create_notification(order['buyer_id'], notif_title, notif_msg, notif_type='order', link=f"/order/track/{order_id}")
+
+        conn.close()
+        return True, "Harvest & Quality updated successfully"
+    except Exception as e:
+        return False, str(e)
+
+def buyer_quality_decision(order_id, buyer_id, decision, notes=None):
+    """Buyer approves produce quality or reports an issue."""
+    import json
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM enquiries WHERE id = ?", (order_id,))
+        order = cursor.fetchone()
+        if not order or order['buyer_id'] != buyer_id:
+            conn.close()
+            return False, "Order not found or unauthorized"
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        timeline = []
+        if order['status_timeline']:
+            try:
+                timeline = json.loads(order['status_timeline'])
+            except Exception:
+                timeline = []
+
+        if decision == 'approve':
+            new_harvest_status = 'Quality Approved'
+            timeline.append({
+                'status': 'Quality Approved',
+                'timestamp': now_str,
+                'actor': 'Buyer',
+                'note': notes or "Buyer reviewed and approved produce freshness and quality."
+            })
+            notif_title = f"Quality Approved! Order #{order['order_code'] or order['id']} ✅"
+            notif_msg = "Buyer has approved produce quality. You can now schedule pickup / delivery."
+        else:
+            new_harvest_status = 'Quality Issue'
+            timeline.append({
+                'status': 'Quality Issue Raised',
+                'timestamp': now_str,
+                'actor': 'Buyer',
+                'note': notes or "Buyer raised a quality concern on the harvest."
+            })
+            notif_title = f"Quality Concern on Order #{order['order_code'] or order['id']} ⚠️"
+            notif_msg = f"Buyer reported: {notes or 'Please check fresh harvest details.'}"
+
+        cursor.execute('''
+            UPDATE enquiries
+            SET harvest_status = ?,
+                status_timeline = ?,
+                updated_at = ?
+            WHERE id = ?
+        ''', (new_harvest_status, json.dumps(timeline), now_str, order_id))
+        conn.commit()
+
+        cursor.execute("SELECT farmer_id FROM listings WHERE id = ?", (order['listing_id'],))
+        listing = cursor.fetchone()
+        if listing:
+            create_notification(listing['farmer_id'], notif_title, notif_msg, notif_type='urgent_risk' if decision != 'approve' else 'order', link=f"/order/track/{order_id}")
+
+        conn.close()
+        return True, "Quality decision recorded successfully"
+    except Exception as e:
+        return False, str(e)
+
+def update_order_delivery_schedule(order_id, delivery_mode=None, pickup_datetime=None,
+                                    delivery_partner=None, delivery_status=None,
+                                    notes=None, actor='Buyer'):
+    """Update pickup and delivery logistics schedule and status."""
+    import json
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT e.*, l.farmer_id FROM enquiries e JOIN listings l ON e.listing_id = l.id WHERE e.id = ?", (order_id,))
+        order = cursor.fetchone()
+        if not order:
+            conn.close()
+            return False, "Order not found"
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        timeline = []
+        if order['status_timeline']:
+            try:
+                timeline = json.loads(order['status_timeline'])
+            except Exception:
+                timeline = []
+
+        if delivery_status:
+            timeline_note = notes or f"Delivery status updated to {delivery_status}"
+            timeline.append({
+                'status': delivery_status,
+                'timestamp': now_str,
+                'actor': actor,
+                'note': timeline_note
+            })
+
+        cursor.execute('''
+            UPDATE enquiries
+            SET delivery_mode = COALESCE(?, delivery_mode),
+                pickup_datetime = COALESCE(?, pickup_datetime),
+                delivery_partner = COALESCE(?, delivery_partner),
+                delivery_status = COALESCE(?, delivery_status),
+                status = CASE 
+                    WHEN ? IN ('In Transit', 'Out for Delivery') THEN 'In Transit'
+                    WHEN ? = 'Delivered' THEN 'Delivered'
+                    ELSE status END,
+                status_timeline = ?,
+                updated_at = ?
+            WHERE id = ?
+        ''', (
+            delivery_mode, pickup_datetime, delivery_partner, delivery_status,
+            delivery_status, delivery_status,
+            json.dumps(timeline), now_str, order_id
+        ))
+        conn.commit()
+
+        msg = f"Logistics update for Order #{order['order_code'] or order['id']}: {delivery_status or delivery_mode}."
+        create_notification(order['buyer_id'], "Logistics Update 🚚", msg, notif_type='order', link=f"/order/track/{order_id}")
+        create_notification(order['farmer_id'], "Logistics Update 🚚", msg, notif_type='order', link=f"/order/track/{order_id}")
+
+        conn.close()
+        return True, "Delivery logistics updated successfully"
+    except Exception as e:
+        return False, str(e)
+
+def verify_order_handover(order_id, otp_or_token, delivered_quantity, user_id=None):
+    """
+    Secure product handover verification:
+    - Validates 6-digit OTP or QR token
+    - Prevents duplicate verification
+    - Records delivered_quantity and timestamp
+    - Updates order status to Delivered (or Completed if paid)
+    - Appends Delivered milestone to 11-stage timeline
+    """
+    import json
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT e.*, l.farmer_id 
+            FROM enquiries e
+            JOIN listings l ON e.listing_id = l.id
+            WHERE e.id = ?
+        """, (order_id,))
+        order = cursor.fetchone()
+        if not order:
+            conn.close()
+            return False, "Order not found"
+
+        if order['handover_verified'] == 1:
+            conn.close()
+            return False, f"Handover was already verified on {order['handover_at']}"
+
+        entered = str(otp_or_token).strip()
+        expected_otp = str(order['handover_otp']).strip() if order['handover_otp'] else None
+        expected_token = str(order['handover_qr_token']).strip() if order['handover_qr_token'] else None
+
+        if entered != expected_otp and entered != expected_token:
+            conn.close()
+            return False, "Invalid Handover OTP or QR Code. Please double-check with counterpart."
+
+        try:
+            deliv_qty = float(delivered_quantity)
+            if deliv_qty <= 0:
+                conn.close()
+                return False, "Delivered quantity must be greater than 0 kg"
+        except (ValueError, TypeError):
+            conn.close()
+            return False, "Please provide a valid delivered quantity in kg"
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        timeline = []
+        if order['status_timeline']:
+            try:
+                timeline = json.loads(order['status_timeline'])
+            except Exception:
+                timeline = []
+
+        timeline.append({
+            'status': 'Delivered',
+            'timestamp': now_str,
+            'actor': 'Counterparties',
+            'note': f"Product Handover Verified via OTP. Delivered Quantity: {deliv_qty} kg"
+        })
+
+        is_paid = order['payment_status'] in ['Paid', 'Payment Verified']
+        new_status = 'Completed' if is_paid else 'Delivered'
+        if is_paid:
+            timeline.append({
+                'status': 'Order Completed',
+                'timestamp': now_str,
+                'actor': 'System',
+                'note': "Both handover verification and payment are complete. Order successfully fulfilled."
+            })
+
+        cursor.execute('''
+            UPDATE enquiries
+            SET handover_verified = 1,
+                handover_at = ?,
+                delivered_quantity = ?,
+                delivery_status = 'Delivered',
+                status = ?,
+                status_timeline = ?,
+                updated_at = ?
+            WHERE id = ?
+        ''', (now_str, deliv_qty, new_status, json.dumps(timeline), now_str, order_id))
+
+        conn.commit()
+
+        # Notify both parties
+        title = f"Handover Verified! Order #{order['order_code'] or order['id']} 🤝"
+        msg = f"Delivery verified successfully ({deliv_qty} kg received)."
+        create_notification(order['farmer_id'], title, msg, notif_type='order', link=f"/order/track/{order_id}")
+        create_notification(order['buyer_id'], title, msg, notif_type='order', link=f"/order/track/{order_id}")
+
+        conn.close()
+        return True, "Product handover verified successfully!"
+    except Exception as e:
+        return False, str(e)
+
+def build_11_stage_timeline(order, timeline_entries=None):
+    """
+    Constructs the 11-stage vertical progress timeline:
+    1. Offer Submitted
+    2. Buyer Accepted
+    3. Order Confirmed
+    4. Harvesting Started
+    5. Quality Approved
+    6. Pickup Scheduled
+    7. Product Picked Up
+    8. In Transit
+    9. Delivered
+    10. Payment Verified
+    11. Order Completed
+    """
+    import json
+    order = dict(order) if order is not None else {}
+    if timeline_entries is None and order.get('status_timeline'):
+        try:
+            timeline_entries = json.loads(order['status_timeline'])
+        except Exception:
+            timeline_entries = []
+    timeline_entries = timeline_entries or []
+
+    entry_map = {}
+    for entry in timeline_entries:
+        status_name = (entry.get('status') or '').strip().lower()
+        entry_map[status_name] = entry
+
+    stages = [
+        {'id': 1, 'name': 'Offer Submitted', 'icon': '📝', 'default_actor': 'Farmer'},
+        {'id': 2, 'name': 'Buyer Accepted', 'icon': '🤝', 'default_actor': 'Buyer'},
+        {'id': 3, 'name': 'Order Confirmed', 'icon': '✅', 'default_actor': 'System'},
+        {'id': 4, 'name': 'Harvesting Started', 'icon': '🌾', 'default_actor': 'Farmer'},
+        {'id': 5, 'name': 'Quality Approved', 'icon': '🔍', 'default_actor': 'Buyer'},
+        {'id': 6, 'name': 'Pickup Scheduled', 'icon': '📅', 'default_actor': 'Buyer'},
+        {'id': 7, 'name': 'Product Picked Up', 'icon': '📦', 'default_actor': 'Logistics'},
+        {'id': 8, 'name': 'In Transit', 'icon': '🚚', 'default_actor': 'Logistics'},
+        {'id': 9, 'name': 'Delivered', 'icon': '📍', 'default_actor': 'Farmer & Buyer'},
+        {'id': 10, 'name': 'Payment Verified', 'icon': '💳', 'default_actor': 'Razorpay / Bank'},
+        {'id': 11, 'name': 'Order Completed', 'icon': '🎉', 'default_actor': 'System'}
+    ]
+
+    status = (order.get('status') or '').strip()
+    harvest_status = (order.get('harvest_status') or '').strip()
+    delivery_status = (order.get('delivery_status') or '').strip()
+    payment_status = (order.get('payment_status') or '').strip()
+    handover_verified = bool(order.get('handover_verified'))
+
+    completed_flags = [False] * 12
+
+    # 1. Offer Submitted
+    if 'offer submitted' in entry_map or order.get('offer_id'):
+        completed_flags[1] = True
+    else:
+        completed_flags[1] = True
+
+    # 2. Buyer Accepted
+    if 'buyer accepted' in entry_map or status in ['Confirmed', 'Accepted', 'Packed', 'Shipped', 'Delivered', 'Completed', 'Ready for Pickup', 'In Transit']:
+        completed_flags[2] = True
+
+    # 3. Order Confirmed
+    if 'order confirmed' in entry_map or status in ['Confirmed', 'Accepted', 'Packed', 'Shipped', 'Delivered', 'Completed', 'Ready for Pickup', 'In Transit']:
+        completed_flags[3] = True
+
+    # 4. Harvesting Started
+    if 'harvesting started' in entry_map or 'harvesting in progress' in entry_map or harvest_status in ['Harvesting in Progress', 'Ready for Quality Check', 'Quality Approved']:
+        completed_flags[4] = True
+
+    # 5. Quality Approved
+    if 'quality approved' in entry_map or harvest_status == 'Quality Approved':
+        completed_flags[5] = True
+
+    # 6. Pickup Scheduled
+    if 'pickup scheduled' in entry_map or order.get('pickup_datetime') or delivery_status in ['Pickup Scheduled', 'Ready for Pickup', 'Picked Up', 'In Transit', 'Out for Delivery', 'Delivered']:
+        completed_flags[6] = True
+
+    # 7. Product Picked Up
+    if 'product picked up' in entry_map or 'picked up' in entry_map or delivery_status in ['Picked Up', 'In Transit', 'Out for Delivery', 'Delivered'] or status in ['Packed', 'Shipped', 'Delivered', 'Completed']:
+        completed_flags[7] = True
+
+    # 8. In Transit
+    if 'in transit' in entry_map or 'out for delivery' in entry_map or delivery_status in ['In Transit', 'Out for Delivery', 'Delivered'] or status in ['Shipped', 'Delivered', 'Completed']:
+        completed_flags[8] = True
+
+    # 9. Delivered
+    if 'delivered' in entry_map or handover_verified or delivery_status == 'Delivered' or status in ['Delivered', 'Completed']:
+        completed_flags[9] = True
+
+    # 10. Payment Verified
+    if 'payment verified' in entry_map or payment_status in ['Paid', 'Payment Verified', 'COD Pending', 'COD Verified']:
+        completed_flags[10] = True
+
+    # 11. Order Completed
+    if 'order completed' in entry_map or (completed_flags[9] and completed_flags[10]) or status == 'Completed':
+        completed_flags[11] = True
+
+    active_stage_id = 11
+    for st in stages:
+        if not completed_flags[st['id']]:
+            active_stage_id = st['id']
+            break
+
+    result = []
+    for st in stages:
+        sid = st['id']
+        is_done = completed_flags[sid]
+        is_active = (sid == active_stage_id and not completed_flags[11]) or (sid == 11 and completed_flags[11])
+
+        matched_entry = entry_map.get(st['name'].lower())
+        timestamp = matched_entry.get('timestamp') if matched_entry else None
+        note = matched_entry.get('note') if matched_entry else None
+        actor = matched_entry.get('actor') if matched_entry else st['default_actor']
+
+        if not timestamp and is_done:
+            timestamp = str(order.get('created_at') or '')
+
+        if not note:
+            if is_done:
+                note = f"{st['name']} completed successfully."
+            elif is_active:
+                note = f"Action in progress: awaiting {st['default_actor'].lower()}."
+            else:
+                note = f"Pending previous stages."
+
+        result.append({
+            'step_num': sid,
+            'name': st['name'],
+            'icon': st['icon'],
+            'actor': actor,
+            'is_completed': is_done,
+            'is_current': is_active and not is_done,
+            'is_pending': not is_done and not is_active,
+            'timestamp': timestamp,
+            'note': note
+        })
+
+    return result
+
 
 def seed_db():
     conn = get_db()

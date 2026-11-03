@@ -16,11 +16,11 @@
   <div class="dashboard-header" style="margin-bottom: 2rem;">
     <div>
       <div style="font-size: 0.85rem; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
-        🤝 {{ _t('nearby_buyers') }} &bull; {{ _t('tamil_nadu') }}
+        🤝 Verified Wholesale Procurement &bull; Tamil Nadu
       </div>
       <h1 style="font-size: 2.25rem; font-weight: 800; margin-top: 0.25rem;">{{ _t('nearby_buyers_title') }}</h1>
       <p style="color: var(--text-muted); font-size: 0.95rem; max-width: 750px;">
-        {{ _t('nearby_buyers_sub') }}
+        Explore real-time harvest demand requirements from commercial buyers across Tamil Nadu. Review target prices, send competitive product offers, and confirm direct sales orders.
       </p>
     </div>
     <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
@@ -39,21 +39,21 @@
     </div>
   </div>
 
-  <!-- Filter Card -->
-  <div class="filter-card" style="margin-bottom: 2rem;">
+  <!-- Filter Card (Section 1: Filter by Crop, Location, Quantity, Price) -->
+  <div class="filter-card" style="margin-bottom: 2rem; background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); padding: 1.5rem; box-shadow: var(--shadow-sm);">
     <form action="{{ url_for('nearby_buyers') }}" method="GET" id="buyerFilterForm">
-      <div class="nearby-filter-grid">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
         <!-- Search Keyword -->
         <div class="filter-group">
-          <label class="filter-label">{{ _t('search_produce') }} / {{ _t('nearby_buyers') }}</label>
-          <input type="text" name="q" value="{{ search_q }}" class="filter-input" placeholder="Crop (e.g. Tomato, Shallots), Buyer, Town...">
+          <label class="filter-label" style="font-weight: 700; font-size: 0.8rem; color: #334155; margin-bottom: 0.35rem; display: block;">{{ _t('search_produce') }} / Crop</label>
+          <input type="text" name="q" value="{{ search_q }}" class="filter-input" placeholder="e.g. Tomato, Shallot, Potato..." style="width: 100%; height: 42px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.5rem 0.75rem;">
         </div>
 
         <!-- District Filter -->
         <div class="filter-group">
-          <label class="filter-label">{{ _t('filter_district') }} (Tamil Nadu)</label>
-          <select name="district" class="filter-select">
-            <option value="">{{ _t('all_districts') }}</option>
+          <label class="filter-label" style="font-weight: 700; font-size: 0.8rem; color: #334155; margin-bottom: 0.35rem; display: block;">{{ _t('filter_district') }}</label>
+          <select name="district" class="filter-select" style="width: 100%; height: 42px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.5rem 0.75rem;">
+            <option value="">All Tamil Nadu Districts</option>
             {% for d in tn_districts %}
               <option value="{{ d }}" {% if district_filter == d %}selected{% endif %}>{{ d }}</option>
             {% endfor %}
@@ -62,85 +62,110 @@
 
         <!-- Buyer Business Type -->
         <div class="filter-group">
-          <label class="filter-label">{{ _t('filter_buyer_type') }}</label>
-          <select name="buyer_type" class="filter-select">
-            <option value="">{{ _t('buyer_all_types') }}</option>
+          <label class="filter-label" style="font-weight: 700; font-size: 0.8rem; color: #334155; margin-bottom: 0.35rem; display: block;">Buyer Business Type</label>
+          <select name="buyer_type" class="filter-select" style="width: 100%; height: 42px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.5rem 0.75rem;">
+            <option value="">All Buyer Types</option>
             {% for btype in buyer_types %}
               <option value="{{ btype }}" {% if buyer_type_filter == btype %}selected{% endif %}>{{ btype }}</option>
             {% endfor %}
           </select>
         </div>
 
-        <!-- Filter Submit & Reset -->
-        <div class="filter-btn-group" style="align-self: flex-end;">
-          <button type="submit" class="btn btn-primary" style="height: 44px;">{{ _t('btn_apply_filters') }}</button>
-          <a href="{{ url_for('nearby_buyers') }}" class="btn btn-secondary" style="height: 44px;" title="Reset filters">{{ _t('btn_reset_filters') }}</a>
+        <!-- Quantity Filter (Min/Max kg) -->
+        <div class="filter-group">
+          <label class="filter-label" style="font-weight: 700; font-size: 0.8rem; color: #334155; margin-bottom: 0.35rem; display: block;">Quantity Range (kg)</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="number" name="min_qty" value="{{ min_qty }}" placeholder="Min" style="width: 50%; height: 42px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.5rem 0.5rem; font-size: 0.85rem;">
+            <input type="number" name="max_qty" value="{{ max_qty }}" placeholder="Max" style="width: 50%; height: 42px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.5rem 0.5rem; font-size: 0.85rem;">
+          </div>
+        </div>
+
+        <!-- Target Price Filter (Min/Max ₹) -->
+        <div class="filter-group">
+          <label class="filter-label" style="font-weight: 700; font-size: 0.8rem; color: #334155; margin-bottom: 0.35rem; display: block;">Target Price (₹/kg)</label>
+          <div style="display: flex; gap: 0.5rem;">
+            <input type="number" name="min_price" value="{{ min_price }}" placeholder="Min ₹" style="width: 50%; height: 42px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.5rem 0.5rem; font-size: 0.85rem;">
+            <input type="number" name="max_price" value="{{ max_price }}" placeholder="Max ₹" style="width: 50%; height: 42px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.5rem 0.5rem; font-size: 0.85rem;">
+          </div>
         </div>
       </div>
 
-      <!-- Quick Category Filter Pills -->
-      <div class="quick-filter-pills" style="margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--border-subtle); display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
-        <span style="font-size: 0.8rem; font-weight: 700; color: #64748b;">Buyer Types:</span>
-        <a href="{{ url_for('nearby_buyers') }}" class="pill-btn {% if not buyer_type_filter %}active{% endif %}">
-          All ({{ requirements|length }})
-        </a>
-        {% for btype in buyer_types %}
-          {% set count = type_counts.get(btype, 0) %}
-          <a href="{{ url_for('nearby_buyers', buyer_type=btype, district=district_filter) }}" 
-             class="pill-btn {% if buyer_type_filter == btype %}active{% endif %}">
-            {{ btype }} {% if count > 0 %}<span style="opacity: 0.8; font-size: 0.75rem;">({{ count }})</span>{% endif %}
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; border-top: 1px dashed var(--border-subtle); padding-top: 1rem;">
+        <!-- Quick Category Filter Pills -->
+        <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;">
+          <span style="font-size: 0.8rem; font-weight: 700; color: #64748b;">Categories:</span>
+          <a href="{{ url_for('nearby_buyers') }}" class="pill-btn {% if not buyer_type_filter %}active{% endif %}" style="padding: 0.25rem 0.65rem; border-radius: 9999px; font-size: 0.8rem; text-decoration: none; border: 1px solid #cbd5e1; color: #334155;">
+            All ({{ requirements|length }})
           </a>
-        {% endfor %}
+          {% for btype in buyer_types %}
+            {% set count = type_counts.get(btype, 0) %}
+            <a href="{{ url_for('nearby_buyers', buyer_type=btype, district=district_filter) }}" 
+               class="pill-btn {% if buyer_type_filter == btype %}active{% endif %}"
+               style="padding: 0.25rem 0.65rem; border-radius: 9999px; font-size: 0.8rem; text-decoration: none; border: 1px solid #cbd5e1; color: #334155; {% if buyer_type_filter == btype %}background: #16a34a; color: white; border-color: #16a34a;{% endif %}">
+              {{ btype }} {% if count > 0 %}<span style="opacity: 0.8; font-size: 0.75rem;">({{ count }})</span>{% endif %}
+            </a>
+          {% endfor %}
+        </div>
+
+        <div style="display: flex; gap: 0.5rem;">
+          <button type="submit" class="btn btn-primary" style="height: 40px; padding: 0 1.25rem; font-weight: 700;">{{ _t('btn_apply_filters') }}</button>
+          <a href="{{ url_for('nearby_buyers') }}" class="btn btn-secondary" style="height: 40px; padding: 0 1rem; display: inline-flex; align-items: center;" title="Reset filters">{{ _t('btn_reset_filters') }}</a>
+        </div>
       </div>
     </form>
   </div>
 
-  <!-- Buyer Requirements Grid -->
+  <!-- Buyer Requirements Grid (Section 1) -->
   {% if requirements %}
-    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem;">
-      <h2 style="font-size: 1.35rem; font-weight: 700;">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1.25rem;">
+      <h2 style="font-size: 1.35rem; font-weight: 800; color: #0f172a;">
         Active Procurement Requests ({{ requirements|length }})
       </h2>
       <span style="font-size: 0.85rem; color: var(--text-muted);">
-        Verified buyers looking for farm harvests in Tamil Nadu
+        Direct commercial procurement from wholesale buyers in Tamil Nadu
       </span>
     </div>
 
-    <div class="buyer-grid">
+    <div class="buyer-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 1.5rem;">
       {% for req in requirements %}
         <div class="buyer-card" style="background: white; border-radius: var(--radius-lg); border: 1px solid var(--border-subtle); padding: 1.5rem; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between; transition: transform var(--transition-fast), box-shadow var(--transition-fast);">
           <div>
-            <!-- Card Header: Business Type & District Badge -->
+            <!-- Card Header: Verification Status & District -->
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem; margin-bottom: 0.75rem;">
-              <span class="badge-category" style="background: #ecfdf5; color: #166534; font-weight: 700;">
-                🏢 {{ req['business_type'] }}
-              </span>
+              <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+                <span class="badge-category" style="background: #ecfdf5; color: #166534; font-weight: 700; font-size: 0.75rem; padding: 0.2rem 0.55rem; border-radius: 9999px;">
+                  🏢 {{ req['business_type'] }}
+                </span>
+                <span style="background: #dcfce7; color: #15803d; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 9999px; display: inline-flex; align-items: center; gap: 0.25rem;">
+                  ✓ Verified Buyer
+                </span>
+              </div>
               <span style="font-size: 0.8rem; font-weight: 600; color: #0284c7; background: #e0f2fe; padding: 0.2rem 0.55rem; border-radius: 9999px;">
                 📍 {{ req['district'] }}
               </span>
             </div>
 
             <!-- Buyer Name & Crop Requested -->
-            <h3 style="font-size: 1.25rem; font-weight: 800; margin-bottom: 0.25rem; color: #0f172a;">
+            <h3 style="font-size: 1.3rem; font-weight: 800; margin-bottom: 0.25rem; color: #0f172a;">
               {{ req['crop_name'] }}
             </h3>
             
             <div style="font-size: 0.875rem; color: #475569; font-weight: 600; margin-bottom: 0.75rem;">
-              Buyer: <span style="color: #0f172a;">{{ req['buyer_name'] }}</span>
+              Buyer: <strong style="color: #0f172a;">{{ req['buyer_name'] }}</strong>
             </div>
 
             <!-- Requirement Details Table / Metrics -->
             <div style="background: #f8fafc; border-radius: var(--radius-md); padding: 0.85rem; margin-bottom: 1rem; border: 1px solid #f1f5f9;">
-              <div class="buyer-card-metric-grid">
+              <div class="buyer-card-metric-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
                 <div>
-                  <div style="font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Required Qty</div>
-                  <div style="font-size: 1.15rem; font-weight: 800; color: #15803d;">
+                  <div style="font-size: 0.725rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Required Quantity</div>
+                  <div style="font-size: 1.2rem; font-weight: 800; color: #15803d;">
                     {{ req['required_quantity'] }} {{ req['unit'] }}
                   </div>
                 </div>
                 <div>
-                  <div style="font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase;">Target Rate</div>
-                  <div style="font-size: 1.15rem; font-weight: 800; color: #0f172a;">
+                  <div style="font-size: 0.725rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Target Rate</div>
+                  <div style="font-size: 1.2rem; font-weight: 800; color: #0f172a;">
                     {% if req['target_price'] %}
                       ₹{{ "%.0f"|format(req['target_price']) }} / {{ req['unit'] }}
                     {% else %}
@@ -151,35 +176,80 @@
               </div>
 
               {% if req['village_town'] %}
-                <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px dashed #e2e8f0;">
-                  📍 Preferred Pickup / Hub: <strong>{{ req['village_town'] }}, {{ req['district'] }}</strong>
+                <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px dashed #e2e8f0;">
+                  📍 Preferred Pickup / Hub: <strong style="color: #334155;">{{ req['village_town'] }}, {{ req['district'] }}</strong>
                 </div>
               {% endif %}
+
+              <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.35rem;">
+                📅 Required Date: <strong style="color: #334155;">{{ req['required_date'] or 'Immediate Delivery (3-5 days)' }}</strong>
+              </div>
             </div>
 
             <!-- Notes from Buyer -->
             {% if req['notes'] %}
-              <div style="font-size: 0.85rem; color: #334155; line-height: 1.5; margin-bottom: 1.25rem; background: #fffbeb; padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border-left: 3px solid #f59e0b;">
+              <div style="font-size: 0.825rem; color: #334155; line-height: 1.4; margin-bottom: 1.25rem; background: #fffbeb; padding: 0.65rem 0.85rem; border-radius: var(--radius-sm); border-left: 3px solid #f59e0b;">
                 <strong>Procurement Specs:</strong> {{ req['notes'] }}
               </div>
             {% endif %}
           </div>
 
-          <!-- Contact Actions -->
-          <div style="display: flex; gap: 0.5rem; padding-top: 1rem; border-top: 1px solid var(--border-subtle);">
-            {% set clean_phone = req['contact_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
-            <a href="tel:{{ req['contact_phone'] }}" class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center; font-size: 0.85rem;">
-              📞 {{ _t('buyer_contact_btn') }}
-            </a>
-            <a href="https://wa.me/91{{ clean_phone }}?text=Vanakkam%20{{ req['buyer_name'] }}%2C%20I%20saw%20your%20requirement%20for%20{{ req['crop_name'] }}%20on%20FarmFresh%20Rescue.%20I%20have%20harvested%20produce%20available." 
-               target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="flex: 1; justify-content: center; font-size: 0.85rem;">
-              💬 {{ _t('buyer_chat_btn') }}
-            </a>
-            {% if current_user and current_user['role'] == 'farmer' %}
-              <a href="{{ url_for('ai_assistant') }}?crop={{ req['crop_name'] }}&qty={{ req['required_quantity'] }}" class="btn btn-outline-primary btn-sm" title="Get AI Rescue Advice" style="padding: 0.35rem 0.6rem;">
-                🤖 AI
+          <!-- Section 1 & 2 Action Buttons -->
+          <div>
+            <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+              <!-- View Details Button -->
+              <button type="button" class="btn btn-outline-primary btn-sm btn-view-details" 
+                      style="flex: 1; font-weight: 700; border-color: #0284c7; color: #0284c7;"
+                      data-id="{{ req['id'] }}"
+                      data-crop="{{ req['crop_name']|escape }}"
+                      data-buyer="{{ req['buyer_name']|escape }}"
+                      data-btype="{{ req['business_type']|escape }}"
+                      data-qty="{{ req['required_quantity'] }}"
+                      data-unit="{{ req['unit'] }}"
+                      data-price="{{ req['target_price'] or 0 }}"
+                      data-location="{{ req['village_town'] or '' }}, {{ req['district'] }}"
+                      data-date="{{ req['required_date'] or 'Immediate' }}"
+                      data-phone="{{ req['contact_phone'] }}"
+                      data-notes="{{ req['notes'] or '' }}"
+                      data-buyer-id="{{ req['buyer_id'] }}">
+                👁️ View Details
+              </button>
+
+              <!-- Send Offer Button -->
+              {% if current_user and current_user['role'] == 'farmer' %}
+                <button type="button" class="btn btn-primary btn-sm btn-open-offer-modal" 
+                        style="flex: 1.2; font-weight: 700; background: #16a34a; border-color: #16a34a;"
+                        data-req-id="{{ req['id'] }}"
+                        data-buyer-id="{{ req['buyer_id'] }}"
+                        data-buyer-name="{{ req['buyer_name']|escape }}"
+                        data-crop="{{ req['crop_name']|escape }}"
+                        data-qty="{{ req['required_quantity'] }}"
+                        data-target-price="{{ req['target_price'] or '' }}">
+                  📨 Send Offer
+                </button>
+              {% elif not current_user %}
+                <a href="{{ url_for('login') }}?next={{ url_for('nearby_buyers') }}" class="btn btn-primary btn-sm" style="flex: 1.2; font-weight: 700; background: #16a34a;">
+                  📨 Send Offer
+                </a>
+              {% endif %}
+            </div>
+
+            <!-- Contact Actions -->
+            <div style="display: flex; gap: 0.4rem; padding-top: 0.75rem; border-top: 1px solid var(--border-subtle);">
+              {% set clean_phone = req['contact_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
+              <a href="tel:{{ req['contact_phone'] }}" class="btn btn-secondary btn-sm" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.35rem 0.5rem;">
+                📞 Call
               </a>
-            {% endif %}
+              <a href="https://wa.me/91{{ clean_phone }}?text=Vanakkam%20{{ req['buyer_name'] }}%2C%20I%20saw%20your%20requirement%20for%20{{ req['crop_name'] }}%20on%20FarmFresh%20Rescue.%20I%20have%20harvested%20produce%20available." 
+                 target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="flex: 1; justify-content: center; font-size: 0.8rem; padding: 0.35rem 0.5rem;">
+                💬 WhatsApp
+              </a>
+              {% if current_user and current_user['role'] == 'farmer' %}
+                <a href="{{ url_for('ai_assistant') }}?crop={{ req['crop_name'] }}&qty={{ req['required_quantity'] }}" class="btn btn-outline-primary btn-sm" title="Get AI Rescue Advice" style="padding: 0.35rem 0.6rem;">
+                  🤖 AI
+                </a>
+              {% endif %}
+            </div>
           </div>
         </div>
       {% endfor %}
@@ -193,7 +263,7 @@
         {{ _t('no_buyers_found') }}
       </h3>
       <p class="empty-text" style="color: var(--text-muted); max-width: 500px; margin: 0 auto 1.5rem;">
-        No active procurement requirements match your current filter settings. Try selecting a different district or clearing keyword filters.
+        No active procurement requirements match your current filter settings. Try adjusting your district or price range.
       </p>
       <div style="display: flex; gap: 0.75rem; justify-content: center; flex-wrap: wrap;">
         <a href="{{ url_for('nearby_buyers') }}" class="btn btn-primary">{{ _t('btn_reset_filters') }}</a>
@@ -205,9 +275,333 @@
   {% endif %}
 
   <!-- Information Notice -->
-  <div class="disclaimer-box" style="margin-top: 2.5rem;">
-    💡 <strong>Direct Farm-to-Buyer Matching:</strong> All registered buyer requirements are verified for commercial purchase in Tamil Nadu. Farmers can directly communicate via telephone or WhatsApp without brokerage commissions or intermediary markups.
+  <div class="disclaimer-box" style="margin-top: 2.5rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-md); padding: 1rem 1.25rem; font-size: 0.875rem; color: #166534;">
+    💡 <strong>Direct Farm-to-Buyer Marketplace:</strong> All procurement requests are verified commercial orders from hotels, supermarkets, and food processors in Tamil Nadu. Submit your product offers with your expected rate and harvest date. Upon buyer acceptance, your order code is instantly generated with guaranteed direct payment and secure OTP delivery handover.
   </div>
 
 </div>
+
+<!-- ======================================================== -->
+<!-- MODAL 1: VIEW DETAILS MODAL (Section 1) -->
+<!-- ======================================================== -->
+<div id="viewDetailsModal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px);">
+  <div style="background: white; border-radius: var(--radius-lg); max-width: 560px; width: 100%; box-shadow: var(--shadow-lg); overflow: hidden; animation: modalPop 0.25s ease-out;">
+    <div style="background: #166534; color: white; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.85;">Procurement Requirement</div>
+        <h3 id="modalReqCrop" style="font-size: 1.35rem; font-weight: 800; margin: 0; color: white;">Crop Details</h3>
+      </div>
+      <button type="button" class="btn-close-modal" style="background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+    </div>
+    
+    <div style="padding: 1.5rem; max-height: 75vh; overflow-y: auto;">
+      <!-- Buyer Information -->
+      <div style="display: flex; gap: 0.75rem; align-items: center; margin-bottom: 1.25rem; padding-bottom: 1rem; border-bottom: 1px solid #e2e8f0;">
+        <div style="width: 48px; height: 48px; border-radius: 9999px; background: #ecfdf5; color: #166534; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; font-weight: 800;">🏢</div>
+        <div>
+          <h4 id="modalReqBuyer" style="margin: 0; font-size: 1.1rem; font-weight: 700; color: #0f172a;">Buyer Name</h4>
+          <div style="display: flex; gap: 0.5rem; margin-top: 0.25rem; align-items: center;">
+            <span id="modalReqBType" class="badge-category" style="background: #ecfdf5; color: #166534; font-size: 0.75rem; padding: 0.15rem 0.5rem; border-radius: 9999px;">Business Type</span>
+            <span style="background: #dcfce7; color: #15803d; font-size: 0.75rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 9999px;">✓ Verified Buyer</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Key Metrics Grid -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.85rem; margin-bottom: 1.25rem;">
+        <div style="background: #f8fafc; padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid #e2e8f0;">
+          <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Required Quantity</div>
+          <div id="modalReqQty" style="font-size: 1.25rem; font-weight: 800; color: #15803d; margin-top: 0.2rem;">0 kg</div>
+        </div>
+        <div style="background: #f8fafc; padding: 0.75rem 1rem; border-radius: var(--radius-sm); border: 1px solid #e2e8f0;">
+          <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Target Rate</div>
+          <div id="modalReqPrice" style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin-top: 0.2rem;">₹0 / kg</div>
+        </div>
+      </div>
+
+      <!-- Logistics & Terms -->
+      <div style="margin-bottom: 1.25rem; font-size: 0.875rem;">
+        <div style="margin-bottom: 0.5rem;">
+          📍 <strong>Preferred Location:</strong> <span id="modalReqLocation" style="color: #334155;">District</span>
+        </div>
+        <div style="margin-bottom: 0.5rem;">
+          📅 <strong>Required Date:</strong> <span id="modalReqDate" style="color: #334155;">Immediate</span>
+        </div>
+        <div style="margin-bottom: 0.5rem;">
+          💳 <strong>Payment Terms:</strong> <span style="color: #166534; font-weight: 700;">Direct Online Transfer / COD upon Handover</span>
+        </div>
+        <div style="margin-bottom: 0.5rem;">
+          📞 <strong>Contact Phone:</strong> <span id="modalReqPhone" style="color: #334155; font-weight: 700;">Phone</span>
+        </div>
+      </div>
+
+      <!-- Procurement Notes -->
+      <div style="background: #fffbeb; border: 1px solid #fef3c7; border-left: 4px solid #f59e0b; padding: 0.85rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+        <div style="font-size: 0.75rem; font-weight: 700; color: #b45309; text-transform: uppercase; margin-bottom: 0.25rem;">Quality Specifications & Notes</div>
+        <div id="modalReqNotes" style="font-size: 0.85rem; color: #78350f; line-height: 1.5;">No additional notes.</div>
+      </div>
+
+      <!-- Action Buttons inside details -->
+      <div style="display: flex; gap: 0.75rem;">
+        {% if current_user and current_user['role'] == 'farmer' %}
+          <button type="button" class="btn btn-primary btn-block btn-open-offer-from-details" style="background: #16a34a; font-weight: 700;">
+            📨 Send Product Offer to this Buyer
+          </button>
+        {% elif not current_user %}
+          <a href="{{ url_for('login') }}?next={{ url_for('nearby_buyers') }}" class="btn btn-primary btn-block" style="background: #16a34a; font-weight: 700; text-align: center;">
+            Login to Send Offer
+          </a>
+        {% endif %}
+        <button type="button" class="btn btn-secondary btn-close-modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================================================== -->
+<!-- MODAL 2: SEND PRODUCT OFFER MODAL (Section 2) -->
+<!-- ======================================================== -->
+{% if current_user and current_user['role'] == 'farmer' %}
+<div id="sendOfferModal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px);">
+  <div style="background: white; border-radius: var(--radius-lg); max-width: 600px; width: 100%; box-shadow: var(--shadow-lg); overflow: hidden; animation: modalPop 0.25s ease-out;">
+    <div style="background: #15803d; color: white; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <div style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.85;">Section 2 &bull; Direct Farm Offer</div>
+        <h3 style="font-size: 1.35rem; font-weight: 800; margin: 0; color: white;">Send Product Offer</h3>
+      </div>
+      <button type="button" class="btn-close-modal" style="background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+    </div>
+
+    <form action="{{ url_for('submit_farmer_offer') }}" method="POST" enctype="multipart/form-data" id="farmerOfferForm" style="padding: 1.5rem; max-height: 80vh; overflow-y: auto;">
+      <input type="hidden" name="requirement_id" id="offerReqId">
+      <input type="hidden" name="buyer_id" id="offerBuyerId">
+
+      <!-- Target Buyer Info Banner -->
+      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-bottom: 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-size: 0.75rem; color: #166534; font-weight: 700;">Submitting Offer to:</div>
+          <strong id="offerBuyerName" style="color: #0f172a; font-size: 1rem;">Buyer Name</strong>
+        </div>
+        <div id="offerTargetRateHint" style="font-size: 0.8rem; color: #166534; font-weight: 700;">Target: ₹0/kg</div>
+      </div>
+
+      <!-- Farmer Pre-populated Information -->
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: var(--radius-sm); padding: 0.75rem 1rem; margin-bottom: 1.25rem;">
+        <div style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 0.35rem;">Farmer Details (Auto-Populated)</div>
+        <div style="font-size: 0.875rem; color: #0f172a; display: flex; flex-wrap: wrap; gap: 1rem;">
+          <span>👤 <strong>{{ current_user['name'] }}</strong></span>
+          <span>📞 <strong>{{ current_user['phone'] }}</strong></span>
+          <span>📍 <strong>{{ current_user['location'] or 'Tamil Nadu' }}</strong></span>
+        </div>
+      </div>
+
+      <!-- Quick Fill from Existing Listing if Farmer has one -->
+      {% if farmer_listings %}
+        <div style="margin-bottom: 1rem;">
+          <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Optional: Auto-fill from your Active Produce Listings</label>
+          <select id="selectFarmerListing" class="filter-select" style="width: 100%; height: 40px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.4rem 0.75rem; font-size: 0.85rem;">
+            <option value="">-- Or enter offer details manually below --</option>
+            {% for item in farmer_listings %}
+              <option value="{{ item['id'] }}" 
+                      data-crop="{{ item['crop_name'] }}"
+                      data-qty="{{ item['quantity'] }}"
+                      data-price="{{ item['price_per_unit'] }}"
+                      data-harvest="{{ item['harvest_date'] }}">
+                🌾 {{ item['crop_name'] }} ({{ item['quantity'] }} {{ item['unit'] }} @ ₹{{ item['price_per_unit'] }}/{{ item['unit'] }})
+              </option>
+            {% endfor %}
+          </select>
+          <input type="hidden" name="listing_id" id="offerListingId">
+        </div>
+      {% endif %}
+
+      <!-- Crop / Product Name -->
+      <div style="margin-bottom: 1rem;">
+        <label style="font-size: 0.85rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Crop / Product Name *</label>
+        <input type="text" name="crop_name" id="offerCropName" required class="filter-input" placeholder="e.g. Tomato (Nattu Thakkali), Shallots, Cabbage" style="width: 100%; height: 42px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.5rem 0.75rem;">
+      </div>
+
+      <!-- Quantity & Price Grid -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div>
+          <label style="font-size: 0.85rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Available Quantity (kg) *</label>
+          <input type="number" step="any" min="1" name="quantity" id="offerQuantity" required class="filter-input" placeholder="e.g. 500" style="width: 100%; height: 42px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.5rem 0.75rem;">
+        </div>
+        <div>
+          <label style="font-size: 0.85rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Expected Price (₹ / kg) *</label>
+          <input type="number" step="any" min="1" name="price_per_kg" id="offerPrice" required class="filter-input" placeholder="e.g. 22" style="width: 100%; height: 42px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.5rem 0.75rem;">
+        </div>
+      </div>
+
+      <!-- Harvest Date & Delivery Preference -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+        <div>
+          <label style="font-size: 0.85rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Harvest Date *</label>
+          <input type="date" name="harvest_date" id="offerHarvestDate" required class="filter-input" style="width: 100%; height: 42px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.5rem 0.75rem;">
+        </div>
+        <div>
+          <label style="font-size: 0.85rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Pickup / Delivery Preference</label>
+          <select name="delivery_preference" class="filter-select" style="width: 100%; height: 42px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.5rem 0.75rem;">
+            <option value="Farmer Pickup">Farmer Pickup (Buyer Collects at Farmgate)</option>
+            <option value="Platform Delivery">Platform Delivery (FarmFresh Logistics Partner)</option>
+            <option value="Farmer Delivery">Farmer Delivery (Farmer Dispatches to Buyer Hub)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Freshness / Quality Description -->
+      <div style="margin-bottom: 1rem;">
+        <label style="font-size: 0.85rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Product Quality & Freshness Assessment</label>
+        <input type="text" name="quality_description" class="filter-input" placeholder="e.g. Grade A firm red harvest, freshly harvested within 12 hours, packed in 25kg crates" style="width: 100%; height: 42px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.5rem 0.75rem;">
+      </div>
+
+      <!-- Product Image Upload -->
+      <div style="margin-bottom: 1rem;">
+        <label style="font-size: 0.85rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Product Image (Optional)</label>
+        <input type="file" name="photo" id="offerPhotoInput" accept="image/*" style="width: 100%; font-size: 0.85rem;">
+        <div id="photoPreviewContainer" style="display: none; margin-top: 0.5rem;">
+          <img id="photoPreviewImg" src="" alt="Preview" style="height: 80px; border-radius: 6px; border: 1px solid #cbd5e1; object-fit: cover;">
+        </div>
+      </div>
+
+      <!-- Additional Message -->
+      <div style="margin-bottom: 1.5rem;">
+        <label style="font-size: 0.85rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Additional Message to Buyer</label>
+        <textarea name="notes" rows="2" class="filter-input" placeholder="e.g. Ready for immediate loading at farmgate. Can arrange bulk transport if needed." style="width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.5rem 0.75rem; font-family: inherit;"></textarea>
+      </div>
+
+      <!-- Form Actions -->
+      <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary btn-close-modal">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="btnSubmitOffer" style="background: #16a34a; font-weight: 700; min-width: 160px;">
+          🚀 Submit Offer
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<style>
+@keyframes modalPop {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const viewModal = document.getElementById('viewDetailsModal');
+  const offerModal = document.getElementById('sendOfferModal');
+
+  // Close modals when clicking close button or backdrop
+  document.querySelectorAll('.btn-close-modal').forEach(btn => {
+    btn.addEventListener('click', function() {
+      if (viewModal) viewModal.style.display = 'none';
+      if (offerModal) offerModal.style.display = 'none';
+    });
+  });
+
+  window.addEventListener('click', function(e) {
+    if (e.target === viewModal) viewModal.style.display = 'none';
+    if (e.target === offerModal) offerModal.style.display = 'none';
+  });
+
+  // Current selected requirement data for chained actions
+  let currentActiveReq = null;
+
+  // View Details Modal Trigger
+  document.querySelectorAll('.btn-view-details').forEach(btn => {
+    btn.addEventListener('click', function() {
+      const d = this.dataset;
+      currentActiveReq = d;
+      
+      document.getElementById('modalReqCrop').textContent = d.crop;
+      document.getElementById('modalReqBuyer').textContent = d.buyer;
+      document.getElementById('modalReqBType').textContent = '🏢 ' + d.btype;
+      document.getElementById('modalReqQty').textContent = d.qty + ' ' + d.unit;
+      document.getElementById('modalReqPrice').textContent = d.price > 0 ? ('₹' + parseFloat(d.price).toFixed(0) + ' / ' + d.unit) : 'Market Rate';
+      document.getElementById('modalReqLocation').textContent = d.location;
+      document.getElementById('modalReqDate').textContent = d.date;
+      document.getElementById('modalReqPhone').textContent = d.phone;
+      document.getElementById('modalReqNotes').textContent = d.notes || 'Clean, sorted commercial grade produce required.';
+      
+      viewModal.style.display = 'flex';
+    });
+  });
+
+  // Open Send Offer from inside View Details Modal
+  const btnFromDetails = document.querySelector('.btn-open-offer-from-details');
+  if (btnFromDetails) {
+    btnFromDetails.addEventListener('click', function() {
+      if (!currentActiveReq) return;
+      viewModal.style.display = 'none';
+      openOfferModal(currentActiveReq);
+    });
+  }
+
+  // Open Send Offer from Card Button
+  document.querySelectorAll('.btn-open-offer-modal').forEach(btn => {
+    btn.addEventListener('click', function() {
+      openOfferModal(this.dataset);
+    });
+  });
+
+  function openOfferModal(data) {
+    if (!offerModal) return;
+    document.getElementById('offerReqId').value = data.reqId || data.id || '';
+    document.getElementById('offerBuyerId').value = data.buyerId || '';
+    document.getElementById('offerBuyerName').textContent = data.buyerName || data.buyer || 'Buyer';
+    document.getElementById('offerTargetRateHint').textContent = data.targetPrice || data.price ? ('Buyer Target: ₹' + (data.targetPrice || data.price) + '/kg') : 'Target: Market Rate';
+    
+    document.getElementById('offerCropName').value = data.crop || '';
+    document.getElementById('offerQuantity').value = data.qty || '';
+    document.getElementById('offerPrice').value = data.targetPrice || data.price || '';
+    
+    // Set default harvest date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('offerHarvestDate').value = today;
+
+    offerModal.style.display = 'flex';
+  }
+
+  // Auto-fill from selected farmer listing dropdown
+  const selectListing = document.getElementById('selectFarmerListing');
+  if (selectListing) {
+    selectListing.addEventListener('change', function() {
+      const selected = this.options[this.selectedIndex];
+      if (selected.value) {
+        document.getElementById('offerListingId').value = selected.value;
+        document.getElementById('offerCropName').value = selected.dataset.crop;
+        document.getElementById('offerQuantity').value = selected.dataset.qty;
+        document.getElementById('offerPrice').value = selected.dataset.price;
+        if (selected.dataset.harvest) {
+          document.getElementById('offerHarvestDate').value = selected.dataset.harvest;
+        }
+      } else {
+        document.getElementById('offerListingId').value = '';
+      }
+    });
+  }
+
+  // Image Preview
+  const photoInput = document.getElementById('offerPhotoInput');
+  const previewContainer = document.getElementById('photoPreviewContainer');
+  const previewImg = document.getElementById('photoPreviewImg');
+  if (photoInput) {
+    photoInput.addEventListener('change', function() {
+      if (this.files && this.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          previewImg.src = e.target.result;
+          previewContainer.style.display = 'block';
+        };
+        reader.readAsDataURL(this.files[0]);
+      }
+    });
+  }
+});
+</script>
 {% endblock %}

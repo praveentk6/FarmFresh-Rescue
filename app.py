@@ -24,7 +24,13 @@ from database import (
     get_farmer_payments, get_admin_payments, get_payment_by_order_id,
     get_available_stock, reserve_listing_stock, get_market_prices,
     get_crop_benchmark_price, save_chat_message, get_conversation_messages,
-    get_user_chat_threads, get_weather_alerts
+    get_user_chat_threads, get_weather_alerts,
+    create_farmer_offer, get_farmer_offers, get_buyer_received_offers,
+    get_offer_by_id, accept_farmer_offer, reject_farmer_offer,
+    counter_farmer_offer, farmer_respond_counter_offer,
+    update_order_harvest_and_quality, buyer_quality_decision,
+    update_order_delivery_schedule, verify_order_handover,
+    build_11_stage_timeline
 )
 from razorpay_gateway import (
     create_razorpay_order, verify_razorpay_signature,
@@ -1626,12 +1632,16 @@ def toggle_listing_status(listing_id):
 def nearby_buyers():
     """
     Helps farmers match with active buyers across Tamil Nadu.
-    Matches by crop, category, district, and buyer business type.
+    Section 1: Active Procurement Requests with filters by crop, location, quantity, and price.
     """
     district_filter = request.args.get('district', '').strip()
     buyer_type_filter = request.args.get('buyer_type', '').strip()
     category_filter = request.args.get('category', '').strip()
     search_q = request.args.get('q', '').strip()
+    min_qty = request.args.get('min_qty', '').strip()
+    max_qty = request.args.get('max_qty', '').strip()
+    min_price = request.args.get('min_price', '').strip()
+    max_price = request.args.get('max_price', '').strip()
 
     conn = get_db()
     cursor = conn.cursor()
@@ -1661,6 +1671,34 @@ def nearby_buyers():
         param_pattern = f"%{search_q}%"
         params.extend([param_pattern] * 4)
 
+    if min_qty:
+        try:
+            query += " AND r.required_quantity >= ?"
+            params.append(float(min_qty))
+        except ValueError:
+            pass
+
+    if max_qty:
+        try:
+            query += " AND r.required_quantity <= ?"
+            params.append(float(max_qty))
+        except ValueError:
+            pass
+
+    if min_price:
+        try:
+            query += " AND r.target_price >= ?"
+            params.append(float(min_price))
+        except ValueError:
+            pass
+
+    if max_price:
+        try:
+            query += " AND r.target_price <= ?"
+            params.append(float(max_price))
+        except ValueError:
+            pass
+
     query += " ORDER BY r.created_at DESC"
 
     cursor.execute(query, params)
@@ -1674,6 +1712,17 @@ def nearby_buyers():
     """)
     type_counts = {row['business_type']: row['count'] for row in cursor.fetchall()}
 
+    farmer_listings = []
+    farmer_profile = None
+    if g.user and g.user['role'] == 'farmer':
+        cursor.execute("SELECT * FROM users WHERE id = ?", (g.user['id'],))
+        farmer_profile = cursor.fetchone()
+        cursor.execute("""
+            SELECT id, crop_name, quantity, unit, price_per_unit, photo, harvest_date
+            FROM listings WHERE farmer_id = ? AND status = 'Available'
+        """, (g.user['id'],))
+        farmer_listings = cursor.fetchall()
+
     conn.close()
 
     return render_template(
@@ -1683,7 +1732,13 @@ def nearby_buyers():
         buyer_type_filter=buyer_type_filter,
         category_filter=category_filter,
         search_q=search_q,
-        type_counts=type_counts
+        min_qty=min_qty,
+        max_qty=max_qty,
+        min_price=min_price,
+        max_price=max_price,
+        type_counts=type_counts,
+        farmer_listings=farmer_listings,
+        farmer_profile=farmer_profile
     )
 
 # ==========================================
@@ -1937,7 +1992,7 @@ def api_demand_prediction():
     conn.close()
     return jsonify(demand_data)
 
-# 8. Smart Delivery Tracking & Map Page
+# 8. Smart Delivery Tracking & Map Page (Section 9: 11-Stage Workflow Timeline)
 @app.route('/order/track/<int:order_id>')
 @login_required
 def track_order(order_id):
@@ -1947,9 +2002,12 @@ def track_order(order_id):
         SELECT e.*, l.crop_name, l.quantity as stock_qty, l.unit, l.price_per_unit,
                l.village_town as farm_village, l.district as farm_district,
                l.farmer_name, l.farmer_phone, l.whatsapp_number, l.photo as crop_photo,
-               l.farmer_id
+               l.farmer_id,
+               fo.offer_code, fo.counter_price, fo.counter_quantity, fo.harvest_date as offer_harvest_date,
+               fo.quality_description as offer_quality_desc, fo.notes as offer_notes
         FROM enquiries e
         JOIN listings l ON e.listing_id = l.id
+        LEFT JOIN farmer_offers fo ON e.offer_id = fo.id
         WHERE e.id = ?
     """, (order_id,))
     order = cursor.fetchone()
@@ -1978,6 +2036,8 @@ def track_order(order_id):
 
     distance_info = calculate_haversine_distance(f_lat, f_lng, b_lat, b_lng)
     timeline = get_order_timeline(order_id)
+    payment = get_payment_by_order_id(order_id)
+    stage_timeline = build_11_stage_timeline(order, timeline)
     conn.close()
 
     return render_template(
@@ -1987,8 +2047,11 @@ def track_order(order_id):
         b_lat=b_lat, b_lng=b_lng, b_hub=b_hub,
         distance_info=distance_info,
         timeline=timeline,
+        stage_timeline=stage_timeline,
+        payment=payment,
         is_farmer=is_farmer,
-        is_buyer=is_buyer
+        is_buyer=is_buyer,
+        is_admin=is_admin
     )
 
 @app.route('/api/order/timeline/<int:order_id>')
@@ -2503,6 +2566,380 @@ def delete_buyer_requirement(req_id):
     return redirect(url_for('buyer_dashboard'))
 
 # ==========================================
+# Farmer to Buyer Order Management Workflow (Sections 1-13)
+# ==========================================
+
+@app.route('/farmer/offer/submit', methods=['POST'])
+@app.route('/api/offers/submit', methods=['POST'])
+@login_required
+@farmer_required
+def submit_farmer_offer():
+    """
+    Farmer sends an offer for a buyer's procurement requirement or direct buyer offer.
+    Supports file upload for crop photos.
+    """
+    is_json = request.is_json or request.headers.get('Accept') == 'application/json'
+    data = request.get_json(silent=True) if request.is_json else request.form
+
+    buyer_id = data.get('buyer_id')
+    requirement_id = data.get('requirement_id')
+    crop_name = (data.get('crop_name') or '').strip()
+    quantity = data.get('quantity')
+    price_per_kg = data.get('price_per_kg')
+    harvest_date = (data.get('harvest_date') or '').strip()
+    quality_description = (data.get('quality_description') or '').strip()
+    delivery_preference = (data.get('delivery_preference') or 'Farmer Pickup').strip()
+    notes = (data.get('notes') or '').strip()
+    listing_id = data.get('listing_id')
+
+    errors = []
+    if not buyer_id:
+        errors.append("Buyer is required.")
+    if not crop_name:
+        errors.append("Crop / Product name is required.")
+    try:
+        qty_val = float(quantity)
+        if qty_val <= 0:
+            errors.append("Quantity must be greater than 0 kg.")
+    except (ValueError, TypeError):
+        errors.append("Please enter a valid numeric quantity.")
+
+    try:
+        price_val = float(price_per_kg)
+        if price_val <= 0:
+            errors.append("Price per kg must be greater than 0.")
+    except (ValueError, TypeError):
+        errors.append("Please enter a valid numeric price.")
+
+    if not harvest_date:
+        harvest_date = datetime.now().strftime('%Y-%m-%d')
+
+    photo_filename = None
+    if 'photo' in request.files:
+        file = request.files['photo']
+        if file and file.filename != '':
+            photo_filename = validate_and_save_image(file)
+
+    if errors:
+        if is_json:
+            return jsonify({'success': False, 'errors': errors, 'message': errors[0]}), 400
+        for err in errors:
+            flash(err, 'danger')
+        return redirect(request.referrer or url_for('nearby_buyers'))
+
+    success, res = create_farmer_offer(
+        farmer_id=g.user['id'],
+        buyer_id=int(buyer_id),
+        crop_name=crop_name,
+        quantity=qty_val,
+        price_per_kg=price_val,
+        harvest_date=harvest_date,
+        quality_description=quality_description,
+        photo=photo_filename,
+        delivery_preference=delivery_preference,
+        notes=notes,
+        requirement_id=int(requirement_id) if requirement_id else None,
+        listing_id=int(listing_id) if listing_id else None
+    )
+
+    if not success:
+        if is_json:
+            return jsonify({'success': False, 'message': res}), 400
+        flash(f"Error submitting offer: {res}", "danger")
+        return redirect(request.referrer or url_for('nearby_buyers'))
+
+    if is_json:
+        return jsonify({
+            'success': True,
+            'message': f"Offer #{res['offer_code']} submitted successfully! The buyer has been notified.",
+            'offer': res
+        }), 201
+
+    flash(f"🎉 Your offer (#{res['offer_code']}) for {qty_val} kg of {crop_name} was submitted! The buyer has been notified.", "success")
+    return redirect(url_for('farmer_dashboard') + '#offersSection')
+
+@app.route('/api/offers/respond', methods=['POST'])
+@app.route('/buyer/offer/respond/<int:offer_id>', methods=['POST'])
+@login_required
+@buyer_required
+def respond_buyer_offer(offer_id=None):
+    """
+    Buyer reviews and acts on a farmer offer:
+    - accept: confirms order, generates unique ORD-2026-XXXX and handover OTP
+    - reject: records rejection reason
+    - counter: records counter price and quantity
+    """
+    is_json = request.is_json or request.headers.get('Accept') == 'application/json'
+    data = request.get_json(silent=True) if request.is_json else request.form
+
+    target_offer_id = offer_id or data.get('offer_id')
+    if not target_offer_id:
+        if is_json:
+            return jsonify({'success': False, 'message': 'Offer ID required'}), 400
+        flash("Offer ID required", "danger")
+        return redirect(url_for('buyer_dashboard'))
+
+    target_offer_id = int(target_offer_id)
+    action = (data.get('action') or '').strip().lower()
+
+    if action == 'accept':
+        ok, msg, order_id = accept_farmer_offer(target_offer_id, g.user['id'])
+        if not ok:
+            if is_json:
+                return jsonify({'success': False, 'message': msg}), 400
+            flash(f"Could not accept offer: {msg}", "danger")
+            return redirect(url_for('buyer_dashboard') + '#offersSection')
+        if is_json:
+            return jsonify({'success': True, 'message': msg, 'order_id': order_id})
+        flash(f"🎉 Offer accepted! Order #{order_id} created successfully.", "success")
+        return redirect(url_for('track_order', order_id=order_id))
+
+    elif action == 'reject':
+        reason = (data.get('reason') or data.get('rejection_reason') or '').strip()
+        ok, msg = reject_farmer_offer(target_offer_id, g.user['id'], reason)
+        if not ok:
+            if is_json:
+                return jsonify({'success': False, 'message': msg}), 400
+            flash(f"Could not reject offer: {msg}", "danger")
+            return redirect(url_for('buyer_dashboard') + '#offersSection')
+        if is_json:
+            return jsonify({'success': True, 'message': "Offer rejected."})
+        flash("Offer rejected.", "info")
+        return redirect(url_for('buyer_dashboard') + '#offersSection')
+
+    elif action == 'counter':
+        c_price = data.get('counter_price')
+        c_qty = data.get('counter_quantity')
+        c_notes = (data.get('counter_notes') or '').strip()
+        try:
+            c_price_val = float(c_price)
+            c_qty_val = float(c_qty)
+            if c_price_val <= 0 or c_qty_val <= 0:
+                raise ValueError()
+        except (ValueError, TypeError):
+            if is_json:
+                return jsonify({'success': False, 'message': 'Valid positive counter price and quantity required'}), 400
+            flash("Valid positive counter price and quantity required.", "danger")
+            return redirect(url_for('buyer_dashboard') + '#offersSection')
+
+        ok, msg = counter_farmer_offer(target_offer_id, g.user['id'], c_price_val, c_qty_val, c_notes)
+        if not ok:
+            if is_json:
+                return jsonify({'success': False, 'message': msg}), 400
+            flash(f"Could not submit counter offer: {msg}", "danger")
+            return redirect(url_for('buyer_dashboard') + '#offersSection')
+        if is_json:
+            return jsonify({'success': True, 'message': "Counter offer sent to farmer."})
+        flash("Counter offer sent to farmer.", "success")
+        return redirect(url_for('buyer_dashboard') + '#offersSection')
+
+    else:
+        if is_json:
+            return jsonify({'success': False, 'message': 'Invalid action. Choose accept, reject, or counter'}), 400
+        flash("Invalid action.", "danger")
+        return redirect(url_for('buyer_dashboard') + '#offersSection')
+
+@app.route('/farmer/offer/counter-respond/<int:offer_id>', methods=['POST'])
+@login_required
+@farmer_required
+def farmer_respond_counter(offer_id):
+    """Farmer accepts or declines buyer's counter offer."""
+    is_json = request.is_json or request.headers.get('Accept') == 'application/json'
+    data = request.get_json(silent=True) if request.is_json else request.form
+    action = (data.get('action') or 'accept').strip().lower()
+
+    ok, msg, order_id = farmer_respond_counter_offer(offer_id, g.user['id'], action)
+    if not ok:
+        if is_json:
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(f"Action failed: {msg}", "danger")
+        return redirect(url_for('farmer_dashboard') + '#offersSection')
+
+    if action == 'accept':
+        if is_json:
+            return jsonify({'success': True, 'message': msg, 'order_id': order_id})
+        flash(f"🎉 Counter offer accepted! Order #{order_id} is confirmed.", "success")
+        return redirect(url_for('track_order', order_id=order_id))
+    else:
+        if is_json:
+            return jsonify({'success': True, 'message': msg})
+        flash("Counter offer declined.", "info")
+        return redirect(url_for('farmer_dashboard') + '#offersSection')
+
+@app.route('/api/order/harvest-update', methods=['POST'])
+@app.route('/farmer/order/harvest-update/<int:order_id>', methods=['POST'])
+@login_required
+def update_order_harvest(order_id=None):
+    """Farmer updates harvest progress and uploads fresh produce photos."""
+    is_json = request.is_json or request.headers.get('Accept') == 'application/json'
+    data = request.get_json(silent=True) if request.is_json else request.form
+
+    target_order_id = order_id or data.get('order_id')
+    if not target_order_id:
+        return jsonify({'success': False, 'message': 'Order ID required'}), 400
+
+    target_order_id = int(target_order_id)
+    harvest_status = data.get('harvest_status', 'Harvesting in Progress').strip()
+    harvested_qty = data.get('harvested_quantity')
+    harvest_notes = (data.get('harvest_notes') or '').strip()
+
+    fresh_image = None
+    if 'fresh_image' in request.files:
+        file = request.files['fresh_image']
+        if file and file.filename != '':
+            fresh_image = validate_and_save_image(file)
+
+    ok, msg = update_order_harvest_and_quality(
+        target_order_id, harvest_status,
+        harvested_qty=harvested_qty,
+        harvest_notes=harvest_notes,
+        fresh_image=fresh_image,
+        actor='Farmer'
+    )
+
+    if not ok:
+        if is_json:
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(f"Error updating harvest: {msg}", "danger")
+        return redirect(request.referrer or url_for('farmer_dashboard'))
+
+    if is_json:
+        return jsonify({'success': True, 'message': msg})
+    flash(f"🌾 Harvest updated to '{harvest_status}'!", "success")
+    return redirect(request.referrer or url_for('track_order', order_id=target_order_id))
+
+@app.route('/api/order/quality-decision', methods=['POST'])
+@app.route('/buyer/order/quality-decision/<int:order_id>', methods=['POST'])
+@login_required
+def order_quality_decision(order_id=None):
+    """Buyer approves produce quality or flags an issue."""
+    is_json = request.is_json or request.headers.get('Accept') == 'application/json'
+    data = request.get_json(silent=True) if request.is_json else request.form
+
+    target_order_id = order_id or data.get('order_id')
+    if not target_order_id:
+        return jsonify({'success': False, 'message': 'Order ID required'}), 400
+
+    decision = data.get('decision', 'approve').strip().lower()
+    notes = (data.get('notes') or '').strip()
+
+    ok, msg = buyer_quality_decision(int(target_order_id), g.user['id'], decision, notes=notes)
+    if not ok:
+        if is_json:
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(f"Action failed: {msg}", "danger")
+        return redirect(request.referrer or url_for('buyer_dashboard'))
+
+    if is_json:
+        return jsonify({'success': True, 'message': msg})
+    if decision == 'approve':
+        flash("✅ Produce quality approved! You can now proceed to schedule pickup / delivery.", "success")
+    else:
+        flash("⚠️ Quality issue recorded and farmer notified.", "warning")
+    return redirect(request.referrer or url_for('track_order', order_id=target_order_id))
+
+@app.route('/api/order/delivery-schedule', methods=['POST'])
+@app.route('/order/delivery-schedule/<int:order_id>', methods=['POST'])
+@login_required
+def schedule_delivery(order_id=None):
+    """Buyer or Farmer schedules/updates pickup and delivery details."""
+    is_json = request.is_json or request.headers.get('Accept') == 'application/json'
+    data = request.get_json(silent=True) if request.is_json else request.form
+
+    target_order_id = order_id or data.get('order_id')
+    if not target_order_id:
+        return jsonify({'success': False, 'message': 'Order ID required'}), 400
+
+    delivery_mode = data.get('delivery_mode')
+    pickup_datetime = data.get('pickup_datetime')
+    delivery_partner = data.get('delivery_partner')
+    delivery_status = data.get('delivery_status')
+    notes = data.get('notes')
+
+    actor = 'Buyer' if g.user['role'] == 'buyer' else ('Farmer' if g.user['role'] == 'farmer' else 'Admin')
+    ok, msg = update_order_delivery_schedule(
+        int(target_order_id),
+        delivery_mode=delivery_mode,
+        pickup_datetime=pickup_datetime,
+        delivery_partner=delivery_partner,
+        delivery_status=delivery_status,
+        notes=notes,
+        actor=actor
+    )
+
+    if not ok:
+        if is_json:
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(f"Logistics update failed: {msg}", "danger")
+        return redirect(request.referrer or url_for('track_order', order_id=target_order_id))
+
+    if is_json:
+        return jsonify({'success': True, 'message': msg})
+    flash("🚚 Delivery logistics updated successfully!", "success")
+    return redirect(request.referrer or url_for('track_order', order_id=target_order_id))
+
+@app.route('/api/order/handover-verify', methods=['POST'])
+@app.route('/order/handover-verify/<int:order_id>', methods=['POST'])
+@login_required
+def verify_handover(order_id=None):
+    """
+    Secure product handover verification using 6-digit OTP or QR token.
+    Prevents duplicate verification and updates order status to Delivered.
+    """
+    is_json = request.is_json or request.headers.get('Accept') == 'application/json'
+    data = request.get_json(silent=True) if request.is_json else request.form
+
+    target_order_id = order_id or data.get('order_id')
+    if not target_order_id:
+        return jsonify({'success': False, 'message': 'Order ID required'}), 400
+
+    otp_or_token = (data.get('otp') or data.get('token') or data.get('handover_otp') or '').strip()
+    delivered_quantity = data.get('delivered_quantity') or data.get('quantity')
+
+    if not otp_or_token:
+        if is_json:
+            return jsonify({'success': False, 'message': '6-digit OTP or QR token required'}), 400
+        flash("Please enter the 6-digit OTP or scan the Handover QR code.", "danger")
+        return redirect(request.referrer or url_for('track_order', order_id=target_order_id))
+
+    if not delivered_quantity:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT requested_quantity FROM enquiries WHERE id = ?", (target_order_id,))
+        row = cursor.fetchone()
+        conn.close()
+        delivered_quantity = row['requested_quantity'] if row else 0
+
+    ok, msg = verify_order_handover(int(target_order_id), otp_or_token, delivered_quantity, user_id=g.user['id'])
+
+    if not ok:
+        if is_json:
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(f"Handover verification error: {msg}", "danger")
+        return redirect(request.referrer or url_for('track_order', order_id=target_order_id))
+
+    if is_json:
+        return jsonify({'success': True, 'message': msg})
+    flash("🎉 Product handover successfully verified! Order marked as Delivered.", "success")
+    return redirect(url_for('track_order', order_id=target_order_id))
+
+@app.route('/order/<int:order_id>/handover-qr')
+@login_required
+def order_handover_qr(order_id):
+    """Generate PNG QR code for order handover verification."""
+    import io
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, handover_otp, handover_qr_token FROM enquiries WHERE id = ?", (order_id,))
+    order = cursor.fetchone()
+    conn.close()
+    if not order or not order['handover_qr_token']:
+        abort(404)
+    qr_data = f"FARMFRESH:ORDER:{order['id']}:OTP:{order['handover_otp']}:TOKEN:{order['handover_qr_token']}"
+    img_bytes = generate_qr_bytes(qr_data)
+    return send_file(io.BytesIO(img_bytes), mimetype='image/png')
+
+# ==========================================
 # In-App Notifications Center (Section 12)
 # ==========================================
 
@@ -2905,6 +3342,7 @@ def farmer_dashboard():
     # Farmer payments and transaction history
     farmer_payments = get_farmer_payments(farmer_id)
     farmer_weather_alerts = get_weather_alerts()
+    submitted_offers = get_farmer_offers(farmer_id)
     paid_orders_revenue = sum(float(p['amount']) for p in farmer_payments if p['payment_status'] == 'Paid')
     cod_pending_revenue = sum(float(p['amount']) for p in farmer_payments if p['payment_status'] == 'COD Pending')
 
@@ -2913,6 +3351,7 @@ def farmer_dashboard():
         listings=my_listings,
         orders=received_orders,
         enquiries=received_orders,  # backwards-compatibility
+        submitted_offers=submitted_offers,
         total_products_listed=total_products_listed,
         available_produce_qty=available_produce_qty,
         pending_orders_count=pending_orders_count,
@@ -3019,6 +3458,7 @@ def buyer_dashboard():
 
     # Buyer payments and transaction history
     buyer_payments = get_buyer_payments(g.user['id'])
+    received_offers = get_buyer_received_offers(g.user['id'])
 
     # Calculated KPIs for Buyer Portal
     total_orders = len(my_orders)
@@ -3045,6 +3485,7 @@ def buyer_dashboard():
         orders=my_orders,
         enquiries=my_orders,  # backward compatibility
         requirements=my_requirements,
+        received_offers=received_offers,
         my_favorites=my_favorites,
         nearby_produce=nearby_produce[:8],
         recommended_produce=recommended_produce[:6],

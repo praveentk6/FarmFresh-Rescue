@@ -31,25 +31,6 @@
       </button>
     </div>
 
-    <!-- Quick Demo Accounts Bar -->
-    <div class="demo-accounts-box">
-      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.35rem;">
-        <span style="font-size: 0.8rem; font-weight: 700; color: #166534;">⚡ 1-Click Quick Fill (Testing):</span>
-        <span style="font-size: 0.725rem; color: #64748b;">Click role to test</span>
-      </div>
-      <div class="demo-pills">
-        <button type="button" class="demo-pill pill-farmer" onclick="autoFillLogin('farmer', 'selvi.farms@gmail.com', 'farmer123')">
-          👨‍🌾 Selvi (Farmer)
-        </button>
-        <button type="button" class="demo-pill pill-buyer" onclick="autoFillLogin('buyer', 'saravana.hotel@gmail.com', 'buyer123')">
-          🛒 Saravana Hotel (Buyer)
-        </button>
-        <button type="button" class="demo-pill pill-admin" onclick="autoFillLogin('admin', 'Pp274142@gmail.com', 'praveen16')">
-          🛡️ Admin (Praveen)
-        </button>
-      </div>
-    </div>
-
     <!-- 1. FARMER LOGIN FORM -->
     <div class="auth-role-pane {% if active_role == 'farmer' or not active_role %}active{% endif %}" id="paneFarmer">
       <div class="role-badge role-badge-farmer">
@@ -64,7 +45,7 @@
           <label class="form-label" for="farmerEmail">Farmer Email Address <span class="required">*</span></label>
           <div class="input-with-icon">
             <span class="input-icon">✉️</span>
-            <input type="email" name="email" id="farmerEmail" class="form-control auth-input" placeholder="e.g. muthu.farmer@gmail.com" required autofocus value="{{ email if active_role == 'farmer' else '' }}">
+            <input type="email" name="email" id="farmerEmail" class="form-control auth-input" placeholder="farmer@example.com" required autofocus value="{{ email if active_role == 'farmer' else '' }}">
           </div>
         </div>
 
@@ -108,7 +89,7 @@
           <label class="form-label" for="buyerEmail">Buyer Email Address <span class="required">*</span></label>
           <div class="input-with-icon">
             <span class="input-icon">✉️</span>
-            <input type="email" name="email" id="buyerEmail" class="form-control auth-input" placeholder="e.g. saravana.hotel@gmail.com" required value="{{ email if active_role == 'buyer' else '' }}">
+            <input type="email" name="email" id="buyerEmail" class="form-control auth-input" placeholder="buyer@example.com" required value="{{ email if active_role == 'buyer' else '' }}">
           </div>
         </div>
 
@@ -157,7 +138,7 @@
           <label class="form-label" for="adminEmail">Authorized Admin Email <span class="required">*</span></label>
           <div class="input-with-icon">
             <span class="input-icon">🛡️</span>
-            <input type="email" name="email" id="adminEmail" class="form-control auth-input" placeholder="Pp274142@gmail.com" required value="{{ email if active_role == 'admin' else '' }}">
+            <input type="email" name="email" id="adminEmail" class="form-control auth-input" placeholder="admin@farmfresh.org" required value="{{ email if active_role == 'admin' else '' }}">
           </div>
         </div>
 
@@ -210,20 +191,6 @@ function togglePasswordVisibility(inputId, btn) {
       el.type = 'password';
       btn.textContent = '👁️';
     }
-  }
-}
-
-function autoFillLogin(role, email, pw) {
-  switchLoginRole(role);
-  if (role === 'farmer') {
-    document.getElementById('farmerEmail').value = email;
-    document.getElementById('farmerPassword').value = pw;
-  } else if (role === 'buyer') {
-    document.getElementById('buyerEmail').value = email;
-    document.getElementById('buyerPassword').value = pw;
-  } else if (role === 'admin') {
-    document.getElementById('adminEmail').value = email;
-    document.getElementById('adminPassword').value = pw;
   }
 }
 

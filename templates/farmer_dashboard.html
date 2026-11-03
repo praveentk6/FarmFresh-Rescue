@@ -621,6 +621,136 @@
     {% endif %}
   </div>
 
+  <!-- Section 2 & 10: My Submitted Offers to Buyers -->
+  <div class="data-table-card" id="offersSection" style="margin-bottom: 2.5rem; border-top: 4px solid #16a34a;">
+    <div class="data-table-header">
+      <div>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: #0f172a;">
+          📨 My Submitted Offers to Buyers ({{ submitted_offers|length if submitted_offers else 0 }})
+        </h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">
+          Track your direct product proposals sent to wholesale buyers across Tamil Nadu
+        </span>
+      </div>
+      <a href="{{ url_for('nearby_buyers') }}" class="btn btn-primary btn-sm" style="background: #16a34a; font-weight: 700;">
+        + Send New Offer to Buyers
+      </a>
+    </div>
+
+    {% if submitted_offers %}
+      <div class="table-responsive">
+        <table class="custom-table" style="font-size: 0.875rem;">
+          <thead>
+            <tr>
+              <th>Offer #</th>
+              <th>Produce</th>
+              <th>Buyer Information</th>
+              <th>Offered Qty & Rate</th>
+              <th>Total Value</th>
+              <th>Harvest Date</th>
+              <th>Status</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for off in submitted_offers %}
+              <tr>
+                <td>
+                  <strong style="color: #166534;">{{ off['offer_code'] }}</strong>
+                  <div style="font-size: 0.725rem; color: #64748b;">{{ off['created_at'][:10] }}</div>
+                </td>
+                <td>
+                  <strong style="color: #0f172a; font-size: 0.95rem;">{{ off['crop_name'] }}</strong>
+                  {% if off['quality_description'] %}
+                    <div style="font-size: 0.75rem; color: #64748b; max-width: 180px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                      {{ off['quality_description'] }}
+                    </div>
+                  {% endif %}
+                </td>
+                <td>
+                  <div style="font-weight: 700;">{{ off['buyer_name'] }}</div>
+                  <div style="font-size: 0.75rem; color: #64748b;">
+                    🏢 {{ off['business_type'] or 'Wholesale' }}<br>
+                    📞 {{ off['buyer_phone'] }}
+                  </div>
+                </td>
+                <td>
+                  <div style="font-size: 0.95rem; font-weight: 800; color: #15803d;">
+                    {{ off['quantity'] }} kg @ ₹{{ "%.0f"|format(off['price_per_kg']) }}/kg
+                  </div>
+                  {% if off['counter_price'] and off['status'] == 'Counter Offered' %}
+                    <div style="font-size: 0.75rem; color: #0284c7; font-weight: 700; margin-top: 0.2rem;">
+                      Buyer Counter: {{ off['counter_quantity'] }} kg @ ₹{{ "%.0f"|format(off['counter_price']) }}/kg
+                    </div>
+                  {% endif %}
+                </td>
+                <td>
+                  <strong style="color: #0f172a;">₹{{ "{:,.0f}".format(off['quantity'] * off['price_per_kg']) }}</strong>
+                  <div style="font-size: 0.725rem; color: #64748b;">{{ off['delivery_preference'] }}</div>
+                </td>
+                <td>
+                  <span style="font-weight: 600; color: #334155;">{{ off['harvest_date'] }}</span>
+                </td>
+                <td>
+                  {% if off['status'] == 'Pending Buyer Review' %}
+                    <span class="badge-urgent" style="font-size: 0.75rem; font-weight: 700;">Pending Review</span>
+                  {% elif off['status'] == 'Accepted' %}
+                    <span class="badge-available" style="font-size: 0.75rem; font-weight: 700;">Accepted</span>
+                  {% elif off['status'] == 'Counter Offered' %}
+                    <span class="badge-category" style="font-size: 0.75rem; font-weight: 700; background: #e0f2fe; color: #0369a1;">Counter Received</span>
+                  {% elif off['status'] == 'Rejected' %}
+                    <span style="font-size: 0.75rem; font-weight: 700; color: #ef4444; background: #fee2e2; padding: 0.2rem 0.5rem; border-radius: 9999px;">Declined</span>
+                  {% else %}
+                    <span class="badge-category" style="font-size: 0.75rem;">{{ off['status'] }}</span>
+                  {% endif %}
+                </td>
+                <td style="text-align: right;">
+                  <div style="display: flex; gap: 0.4rem; justify-content: flex-end; flex-wrap: wrap;">
+                    {% if off['status'] == 'Counter Offered' %}
+                      <!-- Counter Offer Action Buttons -->
+                      <form action="{{ url_for('farmer_respond_counter', offer_id=off['id']) }}" method="POST" onsubmit="return confirm('Accept counter terms ({{ off['counter_quantity'] }} kg @ ₹{{ off['counter_price'] }}/kg)?');" style="display: inline;">
+                        <input type="hidden" name="action" value="accept">
+                        <button type="submit" class="btn btn-success btn-sm" style="background: #16a34a; font-weight: 700; font-size: 0.75rem; padding: 0.25rem 0.5rem;">
+                          ✓ Accept Counter
+                        </button>
+                      </form>
+                      <form action="{{ url_for('farmer_respond_counter', offer_id=off['id']) }}" method="POST" onsubmit="return confirm('Decline this counter offer?');" style="display: inline;">
+                        <input type="hidden" name="action" value="decline">
+                        <button type="submit" class="btn btn-outline-danger btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.5rem;">
+                          ✕ Decline
+                        </button>
+                      </form>
+                    {% elif off['status'] == 'Accepted' and off['order_id'] %}
+                      <a href="{{ url_for('track_order', order_id=off['order_id']) }}" class="btn btn-primary btn-sm" style="font-size: 0.75rem; padding: 0.25rem 0.6rem;">
+                        Track Order #{{ off['order_code'] or off['order_id'] }}
+                      </a>
+                    {% endif %}
+
+                    {% set clean_phone = off['buyer_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
+                    <a href="https://wa.me/91{{ clean_phone }}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" title="WhatsApp Buyer">
+                      💬
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div style="padding: 2.5rem 1.5rem; text-align: center; color: #64748b;">
+        <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">📨</span>
+        <div style="font-weight: 700; color: #0f172a; margin-bottom: 0.25rem;">No Offers Submitted Yet</div>
+        <p style="font-size: 0.85rem; max-width: 450px; margin: 0 auto 1rem;">
+          Connect directly with verified buyers in Tamil Nadu looking for harvests. Send your first product offer now.
+        </p>
+        <a href="{{ url_for('nearby_buyers') }}" class="btn btn-primary btn-sm" style="background: #16a34a;">
+          Browse Active Buyer Requirements
+        </a>
+      </div>
+    {% endif %}
+  </div>
+
   <!-- Purchase Orders & Enquiries Received with 6-stage lifecycle -->
   <div class="data-table-card" id="ordersSection">
     <div class="data-table-header">
@@ -649,7 +779,12 @@
           <tbody>
             {% for o in orders %}
               <tr>
-                <td><strong>#{{ o['id'] }}</strong></td>
+                <td>
+                  <strong>{{ o['order_code'] or ('#' ~ o['id']) }}</strong>
+                  {% if o['order_code'] %}
+                    <div style="font-size: 0.7rem; color: #64748b;">ID: #{{ o['id'] }}</div>
+                  {% endif %}
+                </td>
                 <td>
                   <a href="{{ url_for('listing_detail', listing_id=o['listing_id']) }}" style="font-weight: 700; color: #0f172a;">
                     {{ o['crop_name'] }}
@@ -657,6 +792,13 @@
                   <div style="font-size: 0.75rem; color: #64748b;">
                     Asking: ₹{{ "%.0f"|format(o['price_per_unit']) }} / {{ o['unit'] }}
                   </div>
+                  {% if o['harvest_status'] %}
+                    <div style="margin-top: 0.25rem;">
+                      <span style="font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px; background: #ecfdf5; color: #166534; display: inline-block;">
+                        🌾 {{ o['harvest_status'] }}
+                      </span>
+                    </div>
+                  {% endif %}
                 </td>
                 <td>
                   <div style="font-weight: 700;">{{ o['buyer_name'] }}</div>
@@ -690,13 +832,13 @@
                   </div>
                 </td>
                 <td>
-                  {% if o['status'] == 'Pending' %}
+                  {% if o['status'] in ['Pending', 'Order Placed'] %}
                     <span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Pending</span>
-                  {% elif o['status'] == 'Accepted' %}
-                    <span style="background: #dcfce7; color: #166534; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Accepted</span>
-                  {% elif o['status'] in ['Packed', 'Ready for Collection'] %}
+                  {% elif o['status'] in ['Accepted', 'Confirmed', 'Order Accepted'] %}
+                    <span style="background: #dcfce7; color: #166534; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ o['status'] }}</span>
+                  {% elif o['status'] in ['Packed', 'Ready for Collection', 'Ready for Pickup'] %}
                     <span style="background: #fef08a; color: #854d0e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Packed / Ready</span>
-                  {% elif o['status'] == 'Shipped' %}
+                  {% elif o['status'] in ['Shipped', 'In Transit', 'Out for Delivery'] %}
                     <span style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">In Transit</span>
                   {% elif o['status'] in ['Delivered', 'Completed'] %}
                     <span style="background: #dcfce7; color: #15803d; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Delivered & Rescued</span>
@@ -707,31 +849,50 @@
                   {% endif %}
 
                   <div style="margin-top: 0.35rem;">
-                    {% if o['payment_status'] == 'Paid' %}
+                    {% if o['payment_status'] in ['Paid', 'Payment Verified'] %}
                       <span style="background: #dcfce7; color: #166534; font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.2rem;">
                         💳 Paid
                       </span>
-                    {% elif o['payment_status'] == 'Pending COD' %}
+                    {% elif o['payment_status'] in ['Pending COD', 'Unpaid'] %}
                       <span style="background: #e0f2fe; color: #0369a1; font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.2rem;">
-                        💵 COD Pending
+                        💵 COD
                       </span>
                     {% endif %}
                   </div>
+
+                  {% if o['handover_otp'] and o['status'] in ['Confirmed', 'Accepted', 'Packed', 'Ready for Pickup', 'In Transit'] %}
+                    <div style="margin-top: 0.35rem; font-size: 0.725rem; color: #475569;">
+                      OTP: <strong style="color: #0f172a; font-family: monospace; font-size: 0.85rem;">{{ o['handover_otp'] }}</strong>
+                    </div>
+                  {% endif %}
                 </td>
                 <td>
                   <a href="{{ url_for('track_order', order_id=o['id']) }}" class="btn btn-outline-primary btn-sm" style="white-space: nowrap;">
-                    🗺️ Route Map
+                    🗺️ Route & Timeline
                   </a>
                 </td>
                 <td>
                   <div style="display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end;">
-                    <!-- 6-Stage Lifecycle Form -->
+                    <!-- Section 5: Harvest Update Button for Confirmed/Accepted Orders -->
+                    {% if o['status'] in ['Confirmed', 'Accepted', 'Packed', 'Ready for Collection', 'Ready for Pickup'] %}
+                      <button type="button" class="btn btn-primary btn-sm btn-update-harvest"
+                              style="background: #16a34a; border-color: #16a34a; font-weight: 700; font-size: 0.75rem; padding: 0.25rem 0.6rem; width: 100%; white-space: nowrap;"
+                              data-order-id="{{ o['id'] }}"
+                              data-order-code="{{ o['order_code'] or ('#' ~ o['id']) }}"
+                              data-crop="{{ o['crop_name']|escape }}"
+                              data-qty="{{ o['requested_quantity'] }}"
+                              data-status="{{ o['harvest_status'] or 'Harvest Pending' }}">
+                        🌾 Update Harvest & Quality
+                      </button>
+                    {% endif %}
+
+                    <!-- Lifecycle Update Form -->
                     <form action="{{ url_for('update_order_status', order_id=o['id']) }}" method="POST" style="display: flex; gap: 0.35rem;">
                       <select name="status" class="filter-select" style="font-size: 0.8rem; padding: 0.3rem 0.5rem; width: 145px;">
-                        <option value="Pending" {% if o['status'] == 'Pending' %}selected{% endif %}>Pending</option>
+                        <option value="Confirmed" {% if o['status'] == 'Confirmed' %}selected{% endif %}>Confirmed</option>
                         <option value="Accepted" {% if o['status'] == 'Accepted' %}selected{% endif %}>Accept Request</option>
                         <option value="Packed" {% if o['status'] in ['Packed', 'Ready for Collection'] %}selected{% endif %}>Mark Packed</option>
-                        <option value="Shipped" {% if o['status'] == 'Shipped' %}selected{% endif %}>Mark Shipped</option>
+                        <option value="Shipped" {% if o['status'] in ['Shipped', 'In Transit'] %}selected{% endif %}>Mark In Transit</option>
                         <option value="Delivered" {% if o['status'] in ['Delivered', 'Completed'] %}selected{% endif %}>Mark Delivered</option>
                         <option value="Rejected" {% if o['status'] == 'Rejected' %}selected{% endif %}>Reject</option>
                       </select>
@@ -743,7 +904,7 @@
                       <a href="{{ url_for('chat_conversation', recipient_id=o['buyer_id']) }}?order_id={{ o['id'] }}" class="btn btn-primary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
                         💬 Chat
                       </a>
-                      {% if o['payment_status'] == 'Paid' %}
+                      {% if o['payment_status'] in ['Paid', 'Payment Verified'] %}
                         <a href="{{ url_for('view_invoice', order_id=o['id']) }}" class="btn btn-outline-primary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
                           🧾 Receipt
                         </a>
@@ -773,6 +934,60 @@
         </p>
       </div>
     {% endif %}
+  </div>
+
+  <!-- MODAL: HARVEST & QUALITY UPDATE (Section 5) -->
+  <div id="harvestUpdateModal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px);">
+    <div style="background: white; border-radius: var(--radius-lg); max-width: 540px; width: 100%; box-shadow: var(--shadow-lg); overflow: hidden;">
+      <div style="background: #15803d; color: white; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-size: 0.75rem; text-transform: uppercase; opacity: 0.85;">Section 5 &bull; Harvest & Quality Workflow</div>
+          <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: white;">Update Harvest & Fresh Produce</h3>
+        </div>
+        <button type="button" class="btn-close-harvest" style="background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+      </div>
+
+      <form action="{{ url_for('update_order_harvest') }}" method="POST" enctype="multipart/form-data" style="padding: 1.25rem;">
+        <input type="hidden" name="order_id" id="harvestOrderId">
+
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 0.65rem 0.85rem; margin-bottom: 1rem; font-size: 0.85rem;">
+          Order <strong id="harvestOrderCode"></strong> &bull; <strong id="harvestCropName"></strong><br>
+          Requested Quantity: <span id="harvestRequestedQty" style="color: #166534; font-weight: 700;"></span> kg
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+          <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Harvest Progress Stage *</label>
+          <select name="harvest_status" id="harvestStatusSelect" class="filter-select" style="width: 100%; height: 40px;" required>
+            <option value="Harvesting in Progress">🌾 Harvesting in Progress</option>
+            <option value="Ready for Quality Check">🔍 Ready for Quality Check (Harvest Complete)</option>
+            <option value="Quality Approved">✓ Quality Approved</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+          <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Actual Harvested Quantity (kg)</label>
+          <input type="number" step="any" min="1" name="harvested_quantity" id="harvestedQtyInput" class="filter-input" placeholder="e.g. 500" style="width: 100%; height: 40px;">
+          <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">Confirm final harvested weight for buyer verification.</div>
+        </div>
+
+        <div style="margin-bottom: 1rem;">
+          <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Upload Fresh Harvest Photo</label>
+          <input type="file" name="fresh_image" accept="image/*" style="width: 100%; font-size: 0.85rem;">
+        </div>
+
+        <div style="margin-bottom: 1.25rem;">
+          <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Harvest Notes & Freshness Details</label>
+          <textarea name="harvest_notes" rows="2" class="filter-input" placeholder="e.g. Harvested early morning, sorted into crates, Grade A freshness." style="width: 100%; font-family: inherit; font-size: 0.85rem;"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+          <button type="button" class="btn btn-secondary btn-close-harvest">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="background: #16a34a; font-weight: 700;">
+            Save & Notify Buyer
+          </button>
+        </div>
+      </form>
+    </div>
   </div>
 
 </div>
@@ -805,6 +1020,26 @@ document.addEventListener('DOMContentLoaded', function() {
       .catch(() => {
         this.textContent = 'Error';
       });
+    });
+  });
+
+  // Harvest Modal
+  const harvestModal = document.getElementById('harvestUpdateModal');
+  document.querySelectorAll('.btn-close-harvest').forEach(b => b.addEventListener('click', () => harvestModal.style.display = 'none'));
+
+  document.querySelectorAll('.btn-update-harvest').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.getElementById('harvestOrderId').value = this.dataset.orderId;
+      document.getElementById('harvestOrderCode').textContent = this.dataset.orderCode;
+      document.getElementById('harvestCropName').textContent = this.dataset.crop;
+      document.getElementById('harvestRequestedQty').textContent = this.dataset.qty;
+      document.getElementById('harvestedQtyInput').value = this.dataset.qty;
+      if (this.dataset.status && this.dataset.status !== 'Harvest Pending') {
+        document.getElementById('harvestStatusSelect').value = this.dataset.status;
+      } else {
+        document.getElementById('harvestStatusSelect').value = 'Harvesting in Progress';
+      }
+      harvestModal.style.display = 'flex';
     });
   });
 });

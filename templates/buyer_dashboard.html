@@ -133,11 +133,192 @@
               {% set clean_fphone = act['farmer_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
               <a href="https://wa.me/91{{ clean_fphone }}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm">💬</a>
             </div>
+
+            {% if act['harvest_status'] == 'Ready for Quality Check' %}
+              <div style="background: #fefce8; border: 1px solid #fef08a; border-radius: 6px; padding: 0.6rem 0.8rem; margin-top: 0.75rem; font-size: 0.825rem;">
+                <div style="font-weight: 700; color: #854d0e; margin-bottom: 0.35rem;">🔍 Harvest Ready for Quality Check ({{ act['harvested_quantity'] or act['requested_quantity'] }} kg)</div>
+                <div style="display: flex; gap: 0.4rem;">
+                  <form action="{{ url_for('order_quality_decision', order_id=act['id']) }}" method="POST" style="flex: 1;">
+                    <input type="hidden" name="decision" value="approve">
+                    <button type="submit" class="btn btn-success btn-sm btn-block" style="padding: 0.25rem 0.4rem; font-size: 0.75rem; background: #16a34a;">✓ Approve Quality</button>
+                  </form>
+                  <form action="{{ url_for('order_quality_decision', order_id=act['id']) }}" method="POST" style="flex: 1;" onsubmit="const r = prompt('Reason for quality issue:'); if (!r) return false; this.notes.value = r;">
+                    <input type="hidden" name="decision" value="issue">
+                    <input type="hidden" name="notes" value="">
+                    <button type="submit" class="btn btn-outline-danger btn-sm btn-block" style="padding: 0.25rem 0.4rem; font-size: 0.75rem;">⚠️ Raise Issue</button>
+                  </form>
+                </div>
+              </div>
+            {% endif %}
+
+            {% if act['handover_otp'] and act['status'] in ['Ready for Pickup', 'In Transit', 'Out for Delivery'] %}
+              <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 6px; padding: 0.5rem 0.75rem; margin-top: 0.6rem; font-size: 0.8rem; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <span style="color: #166534; font-weight: 700;">Handover OTP:</span>
+                  <code style="font-size: 1rem; font-weight: 800; color: #0f172a; margin-left: 0.35rem;">{{ act['handover_otp'] }}</code>
+                </div>
+                <a href="{{ url_for('order_handover_qr', order_id=act['id']) }}" target="_blank" style="font-size: 0.75rem; color: #0284c7; font-weight: 600;">View QR Code</a>
+              </div>
+            {% endif %}
           </div>
         {% endfor %}
       </div>
     </div>
   {% endif %}
+
+  <!-- Section 3 & 4: Received Farmer Offers -->
+  <div class="data-table-card" id="offersSection" style="margin-bottom: 3rem; border-top: 4px solid #16a34a;">
+    <div class="data-table-header">
+      <div>
+        <h2 style="font-size: 1.35rem; font-weight: 700; color: #0f172a;">
+          📥 Received Farmer Offers ({{ received_offers|length if received_offers else 0 }})
+        </h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">
+          Review incoming harvest proposals from verified farmers, compare pricing, and confirm orders
+        </span>
+      </div>
+      <a href="{{ url_for('nearby_buyers') }}" class="btn btn-outline-primary btn-sm">
+        Browse Procurement Hub
+      </a>
+    </div>
+
+    {% if received_offers %}
+      <div class="table-responsive">
+        <table class="custom-table" style="font-size: 0.875rem;">
+          <thead>
+            <tr>
+              <th>Offer #</th>
+              <th>Produce & Quality</th>
+              <th>Farmer Details</th>
+              <th>Offered Qty & Rate</th>
+              <th>Total Value</th>
+              <th>Harvest Date</th>
+              <th>Status</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for off in received_offers %}
+              <tr>
+                <td>
+                  <strong style="color: #166534;">{{ off['offer_code'] }}</strong>
+                  <div style="font-size: 0.725rem; color: #64748b;">{{ off['created_at'][:10] }}</div>
+                </td>
+                <td>
+                  <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    {% if off['photo'] %}
+                      <img src="{{ url_for('static', filename='uploads/' ~ off['photo']) }}" alt="{{ off['crop_name'] }}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px;">
+                    {% else %}
+                      <div style="width: 44px; height: 44px; background: #ecfdf5; color: #166534; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
+                        🌾
+                      </div>
+                    {% endif %}
+                    <div>
+                      <strong style="color: #0f172a; font-size: 0.95rem;">{{ off['crop_name'] }}</strong>
+                      {% if off['quality_description'] %}
+                        <div style="font-size: 0.75rem; color: #64748b; max-width: 200px; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">
+                          {{ off['quality_description'] }}
+                        </div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </td>
+                <td>
+                  <div style="font-weight: 700; color: #0f172a;">{{ off['farmer_name'] }}</div>
+                  <div style="font-size: 0.75rem; color: #64748b;">
+                    📍 {{ off['farmer_location'] or off['farmer_district'] or 'Tamil Nadu' }}<br>
+                    📞 {{ off['farmer_phone'] }}
+                  </div>
+                </td>
+                <td>
+                  <div style="font-size: 1rem; font-weight: 800; color: #15803d;">
+                    {{ off['quantity'] }} kg @ ₹{{ "%.0f"|format(off['price_per_kg']) }}/kg
+                  </div>
+                  {% if off['req_target_price'] %}
+                    <div style="font-size: 0.75rem; color: #64748b;">
+                      Target: ₹{{ "%.0f"|format(off['req_target_price']) }}/kg
+                    </div>
+                  {% endif %}
+                </td>
+                <td>
+                  <strong style="font-size: 1rem; color: #0f172a;">₹{{ "{:,.0f}".format(off['quantity'] * off['price_per_kg']) }}</strong>
+                  <div style="font-size: 0.725rem; color: #64748b;">{{ off['delivery_preference'] }}</div>
+                </td>
+                <td>
+                  <span style="font-weight: 600; font-size: 0.8rem; color: #334155;">{{ off['harvest_date'] }}</span>
+                </td>
+                <td>
+                  {% if off['status'] == 'Pending Buyer Review' %}
+                    <span class="badge-urgent" style="font-size: 0.75rem; font-weight: 700;">Pending Review</span>
+                  {% elif off['status'] == 'Accepted' %}
+                    <span class="badge-available" style="font-size: 0.75rem; font-weight: 700;">Accepted</span>
+                  {% elif off['status'] == 'Counter Offered' %}
+                    <span class="badge-category" style="font-size: 0.75rem; font-weight: 700; background: #e0f2fe; color: #0369a1;">Counter: ₹{{ off['counter_price'] }}/kg</span>
+                  {% elif off['status'] == 'Rejected' %}
+                    <span style="font-size: 0.75rem; font-weight: 700; color: #ef4444; background: #fee2e2; padding: 0.2rem 0.5rem; border-radius: 9999px;">Rejected</span>
+                  {% else %}
+                    <span class="badge-category" style="font-size: 0.75rem;">{{ off['status'] }}</span>
+                  {% endif %}
+                </td>
+                <td style="text-align: right;">
+                  <div style="display: flex; gap: 0.4rem; justify-content: flex-end; flex-wrap: wrap;">
+                    {% if off['status'] == 'Pending Buyer Review' %}
+                      <!-- Accept Offer Button -->
+                      <form action="{{ url_for('respond_buyer_offer', offer_id=off['id']) }}" method="POST" onsubmit="return confirm('Accept this farmer offer and confirm order for {{ off['quantity'] }} kg of {{ off['crop_name'] }}?');" style="display: inline;">
+                        <input type="hidden" name="action" value="accept">
+                        <button type="submit" class="btn btn-success btn-sm" style="background: #16a34a; border-color: #16a34a; font-weight: 700; padding: 0.25rem 0.65rem; font-size: 0.8rem;">
+                          ✓ Accept
+                        </button>
+                      </form>
+
+                      <!-- Counter Offer Trigger -->
+                      <button type="button" class="btn btn-outline-primary btn-sm btn-counter-offer"
+                              style="font-size: 0.8rem; padding: 0.25rem 0.55rem; font-weight: 700;"
+                              data-offer-id="{{ off['id'] }}"
+                              data-code="{{ off['offer_code'] }}"
+                              data-crop="{{ off['crop_name']|escape }}"
+                              data-qty="{{ off['quantity'] }}"
+                              data-price="{{ off['price_per_kg'] }}">
+                        💬 Counter
+                      </button>
+
+                      <!-- Reject Offer Trigger -->
+                      <button type="button" class="btn btn-outline-danger btn-sm btn-reject-offer"
+                              style="font-size: 0.8rem; padding: 0.25rem 0.55rem; border-color: #ef4444; color: #ef4444;"
+                              data-offer-id="{{ off['id'] }}"
+                              data-code="{{ off['offer_code'] }}"
+                              data-crop="{{ off['crop_name']|escape }}">
+                        ✕ Reject
+                      </button>
+                    {% elif off['status'] == 'Accepted' and off['order_id'] %}
+                      <a href="{{ url_for('track_order', order_id=off['order_id']) }}" class="btn btn-primary btn-sm" style="font-size: 0.8rem; padding: 0.25rem 0.65rem;">
+                        Track Order #{{ off['order_code'] or off['order_id'] }}
+                      </a>
+                    {% endif %}
+
+                    <!-- WhatsApp / Contact -->
+                    {% set clean_phone = off['farmer_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
+                    <a href="https://wa.me/91{{ clean_phone }}?text=Vanakkam%20{{ off['farmer_name'] }}%2C%20regarding%20Offer%20{{ off['offer_code'] }}%20for%20{{ off['crop_name'] }}" target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.8rem;" title="WhatsApp Farmer">
+                      💬
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty-state" style="padding: 2.5rem 1rem; text-align: center;">
+        <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">📬</span>
+        <div style="font-weight: 700; color: #0f172a; margin-bottom: 0.25rem;">No Farmer Offers Received Yet</div>
+        <p style="font-size: 0.85rem; color: #64748b; max-width: 450px; margin: 0 auto 1rem;">
+          When farmers nearby see your posted procurement requirements, their direct harvest proposals will appear here.
+        </p>
+        <a href="#postRequirementSection" class="btn btn-primary btn-sm">+ Post a Procurement Requirement</a>
+      </div>
+    {% endif %}
+  </div>
 
   <!-- AI Recommended Produce for Your Business Type -->
   {% if recommended_produce %}
@@ -639,6 +820,82 @@
     {% endif %}
   </div>
 
+  <!-- MODAL: REJECT OFFER -->
+  <div id="rejectOfferModal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px);">
+    <div style="background: white; border-radius: var(--radius-lg); max-width: 480px; width: 100%; box-shadow: var(--shadow-lg); overflow: hidden;">
+      <div style="background: #ef4444; color: white; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+        <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: white;">Decline Farmer Offer</h3>
+        <button type="button" class="btn-close-reject" style="background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+      </div>
+      <form action="{{ url_for('respond_buyer_offer') }}" method="POST" style="padding: 1.25rem;">
+        <input type="hidden" name="action" value="reject">
+        <input type="hidden" name="offer_id" id="rejectOfferId">
+        <div style="font-size: 0.85rem; color: #475569; margin-bottom: 1rem;">
+          Please state the reason for declining Offer <strong id="rejectOfferCode"></strong> (<span id="rejectOfferCrop"></span>). The farmer will be notified.
+        </div>
+        <div style="margin-bottom: 1rem;">
+          <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Rejection Reason *</label>
+          <select name="reason" class="form-control" style="width: 100%; height: 38px; margin-bottom: 0.5rem;" required>
+            <option value="Offered price is higher than our budget">Offered price is higher than our budget</option>
+            <option value="Quantity does not match current procurement requirements">Quantity does not match current requirements</option>
+            <option value="Harvest / delivery date is too late">Harvest / delivery date is too late</option>
+            <option value="Procurement requirement already fulfilled">Procurement requirement already fulfilled</option>
+            <option value="Other specifications mismatch">Other specifications mismatch</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+          <button type="button" class="btn btn-secondary btn-close-reject">Cancel</button>
+          <button type="submit" class="btn btn-danger" style="background: #ef4444; border-color: #ef4444;">Confirm Decline</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL: COUNTER OFFER -->
+  <div id="counterOfferModal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px);">
+    <div style="background: white; border-radius: var(--radius-lg); max-width: 500px; width: 100%; box-shadow: var(--shadow-lg); overflow: hidden;">
+      <div style="background: #0284c7; color: white; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <div style="font-size: 0.75rem; text-transform: uppercase; opacity: 0.85;">Section 3 &bull; Propose Counter Terms</div>
+          <h3 style="margin: 0; font-size: 1.15rem; font-weight: 700; color: white;">Send Counter Offer</h3>
+        </div>
+        <button type="button" class="btn-close-counter" style="background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
+      </div>
+      <form action="{{ url_for('respond_buyer_offer') }}" method="POST" style="padding: 1.25rem;">
+        <input type="hidden" name="action" value="counter">
+        <input type="hidden" name="offer_id" id="counterOfferId">
+
+        <div style="background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; padding: 0.65rem 0.85rem; margin-bottom: 1rem; font-size: 0.85rem;">
+          Offer <strong id="counterOfferCode"></strong> &bull; <strong id="counterOfferCrop"></strong><br>
+          Farmer's Offer: <span id="counterFarmerOriginal" style="color: #0369a1; font-weight: 700;"></span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1rem;">
+          <div>
+            <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Counter Price (₹ / kg) *</label>
+            <input type="number" step="any" min="1" name="counter_price" id="counterPriceInput" required class="form-control" style="width: 100%; height: 38px;">
+          </div>
+          <div>
+            <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Counter Quantity (kg) *</label>
+            <input type="number" step="any" min="1" name="counter_quantity" id="counterQtyInput" required class="form-control" style="width: 100%; height: 38px;">
+          </div>
+        </div>
+
+        <div style="margin-bottom: 1.25rem;">
+          <label style="font-size: 0.8rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.35rem;">Notes / Reason for Counter</label>
+          <textarea name="counter_notes" rows="2" class="form-control" placeholder="e.g. Can purchase immediately at ₹20/kg for bulk delivery." style="width: 100%; font-family: inherit; font-size: 0.85rem;"></textarea>
+        </div>
+
+        <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+          <button type="button" class="btn btn-secondary btn-close-counter">Cancel</button>
+          <button type="submit" class="btn btn-primary" style="background: #0284c7; border-color: #0284c7; font-weight: 700;">
+            Send Counter Offer
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
 </div>
 {% endblock %}
 
@@ -701,6 +958,34 @@ document.addEventListener('DOMContentLoaded', function() {
         this.disabled = false;
         this.textContent = 'Request Refund';
       });
+    });
+  });
+
+  // Offer Modals
+  const rejectModal = document.getElementById('rejectOfferModal');
+  const counterModal = document.getElementById('counterOfferModal');
+
+  document.querySelectorAll('.btn-close-reject').forEach(b => b.addEventListener('click', () => rejectModal.style.display = 'none'));
+  document.querySelectorAll('.btn-close-counter').forEach(b => b.addEventListener('click', () => counterModal.style.display = 'none'));
+
+  document.querySelectorAll('.btn-reject-offer').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.getElementById('rejectOfferId').value = this.dataset.offerId;
+      document.getElementById('rejectOfferCode').textContent = this.dataset.code;
+      document.getElementById('rejectOfferCrop').textContent = this.dataset.crop;
+      rejectModal.style.display = 'flex';
+    });
+  });
+
+  document.querySelectorAll('.btn-counter-offer').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.getElementById('counterOfferId').value = this.dataset.offerId;
+      document.getElementById('counterOfferCode').textContent = this.dataset.code;
+      document.getElementById('counterOfferCrop').textContent = this.dataset.crop;
+      document.getElementById('counterFarmerOriginal').textContent = this.dataset.qty + ' kg @ ₹' + this.dataset.price + '/kg';
+      document.getElementById('counterPriceInput').value = this.dataset.price;
+      document.getElementById('counterQtyInput').value = this.dataset.qty;
+      counterModal.style.display = 'flex';
     });
   });
 });
