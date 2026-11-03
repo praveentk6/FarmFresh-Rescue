@@ -178,7 +178,7 @@ class TestCompleteAuthSystem(unittest.TestCase):
 
     def test_09_forgot_and_reset_password_flow(self):
         """Forgot password token issuance and password reset verification."""
-        test_email = "selvi.farms@gmail.com"
+        test_email = "test.farmer.new@gmail.com"
         ok, token = auth_service.generate_password_reset_token(test_email)
         self.assertTrue(ok)
         self.assertIsNotNone(token)
