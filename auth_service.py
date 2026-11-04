@@ -121,7 +121,7 @@ def get_user_by_email(email: str):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT id, name, email, password_hash, role, phone, location, pin_code, user_type, is_active, created_at
+        SELECT id, name, email, password_hash, role, phone, location, pin_code, user_type, is_active, created_at, email_verified, verification_token, verified_at, district
         FROM users WHERE LOWER(email) = ?
     """, (email_clean,))
     row = cursor.fetchone()
@@ -148,6 +148,7 @@ def get_user_by_email(email: str):
                     'pin_code': m_user.get('pin_code', ''),
                     'user_type': m_user.get('user_type', ''),
                     'is_active': 1 if m_user.get('status') == 'active' else 0,
+                    'email_verified': m_user.get('email_verified', 0),
                     'created_at': str(m_user.get('createdAt', ''))
                 }
         except Exception as e:
@@ -162,7 +163,7 @@ def get_user_by_id(user_id: int):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT id, name, email, password_hash, role, phone, location, pin_code, user_type, is_active, created_at
+        SELECT id, name, email, password_hash, role, phone, location, pin_code, user_type, is_active, created_at, email_verified, verification_token, verified_at, district
         FROM users WHERE id = ?
     """, (user_id,))
     row = cursor.fetchone()

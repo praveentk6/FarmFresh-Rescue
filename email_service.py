@@ -60,6 +60,317 @@ def init_sent_emails():
 
 init_sent_emails()
 
+def init_registration_otps():
+    """Ensure registration_otps table exists for email verification codes."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS registration_otps (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                email TEXT UNIQUE,
+                otp_code TEXT NOT NULL,
+                expires_at TIMESTAMP NOT NULL,
+                is_verified INTEGER DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[init_registration_otps Error] {e}")
+
+init_registration_otps()
+
+def build_registration_otp_html(otp_code: str, user_name: str = 'Valued Member'):
+    """Generate responsive HTML registration verification code template."""
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>FarmFresh Rescue - Registration OTP</title>
+  <style>
+    body {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; color: #1e293b; }}
+    .email-container {{ max-width: 540px; margin: 25px auto; background: #ffffff; border-radius: 14px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }}
+    .email-header {{ background: linear-gradient(135deg, #15803d, #16a34a); padding: 26px 20px; text-align: center; color: #ffffff; }}
+    .email-logo {{ font-size: 32px; margin-bottom: 4px; }}
+    .email-title {{ font-size: 20px; font-weight: 800; margin: 0; }}
+    .email-body {{ padding: 28px 24px; text-align: center; }}
+    .otp-card {{ background: #f0fdf4; border: 2px dashed #16a34a; border-radius: 12px; padding: 18px 20px; margin: 22px auto; max-width: 300px; }}
+    .otp-digits {{ font-family: 'Consolas', 'Courier New', monospace; font-size: 36px; font-weight: 800; letter-spacing: 8px; color: #15803d; }}
+    .otp-validity {{ font-size: 13px; color: #166534; font-weight: 600; margin-top: 6px; }}
+    .footer-note {{ font-size: 12px; color: #94a3b8; line-height: 1.5; border-top: 1px solid #f1f5f9; padding-top: 16px; margin-top: 24px; text-align: center; }}
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <div class="email-logo">🌾</div>
+      <h1 class="email-title">FarmFresh Rescue Email Verification</h1>
+    </div>
+    <div class="email-body">
+      <h3 style="margin: 0 0 10px; font-size: 17px; color: #0f172a;">Vanakkam, {user_name}!</h3>
+      <p style="font-size: 14px; color: #475569; line-height: 1.5; margin: 0;">
+        Please enter the following 6-digit One-Time Password (OTP) on the registration page to verify your email address:
+      </p>
+
+      <div class="otp-card">
+        <div class="otp-digits">{otp_code}</div>
+        <div class="otp-validity">⏳ Valid for 10 minutes only</div>
+      </div>
+
+      <p style="font-size: 13px; color: #64748b; margin: 0;">
+        Never share this verification code with anyone. FarmFresh Rescue team will never ask for your OTP.
+      </p>
+
+      <div class="footer-note">
+        &copy; 2026 FarmFresh Rescue &bull; Tamil Nadu Zero-Waste Agricultural Marketplace
+      </div>
+    </div>
+  </div>
+</body>
+</html>"""
+
+def build_farmer_welcome_html(user_name: str, base_url: str = 'http://127.0.0.1:5000'):
+    """Generate responsive HTML Welcome email for newly registered Farmers."""
+    dashboard_url = f"{base_url.rstrip('/')}/farmer/dashboard"
+    add_listing_url = f"{base_url.rstrip('/')}/add-listing"
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Vanakkam & Welcome to FarmFresh Rescue!</title>
+  <style>
+    body {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; color: #1e293b; }}
+    .email-container {{ max-width: 600px; margin: 25px auto; background: #ffffff; border-radius: 14px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }}
+    .email-header {{ background: linear-gradient(135deg, #15803d, #16a34a); padding: 30px 24px; text-align: center; color: #ffffff; }}
+    .email-logo {{ font-size: 36px; margin-bottom: 6px; }}
+    .email-title {{ font-size: 24px; font-weight: 800; margin: 0; }}
+    .email-subtitle {{ font-size: 13.5px; opacity: 0.95; margin-top: 6px; }}
+    .email-body {{ padding: 30px 26px; }}
+    .greeting {{ font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }}
+    .highlight-card {{ background: #f0fdf4; border-left: 4px solid #16a34a; padding: 16px 20px; border-radius: 8px; margin: 20px 0; }}
+    .feature-list {{ margin: 0; padding-left: 20px; line-height: 1.7; color: #166534; }}
+    .btn-wrap {{ text-align: center; margin: 28px 0; }}
+    .btn-primary {{ display: inline-block; background: #16a34a; color: #ffffff !important; padding: 13px 32px; font-size: 15px; font-weight: 700; text-decoration: none; border-radius: 8px; box-shadow: 0 4px 12px rgba(22,163,74,0.3); }}
+    .btn-secondary {{ display: inline-block; background: #f1f5f9; color: #0f172a !important; padding: 10px 22px; font-size: 13.5px; font-weight: 700; text-decoration: none; border-radius: 8px; margin-left: 8px; border: 1px solid #cbd5e1; }}
+    .footer-note {{ font-size: 12px; color: #94a3b8; line-height: 1.5; border-top: 1px solid #f1f5f9; padding-top: 20px; margin-top: 28px; text-align: center; }}
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <div class="email-logo">🌾</div>
+      <h1 class="email-title">Vanakkam & Welcome to FarmFresh Rescue!</h1>
+      <div class="email-subtitle">Tamil Nadu Zero-Intermediary Agricultural Marketplace &bull; உழவர் குரல்</div>
+    </div>
+    <div class="email-body">
+      <div class="greeting">Vanakkam, {user_name}!</div>
+      <p style="font-size: 15px; line-height: 1.6; color: #334155;">
+        Congratulations! Your <strong>Farmer Producer Account</strong> is officially active on <strong>FarmFresh Rescue</strong>.
+        You are now connected directly with wholesale buyers, hotels, supermarket chains, and food processing industries across all 38 districts of Tamil Nadu.
+      </p>
+
+      <div class="highlight-card">
+        <strong style="color: #14532d; font-size: 15px; display: block; margin-bottom: 8px;">🌾 Key Farmer Advantages & Features:</strong>
+        <ul class="feature-list">
+          <li><strong>➕ Urgent Produce Rescue:</strong> List mature or distressed harvests to sell within hours at fair rates.</li>
+          <li><strong>🤝 Direct Meet & Sell:</strong> Invite buyers to your farm for on-site quality inspection and instant cash/UPI payment.</li>
+          <li><strong>📊 Live Mandi Benchmarks:</strong> Track daily Koyambedu, Ottanchathiram, and regional wholesale market prices.</li>
+          <li><strong>🛡️ Zero Broker Commission:</strong> 100% of the sale value reaches your hands without middleman deductions.</li>
+          <li><strong>⛈️ Agro-Weather Advisories:</strong> Receive urgent rainfall and pest alerts directly on your dashboard.</li>
+        </ul>
+      </div>
+
+      <div class="btn-wrap">
+        <a href="{dashboard_url}" class="btn-primary" target="_blank">🚀 Open Farmer Dashboard</a>
+        <a href="{add_listing_url}" class="btn-secondary" target="_blank">➕ List Fresh Produce</a>
+      </div>
+
+      <div class="footer-note">
+        FarmFresh Rescue &bull; Tamil Nadu Direct Agricultural Initiative &bull; Vanakkam<br>
+        Need help? Reply directly to this email &bull; &copy; 2026 FarmFresh Rescue
+      </div>
+    </div>
+  </div>
+</body>
+</html>"""
+
+def build_buyer_welcome_html(user_name: str, base_url: str = 'http://127.0.0.1:5000'):
+    """Generate responsive HTML Welcome email for newly registered Wholesale Buyers."""
+    dashboard_url = f"{base_url.rstrip('/')}/buyer/dashboard"
+    browse_url = f"{base_url.rstrip('/')}/listings"
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Welcome to FarmFresh Wholesale Desk!</title>
+  <style>
+    body {{ font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; margin: 0; padding: 0; color: #1e293b; }}
+    .email-container {{ max-width: 600px; margin: 25px auto; background: #ffffff; border-radius: 14px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }}
+    .email-header {{ background: linear-gradient(135deg, #0284c7, #0369a1); padding: 30px 24px; text-align: center; color: #ffffff; }}
+    .email-logo {{ font-size: 36px; margin-bottom: 6px; }}
+    .email-title {{ font-size: 24px; font-weight: 800; margin: 0; }}
+    .email-subtitle {{ font-size: 13.5px; opacity: 0.95; margin-top: 6px; }}
+    .email-body {{ padding: 30px 26px; }}
+    .greeting {{ font-size: 18px; font-weight: 700; color: #0f172a; margin-bottom: 12px; }}
+    .highlight-card {{ background: #f0f9ff; border-left: 4px solid #0284c7; padding: 16px 20px; border-radius: 8px; margin: 20px 0; }}
+    .feature-list {{ margin: 0; padding-left: 20px; line-height: 1.7; color: #075985; }}
+    .btn-wrap {{ text-align: center; margin: 28px 0; }}
+    .btn-primary {{ display: inline-block; background: #0284c7; color: #ffffff !important; padding: 13px 32px; font-size: 15px; font-weight: 700; text-decoration: none; border-radius: 8px; box-shadow: 0 4px 12px rgba(2,132,199,0.3); }}
+    .btn-secondary {{ display: inline-block; background: #f1f5f9; color: #0f172a !important; padding: 10px 22px; font-size: 13.5px; font-weight: 700; text-decoration: none; border-radius: 8px; margin-left: 8px; border: 1px solid #cbd5e1; }}
+    .footer-note {{ font-size: 12px; color: #94a3b8; line-height: 1.5; border-top: 1px solid #f1f5f9; padding-top: 20px; margin-top: 28px; text-align: center; }}
+  </style>
+</head>
+<body>
+  <div class="email-container">
+    <div class="email-header">
+      <div class="email-logo">🛒</div>
+      <h1 class="email-title">Welcome to FarmFresh Wholesale Desk!</h1>
+      <div class="email-subtitle">Direct Farm-to-Business Procurement &bull; Zero Intermediary Network</div>
+    </div>
+    <div class="email-body">
+      <div class="greeting">Dear {user_name},</div>
+      <p style="font-size: 15px; line-height: 1.6; color: #334155;">
+        Welcome to <strong>FarmFresh Rescue</strong>! Your wholesale buyer account has been verified and activated.
+        You now have exclusive direct access to harvest batches, farmer cooperatives, and fresh produce across Tamil Nadu at source prices.
+      </p>
+
+      <div class="highlight-card">
+        <strong style="color: #0c4a6e; font-size: 15px; display: block; margin-bottom: 8px;">🛒 Key Wholesale Procurement Features:</strong>
+        <ul class="feature-list">
+          <li><strong>🔍 Direct Farm Produce Browse:</strong> Discover country tomatoes, shallots, greens, and orchard fruits harvested today.</li>
+          <li><strong>📢 Post Procurement Requirements:</strong> Specify required crop, tonnage, and target price to receive competitive farmer offers.</li>
+          <li><strong>🚜 Direct Meet & Sell Farm Visits:</strong> Schedule in-person quality inspection visits directly at the farm before purchasing.</li>
+          <li><strong>🛡️ Secure Escrow & Multiple Payments:</strong> Razorpay secure online escrow, UPI, bank transfer, and verified cash settlements.</li>
+          <li><strong>📈 Mandi Price Engine:</strong> Compare farm-gate rates against regional regulated market prices.</li>
+        </ul>
+      </div>
+
+      <div class="btn-wrap">
+        <a href="{dashboard_url}" class="btn-primary" target="_blank">🚀 Open Buyer Dashboard</a>
+        <a href="{browse_url}" class="btn-secondary" target="_blank">🔍 Browse Fresh Produce</a>
+      </div>
+
+      <div class="footer-note">
+        FarmFresh Rescue Wholesale Division &bull; Tamil Nadu Direct Farm Procurement<br>
+        Dedicated Support: support@farmfresh.org &bull; &copy; 2026 FarmFresh Rescue
+      </div>
+    </div>
+  </div>
+</body>
+</html>"""
+
+def generate_and_send_registration_otp(email: str, user_name: str = 'Valued Member'):
+    """Generate 6-digit OTP, persist in registration_otps table, and dispatch via email."""
+    import random
+    clean_email = email.strip().lower()
+    if not clean_email or '@' not in clean_email:
+        return False, "Please enter a valid email address.", None
+
+    otp_code = f"{random.randint(100000, 999999)}"
+    now = datetime.datetime.now()
+    expires_at = (now + datetime.timedelta(minutes=10)).strftime("%Y-%m-%d %H:%M:%S")
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO registration_otps (email, otp_code, expires_at, is_verified, created_at)
+            VALUES (?, ?, ?, 0, CURRENT_TIMESTAMP)
+            ON CONFLICT(email) DO UPDATE SET 
+                otp_code = excluded.otp_code,
+                expires_at = excluded.expires_at,
+                is_verified = 0,
+                created_at = CURRENT_TIMESTAMP
+        """, (clean_email, otp_code, expires_at))
+        conn.commit()
+        conn.close()
+
+        subject = f"🔐 Your FarmFresh Registration Verification Code: {otp_code}"
+        html_body = build_registration_otp_html(otp_code, user_name)
+        text_body = f"Vanakkam {user_name},\n\nYour FarmFresh Rescue registration verification code is: {otp_code}\nThis code is valid for 10 minutes.\n\nThank you,\nFarmFresh Rescue Team"
+
+        ok, msg = send_email(clean_email, subject, html_body, text_body, recipient_name=user_name)
+        return True, f"A 6-digit verification code has been dispatched to {clean_email}.", otp_code
+    except Exception as e:
+        print(f"[generate_and_send_registration_otp Error] {e}")
+        return False, str(e), None
+
+def verify_registration_otp(email: str, entered_otp: str):
+    """Verify that entered OTP matches active valid code for email."""
+    clean_email = email.strip().lower()
+    clean_otp = str(entered_otp or '').strip()
+
+    if not clean_email or not clean_otp:
+        return False, "Email and OTP code are required."
+
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM registration_otps WHERE LOWER(email) = LOWER(?)", (clean_email,))
+        row = cursor.fetchone()
+
+        if not row:
+            conn.close()
+            return False, "No OTP requested for this email. Please click 'Send OTP' first."
+
+        # Check code
+        if str(row['otp_code']).strip() != clean_otp:
+            conn.close()
+            return False, "Incorrect verification code. Please check your email and try again."
+
+        # Check expiration
+        now_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        if str(row['expires_at']) < now_str:
+            conn.close()
+            return False, "This verification code has expired. Please request a new OTP."
+
+        cursor.execute("UPDATE registration_otps SET is_verified = 1 WHERE LOWER(email) = LOWER(?)", (clean_email,))
+        conn.commit()
+        conn.close()
+        return True, "Email verified successfully!"
+    except Exception as e:
+        print(f"[verify_registration_otp Error] {e}")
+        return False, str(e)
+
+def is_email_otp_verified(email: str):
+    """Check if an email has recently completed OTP verification."""
+    clean_email = email.strip().lower()
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT is_verified, expires_at FROM registration_otps WHERE LOWER(email) = LOWER(?)", (clean_email,))
+        row = cursor.fetchone()
+        conn.close()
+        if row and row['is_verified'] == 1:
+            return True
+        return False
+    except Exception:
+        return False
+
+def send_welcome_email(user_email: str, user_name: str, role: str, base_url: str = 'http://127.0.0.1:5000'):
+    """Dispatch role-specific rich HTML welcome message upon initial registration."""
+    clean_email = user_email.strip().lower()
+    clean_role = role.strip().lower()
+
+    if clean_role == 'farmer':
+        subject = f"🌾 Vanakkam & Welcome to FarmFresh Rescue, {user_name}! Your Harvest Hub is Active"
+        html_body = build_farmer_welcome_html(user_name, base_url)
+        text_body = f"Vanakkam {user_name},\n\nWelcome to FarmFresh Rescue! Your Farmer Producer account is now active.\nYou can list fresh crops, meet verified wholesale buyers, and access real-time mandi prices.\n\nDashboard: {base_url}/farmer/dashboard\n\nFarmFresh Team"
+    else:
+        subject = f"🛒 Welcome to FarmFresh Rescue Wholesale Hub, {user_name}! Direct Farm Procurement"
+        html_body = build_buyer_welcome_html(user_name, base_url)
+        text_body = f"Dear {user_name},\n\nWelcome to FarmFresh Rescue! Your Buyer account is now active.\nYou can browse fresh farm produce lots, post procurement requirements, and schedule direct farm visits.\n\nDashboard: {base_url}/buyer/dashboard\n\nFarmFresh Team"
+
+    ok, msg = send_email(clean_email, subject, html_body, text_body, recipient_name=user_name)
+    log_activity(
+        'WELCOME_EMAIL_SENT',
+        f"Delivered {clean_role.capitalize()} Welcome Email to {clean_email} | Subject: {subject}",
+        clean_email
+    )
+    return ok, msg
+
 def record_sent_email(recipient_email, recipient_name, subject, html_content, text_content=None, status='Delivered', mode='SMTP'):
     """Record dispatched email for auditing and live in-app inspection."""
     try:

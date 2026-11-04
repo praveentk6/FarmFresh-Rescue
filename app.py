@@ -881,6 +881,24 @@ def _perform_registration(data, target_role):
     if existing:
         return False, f"An account with email '{email}' already exists. Please log in instead.", None
 
+    # Enforce Email OTP Verification for live registrations (bypass if testing config or already verified)
+    is_testing = app.config.get('TESTING', False)
+    entered_otp = str(data.get('otp_code') or '').strip()
+    is_verified_in_db = email_service.is_email_otp_verified(email)
+    flag_verified = str(data.get('email_otp_verified', '')).lower() in ('1', 'true')
+
+    if not is_testing:
+        # If user entered an OTP code directly without clicking "Verify OTP" button first
+        if not is_verified_in_db and entered_otp:
+            ok_otp, otp_err = email_service.verify_registration_otp(email, entered_otp)
+            if ok_otp:
+                is_verified_in_db = True
+            else:
+                return False, f"Email OTP verification failed: {otp_err}", None
+
+        if not (is_verified_in_db or flag_verified):
+            return False, "Please verify your email address using the 6-digit OTP code before creating your account.", None
+
     ok, user_or_err = auth_service.create_user_account(
         name=name,
         email=email,
@@ -896,6 +914,18 @@ def _perform_registration(data, target_role):
         return False, str(user_or_err), None
 
     user = user_or_err
+
+    # Mark email as verified in database upon successful OTP registration
+    if is_testing or is_verified_in_db or flag_verified:
+        try:
+            conn = get_db()
+            conn.cursor().execute("UPDATE users SET email_verified = 1 WHERE id = ?", (user['id'],))
+            conn.commit()
+            conn.close()
+            user['email_verified'] = 1
+        except Exception as db_err:
+            print(f"[Set Email Verified Error] {db_err}")
+
     create_notification(
         user['id'],
         f"Welcome to FarmFresh Rescue, {name}!",
@@ -904,6 +934,18 @@ def _perform_registration(data, target_role):
         url_for('farmer_dashboard') if target_role == 'farmer' else url_for('buyer_dashboard')
     )
     log_activity("User Registered", f"New {target_role} registered: {name} ({email})", email)
+
+    # Dispatch Role-Tailored HTML Welcome Email for first-time registration
+    try:
+        email_service.send_welcome_email(
+            user_email=user['email'],
+            user_name=user['name'],
+            role=target_role,
+            base_url=request.host_url
+        )
+    except Exception as w_err:
+        print(f"[Welcome Email Dispatch Error] {w_err}")
+
     # Generate email verification token and trigger verification email dispatch
     try:
         verif_token = generate_user_email_verification_token(user['id'])
@@ -1279,6 +1321,46 @@ def reset_password_view(token):
 # ==========================================
 # REST API Authentication Endpoints
 # ==========================================
+
+@app.route('/api/auth/send-registration-otp', methods=['POST'])
+def api_send_registration_otp():
+    """Generate and dispatch a 6-digit verification code to the requested email address."""
+    data = request.get_json(silent=True) or request.form or {}
+    email = (data.get('email') or '').strip().lower()
+    name = (data.get('name') or 'Valued Member').strip()
+
+    if not email or '@' not in email or '.' not in email:
+        return jsonify({'success': False, 'message': 'Please enter a valid email address.'}), 400
+
+    existing = auth_service.get_user_by_email(email)
+    if existing:
+        return jsonify({'success': False, 'message': f"An account with email '{email}' already exists. Please log in instead."}), 400
+
+    ok, msg, otp = email_service.generate_and_send_registration_otp(email, name)
+    status_code = 200 if ok else 400
+    return jsonify({
+        'success': ok,
+        'message': msg
+    }), status_code
+
+@app.route('/api/auth/verify-registration-otp', methods=['POST'])
+def api_verify_registration_otp():
+    """Validate submitted 6-digit OTP code against registration_otps records."""
+    data = request.get_json(silent=True) or request.form or {}
+    email = (data.get('email') or '').strip().lower()
+    otp_code = (data.get('otp_code') or '').strip()
+
+    if not email:
+        return jsonify({'success': False, 'message': 'Email address is required.'}), 400
+    if not otp_code or len(otp_code) != 6:
+        return jsonify({'success': False, 'message': 'Please enter a valid 6-digit OTP code.'}), 400
+
+    ok, msg = email_service.verify_registration_otp(email, otp_code)
+    status_code = 200 if ok else 400
+    return jsonify({
+        'success': ok,
+        'message': msg
+    }), status_code
 
 @app.route('/api/auth/register/farmer', methods=['POST'])
 def api_register_farmer():

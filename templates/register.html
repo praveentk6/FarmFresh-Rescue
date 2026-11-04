@@ -56,11 +56,37 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="farmerEmail">Email Address <span class="required">*</span></label>
-            <div class="input-with-icon">
-              <span class="input-icon">✉️</span>
-              <input type="email" name="email" id="farmerEmail" class="form-control auth-input" placeholder="selvi.farms@gmail.com" required value="{{ email if active_role == 'farmer' else '' }}">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+              <label class="form-label" for="farmerEmail" style="margin-bottom: 0;">Email Address <span class="required">*</span></label>
+              <span id="farmerEmailBadge" style="font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;">
+                ⚠️ Unverified
+              </span>
             </div>
+            <div style="display: flex; gap: 8px;">
+              <div class="input-with-icon" style="flex: 1;">
+                <span class="input-icon">✉️</span>
+                <input type="email" name="email" id="farmerEmail" class="form-control auth-input" placeholder="selvi.farms@gmail.com" required value="{{ email if active_role == 'farmer' else '' }}" oninput="onEmailFieldChange('farmer')">
+              </div>
+              <button type="button" class="btn btn-outline-primary" id="btnSendFarmerOtp" onclick="sendRegOtp('farmer')" style="white-space: nowrap; font-size: 0.82rem; padding: 0 14px; font-weight: 700; border-radius: 8px; border: 1.5px solid #16a34a; color: #16a34a; background: #ffffff;">
+                <span>Send OTP</span>
+              </button>
+            </div>
+
+            <!-- OTP Verification Drawer -->
+            <div id="farmerOtpDrawer" style="display: none; margin-top: 10px; padding: 12px 14px; background: #f0fdf4; border: 1.5px dashed #86efac; border-radius: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 0.8rem; font-weight: 700; color: #166534;">🔐 Enter 6-Digit Email OTP:</span>
+                <span id="farmerOtpTimer" style="font-size: 0.75rem; color: #15803d; font-weight: 600;">Valid for 10m</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="text" name="otp_code" id="farmerOtpInput" maxlength="6" pattern="[0-9]{6}" placeholder="------" class="form-control" style="max-width: 150px; font-family: monospace; font-size: 1.15rem; letter-spacing: 4px; text-align: center; font-weight: 800; border: 1.5px solid #16a34a; border-radius: 8px;">
+                <button type="button" class="btn btn-success" id="btnVerifyFarmerOtp" onclick="verifyRegOtp('farmer')" style="background: #16a34a; border: none; color: #fff; font-weight: 700; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem;">
+                  Verify OTP
+                </button>
+              </div>
+              <div id="farmerOtpStatus" style="font-size: 0.775rem; margin-top: 6px; color: #15803d; line-height: 1.4;"></div>
+            </div>
+            <input type="hidden" name="email_otp_verified" id="farmerEmailOtpVerified" value="0">
           </div>
         </div>
 
@@ -167,11 +193,37 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label" for="buyerEmail">Email Address <span class="required">*</span></label>
-            <div class="input-with-icon">
-              <span class="input-icon">✉️</span>
-              <input type="email" name="email" id="buyerEmail" class="form-control auth-input" placeholder="procurement@saravana.com" required value="{{ email if active_role == 'buyer' else '' }}">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.35rem;">
+              <label class="form-label" for="buyerEmail" style="margin-bottom: 0;">Email Address <span class="required">*</span></label>
+              <span id="buyerEmailBadge" style="font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 12px; background: #fef2f2; color: #dc2626; border: 1px solid #fecaca;">
+                ⚠️ Unverified
+              </span>
             </div>
+            <div style="display: flex; gap: 8px;">
+              <div class="input-with-icon" style="flex: 1;">
+                <span class="input-icon">✉️</span>
+                <input type="email" name="email" id="buyerEmail" class="form-control auth-input" placeholder="procurement@saravana.com" required value="{{ email if active_role == 'buyer' else '' }}" oninput="onEmailFieldChange('buyer')">
+              </div>
+              <button type="button" class="btn btn-outline-primary" id="btnSendBuyerOtp" onclick="sendRegOtp('buyer')" style="white-space: nowrap; font-size: 0.82rem; padding: 0 14px; font-weight: 700; border-radius: 8px; border: 1.5px solid #0284c7; color: #0284c7; background: #ffffff;">
+                <span>Send OTP</span>
+              </button>
+            </div>
+
+            <!-- OTP Verification Drawer -->
+            <div id="buyerOtpDrawer" style="display: none; margin-top: 10px; padding: 12px 14px; background: #f0f9ff; border: 1.5px dashed #7dd3fc; border-radius: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 0.8rem; font-weight: 700; color: #0369a1;">🔐 Enter 6-Digit Email OTP:</span>
+                <span id="buyerOtpTimer" style="font-size: 0.75rem; color: #0284c7; font-weight: 600;">Valid for 10m</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="text" name="otp_code" id="buyerOtpInput" maxlength="6" pattern="[0-9]{6}" placeholder="------" class="form-control" style="max-width: 150px; font-family: monospace; font-size: 1.15rem; letter-spacing: 4px; text-align: center; font-weight: 800; border: 1.5px solid #0284c7; border-radius: 8px;">
+                <button type="button" class="btn btn-primary" id="btnVerifyBuyerOtp" onclick="verifyRegOtp('buyer')" style="background: #0284c7; border: none; color: #fff; font-weight: 700; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem;">
+                  Verify OTP
+                </button>
+              </div>
+              <div id="buyerOtpStatus" style="font-size: 0.775rem; margin-top: 6px; color: #0369a1; line-height: 1.4;"></div>
+            </div>
+            <input type="hidden" name="email_otp_verified" id="buyerEmailOtpVerified" value="0">
           </div>
         </div>
 
@@ -344,9 +396,10 @@ function evaluateStrength(pw, meterId, labelId) {
 }
 
 function validateRegForm(role) {
-  var pw = document.getElementById(role === 'Farmer' ? 'farmerPassword' : 'buyerPassword').value;
-  var cpw = document.getElementById(role === 'Farmer' ? 'farmerConfirm' : 'buyerConfirm').value;
-  var err = document.getElementById(role === 'Farmer' ? 'errFarmerMatch' : 'errBuyerMatch');
+  var roleLower = role.toLowerCase();
+  var pw = document.getElementById(roleLower + 'Password').value;
+  var cpw = document.getElementById(roleLower + 'Confirm').value;
+  var err = document.getElementById(roleLower === 'farmer' ? 'errFarmerMatch' : 'errBuyerMatch');
 
   if (pw !== cpw) {
     if (err) err.style.display = 'block';
@@ -354,7 +407,200 @@ function validateRegForm(role) {
     return false;
   }
   if (err) err.style.display = 'none';
+
+  var verifiedField = document.getElementById(roleLower + 'EmailOtpVerified');
+  var otpInput = document.getElementById(roleLower + 'OtpInput');
+
+  if (!verifiedField || verifiedField.value !== '1') {
+    if (otpInput && otpInput.value.trim().length === 6) {
+      alert('You have entered an OTP code. Please click the "Verify OTP" button to confirm your email before submitting.');
+      otpInput.focus();
+      return false;
+    }
+    alert('Please verify your email address with the 6-digit OTP code before creating your account.');
+    var emailInput = document.getElementById(roleLower + 'Email');
+    if (emailInput) emailInput.focus();
+    return false;
+  }
+
   return true;
+}
+
+function onEmailFieldChange(role) {
+  var hiddenVerified = document.getElementById(role + 'EmailOtpVerified');
+  if (hiddenVerified && hiddenVerified.value === '1') {
+    hiddenVerified.value = '0';
+    var badge = document.getElementById(role + 'EmailBadge');
+    if (badge) {
+      badge.style.background = '#fef2f2';
+      badge.style.color = '#dc2626';
+      badge.style.borderColor = '#fecaca';
+      badge.innerHTML = '⚠️ Unverified';
+    }
+    var roleCapital = role === 'farmer' ? 'Farmer' : 'Buyer';
+    var btnSend = document.getElementById('btnSend' + roleCapital + 'Otp');
+    if (btnSend) {
+      btnSend.style.display = 'inline-block';
+      btnSend.disabled = false;
+      btnSend.innerHTML = '<span>Send OTP</span>';
+    }
+    var statusDiv = document.getElementById(role + 'OtpStatus');
+    if (statusDiv) statusDiv.innerHTML = '';
+  }
+}
+
+function sendRegOtp(role) {
+  var roleCapital = role === 'farmer' ? 'Farmer' : 'Buyer';
+  var emailInput = document.getElementById(role + 'Email');
+  var nameInput = document.getElementById(role + 'Name');
+  var btnSend = document.getElementById('btnSend' + roleCapital + 'Otp');
+  var drawer = document.getElementById(role + 'OtpDrawer');
+  var statusDiv = document.getElementById(role + 'OtpStatus');
+  var timerSpan = document.getElementById(role + 'OtpTimer');
+  var email = (emailInput ? emailInput.value : '').trim().toLowerCase();
+  var name = (nameInput ? nameInput.value : '').trim();
+
+  if (!email || email.indexOf('@') === -1 || email.indexOf('.') === -1) {
+    alert('Please enter a valid email address before requesting an OTP code.');
+    if (emailInput) emailInput.focus();
+    return;
+  }
+
+  btnSend.disabled = true;
+  btnSend.innerHTML = '<span>Sending OTP...</span>';
+  if (statusDiv) {
+    statusDiv.style.color = '#0284c7';
+    statusDiv.innerHTML = '⏳ Contacting email service...';
+  }
+
+  fetch('/api/auth/send-registration-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, name: name })
+  })
+  .then(function(res) {
+    return res.json().then(function(d) {
+      return { status: res.status, ok: res.ok, data: d };
+    });
+  })
+  .then(function(result) {
+    if (result.ok && result.data.success) {
+      if (drawer) drawer.style.display = 'block';
+      var otpInput = document.getElementById(role + 'OtpInput');
+      if (otpInput) {
+        otpInput.value = '';
+        otpInput.focus();
+      }
+      if (statusDiv) {
+        statusDiv.style.color = '#15803d';
+        statusDiv.innerHTML = '✓ ' + (result.data.message || 'OTP dispatched! Please check your email inbox.');
+      }
+
+      // 60s cooldown timer
+      var cooldown = 60;
+      btnSend.disabled = true;
+      var countdownInt = setInterval(function() {
+        cooldown--;
+        if (cooldown <= 0) {
+          clearInterval(countdownInt);
+          btnSend.disabled = false;
+          btnSend.innerHTML = '<span>Resend OTP</span>';
+          if (timerSpan) timerSpan.textContent = 'Code valid for 10m';
+        } else {
+          btnSend.innerHTML = '<span>Resend (' + cooldown + 's)</span>';
+          if (timerSpan) timerSpan.textContent = 'Resend in ' + cooldown + 's';
+        }
+      }, 1000);
+    } else {
+      btnSend.disabled = false;
+      btnSend.innerHTML = '<span>Send OTP</span>';
+      var err = (result.data && result.data.message) ? result.data.message : 'Unable to send OTP. Please check your email.';
+      alert(err);
+      if (statusDiv) {
+        statusDiv.style.color = '#dc2626';
+        statusDiv.innerHTML = '✕ ' + err;
+      }
+    }
+  })
+  .catch(function(err) {
+    btnSend.disabled = false;
+    btnSend.innerHTML = '<span>Send OTP</span>';
+    alert('Network error while requesting verification OTP. Please try again.');
+    if (statusDiv) {
+      statusDiv.style.color = '#dc2626';
+      statusDiv.innerHTML = '✕ Network error while contacting server.';
+    }
+  });
+}
+
+function verifyRegOtp(role) {
+  var roleCapital = role === 'farmer' ? 'Farmer' : 'Buyer';
+  var emailInput = document.getElementById(role + 'Email');
+  var otpInput = document.getElementById(role + 'OtpInput');
+  var btnVerify = document.getElementById('btnVerify' + roleCapital + 'Otp');
+  var statusDiv = document.getElementById(role + 'OtpStatus');
+  var badge = document.getElementById(role + 'EmailBadge');
+  var hiddenVerified = document.getElementById(role + 'EmailOtpVerified');
+
+  var email = (emailInput ? emailInput.value : '').trim().toLowerCase();
+  var otp = (otpInput ? otpInput.value : '').trim();
+
+  if (!otp || otp.length !== 6) {
+    alert('Please enter the complete 6-digit OTP code sent to your email.');
+    if (otpInput) otpInput.focus();
+    return;
+  }
+
+  btnVerify.disabled = true;
+  btnVerify.innerHTML = 'Verifying...';
+
+  fetch('/api/auth/verify-registration-otp', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, otp_code: otp })
+  })
+  .then(function(res) {
+    return res.json().then(function(d) {
+      return { status: res.status, ok: res.ok, data: d };
+    });
+  })
+  .then(function(result) {
+    btnVerify.disabled = false;
+    btnVerify.innerHTML = 'Verify OTP';
+    if (result.ok && result.data.success) {
+      if (hiddenVerified) hiddenVerified.value = '1';
+      if (badge) {
+        badge.style.background = '#dcfce7';
+        badge.style.color = '#15803d';
+        badge.style.borderColor = '#86efac';
+        badge.innerHTML = '✓ Email Verified';
+      }
+      if (statusDiv) {
+        statusDiv.style.color = '#15803d';
+        statusDiv.innerHTML = '✓ <strong>Email successfully verified!</strong> You may now submit registration.';
+      }
+      if (emailInput) {
+        emailInput.readOnly = true;
+      }
+      var btnSend = document.getElementById('btnSend' + roleCapital + 'Otp');
+      if (btnSend) {
+        btnSend.disabled = true;
+        btnSend.style.display = 'none';
+      }
+    } else {
+      var msg = (result.data && result.data.message) ? result.data.message : 'Invalid verification code.';
+      alert(msg);
+      if (statusDiv) {
+        statusDiv.style.color = '#dc2626';
+        statusDiv.innerHTML = '✕ ' + msg;
+      }
+    }
+  })
+  .catch(function(err) {
+    btnVerify.disabled = false;
+    btnVerify.innerHTML = 'Verify OTP';
+    alert('Network error while verifying OTP. Please try again.');
+  });
 }
 </script>
 {% endblock %}
