@@ -4043,3 +4043,209 @@ def send_direct_chat_message(sender_id, receiver_id, message, meeting_id=None, l
     init_db()
     seed_db()
     print("Database initialized and updated successfully.")
+
+
+# ============================================================================
+# BROADCAST ANNOUNCEMENTS & WEATHER ALERT BROADCAST MODULE
+# ============================================================================
+
+def create_broadcast_announcement(title, message, category='Weather Alert', severity='Warning',
+                                  target_role='all', target_district='All Tamil Nadu',
+                                  action_link=None, action_text=None, expires_at=None,
+                                  expires_days=None, created_by='Platform Administrator'):
+    """Create a new platform-wide or role/district targeted announcement."""
+    try:
+        if expires_days and not expires_at:
+            from datetime import timedelta
+            expires_at = (datetime.now() + timedelta(days=int(expires_days))).strftime('%Y-%m-%d')
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO broadcast_announcements (
+                title, message, category, severity, target_role, target_district,
+                action_link, action_text, expires_at, created_by, is_active
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+        """, (title.strip(), message.strip(), category, severity, target_role,
+              target_district or 'All Tamil Nadu', action_link, action_text,
+              expires_at, created_by))
+        ann_id = cursor.lastrowid
+        conn.commit()
+
+        # If it's a Weather Alert, also add to weather_alerts table for backward compatibility
+        if category == 'Weather Alert':
+            try:
+                cursor.execute("""
+                    INSERT INTO weather_alerts (
+                        district, severity, condition, temperature, rainfall_prob, affected_crops, title, advice, valid_until
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    target_district if target_district != 'All Tamil Nadu' else 'Tamil Nadu Statewide',
+                    severity if severity in ('Info', 'Advisory', 'Warning', 'Critical') else 'Warning',
+                    title[:40],
+                    30,
+                    55,
+                    'All District Crops',
+                    title,
+                    message,
+                    expires_at
+                ))
+                conn.commit()
+            except Exception:
+                pass
+
+        conn.close()
+        return True, "Broadcast announcement published successfully.", ann_id
+    except Exception as e:
+        return False, str(e), None
+
+def get_active_broadcast_announcements(role=None, district=None):
+    """Retrieve active announcements applicable to a role and/or district."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        query = """
+            SELECT * FROM broadcast_announcements 
+            WHERE is_active = 1 
+              AND (expires_at IS NULL OR expires_at >= DATE('now'))
+        """
+        params = []
+        if role:
+            query += " AND (target_role = 'all' OR target_role = ?)"
+            params.append(role)
+        if district:
+            query += " AND (target_district = 'All Tamil Nadu' OR target_district = ?)"
+            params.append(district)
+
+        query += " ORDER BY id DESC"
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"[get_active_broadcast_announcements Error] {e}")
+        return []
+
+def get_all_broadcast_announcements(limit=100):
+    """Retrieve all announcements for Admin Control Center management."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM broadcast_announcements ORDER BY id DESC LIMIT ?", (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"[get_all_broadcast_announcements Error] {e}")
+        return []
+
+def toggle_broadcast_announcement_status(announcement_id):
+    """Toggle announcement between Active (1) and Inactive (0)."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT is_active FROM broadcast_announcements WHERE id = ?", (announcement_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return False, "Announcement not found."
+        new_status = 0 if row['is_active'] == 1 else 1
+        cursor.execute("UPDATE broadcast_announcements SET is_active = ? WHERE id = ?", (new_status, announcement_id))
+        conn.commit()
+        conn.close()
+        return True, f"Announcement status changed to {'Active' if new_status == 1 else 'Inactive'}."
+    except Exception as e:
+        return False, str(e)
+
+def delete_broadcast_announcement(announcement_id):
+    """Delete an announcement by ID."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM broadcast_announcements WHERE id = ?", (announcement_id,))
+        conn.commit()
+        conn.close()
+        return True, "Announcement deleted successfully."
+    except Exception as e:
+        return False, str(e)
+
+# ============================================================================
+# USER EMAIL VERIFICATION & MANAGEMENT MODULE
+# ============================================================================
+
+def generate_user_email_verification_token(user_id):
+    """Generate and store a secure verification token for a user."""
+    import secrets
+    token = secrets.token_urlsafe(32)
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("UPDATE users SET verification_token = ? WHERE id = ?", (token, user_id))
+        conn.commit()
+        conn.close()
+        return token
+    except Exception as e:
+        print(f"[generate_user_email_verification_token Error] {e}")
+        return None
+
+def verify_user_email_by_token(token):
+    """Verify a user's email address using their unique verification token."""
+    if not token:
+        return False, "Invalid verification token.", None
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, name, email, role, email_verified FROM users WHERE verification_token = ?", (token.strip(),))
+        user = cursor.fetchone()
+        if not user:
+            conn.close()
+            return False, "Verification link is invalid or has expired.", None
+        
+        user_dict = dict(user)
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cursor.execute("""
+            UPDATE users 
+            SET email_verified = 1, verified_at = ?, verification_token = NULL 
+            WHERE id = ?
+        """, (now_str, user_dict['id']))
+        conn.commit()
+        conn.close()
+        return True, f"Email address for {user_dict['name']} has been successfully verified!", user_dict
+    except Exception as e:
+        return False, str(e), None
+
+def admin_toggle_user_verification(user_id):
+    """Admin 1-click manual toggle to verify or unverify a user."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT email_verified, name FROM users WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
+        if not user:
+            conn.close()
+            return False, "User not found."
+        new_status = 0 if (user['email_verified'] or 0) == 1 else 1
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S') if new_status == 1 else None
+        cursor.execute("UPDATE users SET email_verified = ?, verified_at = ? WHERE id = ?", (new_status, now_str, user_id))
+        conn.commit()
+        conn.close()
+        status_text = "Verified ✓" if new_status == 1 else "Unverified ⏳"
+        return True, f"User {user['name']} marked as {status_text}."
+    except Exception as e:
+        return False, str(e)
+
+def get_recent_email_activity_logs(limit=25):
+    """Retrieve recent email delivery or simulation activity logs."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM activity_logs 
+            WHERE action LIKE '%EMAIL%' 
+            ORDER BY id DESC LIMIT ?
+        """, (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"[get_recent_email_activity_logs Error] {e}")
+        return []

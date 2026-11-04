@@ -118,9 +118,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check left edge boundary
     const updatedRect = userProfilePopover.getBoundingClientRect();
     if (updatedRect.left < margin) {
-      const offsetNeeded = margin - updatedRect.left;
-      const currentRight = parseFloat(userProfilePopover.style.right || '0');
-      userProfilePopover.style.right = `${currentRight - offsetNeeded}px`;
+      userProfilePopover.style.left = `${margin}px`;
+      userProfilePopover.style.right = 'auto';
     }
 
     // Check bottom viewport boundary
@@ -877,6 +876,38 @@ document.addEventListener('DOMContentLoaded', () => {
           btnAiPrice.disabled = false;
           alert('AI price recommendation service unavailable. Please enter price manually.');
         });
+    });
+  }
+
+
+  // ===================================================================
+  // Floating Bottom-Left User Profile Dock Toggle & Logout Behavior
+  // ===================================================================
+  const dockProfileTrigger = document.getElementById('dockProfileTrigger');
+  const dockProfileMenu = document.getElementById('dockProfileMenu');
+
+  if (dockProfileTrigger && dockProfileMenu) {
+    dockProfileTrigger.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isActive = dockProfileMenu.classList.contains('active');
+      dockProfileMenu.classList.toggle('active', !isActive);
+      dockProfileTrigger.setAttribute('aria-expanded', !isActive ? 'true' : 'false');
+    });
+
+    // Close when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!dockProfileMenu.contains(e.target) && !dockProfileTrigger.contains(e.target)) {
+        dockProfileMenu.classList.remove('active');
+        dockProfileTrigger.setAttribute('aria-expanded', 'false');
+      }
+    });
+
+    // Close on Escape key
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && dockProfileMenu.classList.contains('active')) {
+        dockProfileMenu.classList.remove('active');
+        dockProfileTrigger.setAttribute('aria-expanded', 'false');
+      }
     });
   }
 

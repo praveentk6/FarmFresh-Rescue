@@ -1,6 +1,108 @@
 {% extends "base.html" %}
 
-{% block title %}{{ _t('my_dashboard') }} - {{ _t('brand_name') }}{% endblock %}
+{% block title %}{{ _t('my_dashboard') }} - {{ _t('brand_name') }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const farmerTabBtns = document.querySelectorAll('.farmer-tab-btn');
+  const farmerPanes = document.querySelectorAll('.farmer-feature-pane');
+
+  function switchFarmerTab(targetTab, updateHash = true) {
+    if (!targetTab) targetTab = 'overview';
+
+    // 1. Update active tab button
+    farmerTabBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-farmer-tab') === targetTab);
+    });
+
+    // 2. Show/hide feature panes cleanly in-place
+    if (targetTab === 'all') {
+      farmerPanes.forEach(pane => { pane.style.display = 'block'; });
+    } else {
+      farmerPanes.forEach(pane => {
+        const pTab = pane.getAttribute('data-farmer-pane');
+        pane.style.display = (pTab === targetTab) ? 'block' : 'none';
+      });
+    }
+
+    // 3. Keep scroll aligned at the feature tabs container without moving down
+    const tabsWrap = document.getElementById('farmerFeatureTabsWrap');
+    if (tabsWrap) {
+      const rect = tabsWrap.getBoundingClientRect();
+      if (rect.top < 0) {
+        tabsWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    // 4. Update URL without causing anchor scroll
+    if (updateHash) {
+      const hashMap = {
+        'overview': 'overview',
+        'orders': 'ordersSection',
+        'listings': 'listingsSection',
+        'rescue': 'rescueProductsSection',
+        'meetings': 'meetingsSection',
+        'direct-sales': 'directSalesSection',
+        'offers': 'offersSection',
+        'escrow': 'escrowSection',
+        'all': 'all'
+      };
+      if (hashMap[targetTab]) {
+        history.replaceState(null, '', '#' + hashMap[targetTab]);
+      }
+    }
+  }
+
+  // Handle Tab Button Clicks
+  farmerTabBtns.forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const target = this.getAttribute('data-farmer-tab');
+      switchFarmerTab(target, true);
+    });
+  });
+
+  // Intercept any internal anchor links pointing to sections
+  document.querySelectorAll('a[href*="#"]').forEach(link => {
+    link.addEventListener('click', function(e) {
+      const rawHref = this.getAttribute('href') || ''; const hash = rawHref.includes('#') ? ('#' + rawHref.split('#')[1]) : '';
+      const hashToTab = {
+        '#ordersSection': 'orders',
+        '#rescueProductsSection': 'rescue',
+        '#meetingsSection': 'meetings',
+        '#directSalesSection': 'direct-sales',
+        '#listingsSection': 'listings',
+        '#offersSection': 'offers',
+        '#escrowSection': 'escrow'
+      };
+      if (hashToTab[hash]) {
+        e.preventDefault();
+        switchFarmerTab(hashToTab[hash], true);
+      }
+    });
+  });
+
+  // Check URL hash on page load
+  const initialHash = window.location.hash;
+  const hashToTab = {
+    '#ordersSection': 'orders',
+    '#rescueProductsSection': 'rescue',
+    '#meetingsSection': 'meetings',
+    '#directSalesSection': 'direct-sales',
+    '#listingsSection': 'listings',
+    '#offersSection': 'offers',
+    '#escrowSection': 'escrow',
+    '#overview': 'overview',
+    '#all': 'all'
+  };
+  if (initialHash && hashToTab[initialHash]) {
+    switchFarmerTab(hashToTab[initialHash], false);
+  } else {
+    switchFarmerTab('overview', false);
+  }
+});
+</script>
+
+{% endblock %}
 
 {% block content %}
 <div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
@@ -28,31 +130,105 @@
       <a href="{{ url_for('export_analytics_csv') }}" class="btn btn-secondary btn-lg" title="Download Sales CSV Report">
         📥 Export CSV
       </a>
-      <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-lg" style="border-color: #ef4444; color: #ef4444; font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem;" id="farmerDashboardLogoutBtn">
-        🚪 {{ _t('logout') }}
+    </div>
+  </div>
+
+  
+  <!-- Platform Announcements & Weather Alert Broadcasts -->
+  {% if active_broadcasts %}
+  <div class="platform-broadcasts-wrapper" style="margin-bottom: 2rem;">
+    {% for alert in active_broadcasts %}
+      <div class="alert-broadcast-card alert-broadcast-{{ alert.severity|lower }}" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.4rem; border-radius: 12px; margin-bottom: 0.85rem; border-left: 5px solid {% if alert.severity == 'Critical' %}#dc2626{% elif alert.severity == 'Warning' %}#ea580c{% elif alert.severity == 'Advisory' %}#d97706{% else %}#0284c7{% endif %}; background: {% if alert.severity == 'Critical' %}#fef2f2{% elif alert.severity == 'Warning' %}#fff7ed{% elif alert.severity == 'Advisory' %}#fffbeb{% else %}#f0f9ff{% endif %}; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+        <div style="display: flex; gap: 1rem; align-items: flex-start;">
+          <div style="font-size: 1.6rem; line-height: 1; flex-shrink: 0; margin-top: 2px;">
+            {% if alert.category == 'Weather Alert' %}⛈️{% elif alert.category == 'Scheme / Subsidy' %}🌾{% elif alert.category == 'Market Advisory' %}📈{% elif alert.category == 'Logistics' %}🚚{% else %}📢{% endif %}
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.35rem;">
+              <span class="badge" style="background: {% if alert.severity == 'Critical' %}#dc2626{% elif alert.severity == 'Warning' %}#ea580c{% elif alert.severity == 'Advisory' %}#d97706{% else %}#0284c7{% endif %}; color: #ffffff; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; padding: 0.2rem 0.6rem; border-radius: 6px;">
+                {{ alert.category }} &bull; {{ alert.severity }}
+              </span>
+              {% if alert.target_district and alert.target_district != 'All Tamil Nadu' %}
+              <span style="font-size: 0.75rem; background: #e2e8f0; color: #334155; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 600;">
+                📍 {{ alert.target_district }}
+              </span>
+              {% else %}
+              <span style="font-size: 0.75rem; background: #e2e8f0; color: #334155; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 600;">
+                🌐 Statewide Alert
+              </span>
+              {% endif %}
+              <span style="font-size: 0.75rem; color: #64748b;">
+                {{ alert.created_at[:10] }}
+              </span>
+            </div>
+            <h4 style="margin: 0 0 0.35rem 0; font-size: 1.05rem; font-weight: 800; color: #0f172a;">{{ alert.title }}</h4>
+            <p style="margin: 0; font-size: 0.92rem; color: #334155; line-height: 1.5;">{{ alert.message }}</p>
+            {% if alert.action_link %}
+            <div style="margin-top: 0.6rem;">
+              <a href="{{ alert.action_link }}" class="btn btn-sm btn-outline" style="font-weight: 700; font-size: 0.82rem; padding: 0.3rem 0.75rem;">
+                {{ alert.action_text or 'View Details' }} &rarr;
+              </a>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Farmer Interactive In-Place Feature Tab Control Bar (Zero Downward Jumping) -->
+  <div class="farmer-feature-tabs-wrap" id="farmerFeatureTabsWrap">
+    <div class="farmer-feature-tabs" role="tablist">
+      <button type="button" class="farmer-tab-btn active" data-farmer-tab="overview">
+        <span class="tab-icon">📊</span>
+        <span>{{ 'Overview' if lang == 'en' else 'கண்ணோட்டம்' }}</span>
+      </button>
+      <button type="button" class="farmer-tab-btn" data-farmer-tab="orders">
+        <span class="tab-icon">📦</span>
+        <span>{{ _t('my_orders') }}</span>
+        <span class="tab-badge">{{ orders|length }}</span>
+      </button>
+      <button type="button" class="farmer-tab-btn" data-farmer-tab="listings">
+        <span class="tab-icon">🥕</span>
+        <span>{{ 'Produce Listings' if lang == 'en' else 'விளைபொருட்கள்' }}</span>
+        <span class="tab-badge">{{ listings|length }}</span>
+      </button>
+      <button type="button" class="farmer-tab-btn" data-farmer-tab="rescue">
+        <span class="tab-icon">🛒</span>
+        <span>{{ 'Rescue Products' if lang == 'en' else 'மீட்பு பொருட்கள்' }}</span>
+        <span class="tab-badge">{{ farmer_rescue_products|length }}</span>
+      </button>
+      <button type="button" class="farmer-tab-btn" data-farmer-tab="meetings">
+        <span class="tab-icon">🤝</span>
+        <span>{{ 'Buyer Meetings' if lang == 'en' else 'நேரடி சந்திப்புகள்' }}</span>
+        <span class="tab-badge">{{ farmer_meetings|length }}</span>
+      </button>
+      <button type="button" class="farmer-tab-btn" data-farmer-tab="direct-sales">
+        <span class="tab-icon">💵</span>
+        <span>{{ 'Direct Sales' if lang == 'en' else 'நேரடி விற்பனை' }}</span>
+        <span class="tab-badge">{{ farmer_direct_sales|length }}</span>
+      </button>
+      <button type="button" class="farmer-tab-btn" data-farmer-tab="offers">
+        <span class="tab-icon">💬</span>
+        <span>{{ 'Submitted Offers' if lang == 'en' else 'சலுகைகள்' }}</span>
+        <span class="tab-badge">{{ submitted_offers|length }}</span>
+      </button>
+      <button type="button" class="farmer-tab-btn" data-farmer-tab="escrow">
+        <span class="tab-icon">💳</span>
+        <span>{{ 'Payments & Escrow' if lang == 'en' else 'பணம் செலுத்துதல்' }}</span>
+      </button>
+      <button type="button" class="farmer-tab-btn" data-farmer-tab="all">
+        <span class="tab-icon">👁️</span>
+        <span>{{ 'View All' if lang == 'en' else 'அனைத்தும்' }}</span>
+      </button>
+      <a href="{{ url_for('add_rescue_product') }}" class="btn btn-sm" style="background: #16a34a; color: white; font-weight: 700; border-radius: 10px; margin-left: auto; text-decoration: none; padding: 0.5rem 0.85rem; white-space: nowrap;">
+        ➕ Add Rescue Product
       </a>
     </div>
   </div>
 
-  <!-- Direct Meet & Sell Navigation Shortcuts -->
-  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; background: #ffffff; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid #e5e7eb; align-items: center;">
-    <a href="#rescueProductsSection" class="btn btn-sm" style="background: #ecfdf5; color: #166534; font-weight: 700; border-radius: 20px;">
-      🛒 My Rescue Products ({{ farmer_rescue_products|length }})
-    </a>
-    <a href="#meetingsSection" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; font-weight: 700; border-radius: 20px;">
-      🤝 Buyer Meetings ({{ farmer_meetings|length }})
-    </a>
-    <a href="#directSalesSection" class="btn btn-sm" style="background: #fef3c7; color: #92400e; font-weight: 700; border-radius: 20px;">
-      💵 Direct Sales ({{ farmer_direct_sales|length }})
-    </a>
-    <a href="#ordersSection" class="btn btn-sm" style="background: #f3f4f6; color: #374151; font-weight: 600; border-radius: 20px;">
-      📦 Platform Orders ({{ orders|length }})
-    </a>
-    <a href="{{ url_for('add_rescue_product') }}" class="btn btn-sm" style="background: #16a34a; color: white; font-weight: 700; border-radius: 20px; margin-left: auto;">
-      ➕ Add Rescue Product
-    </a>
-  </div>
-
+  <div class="farmer-feature-pane" data-farmer-pane="overview">
   <!-- Agro-Meteorological Weather Early Warning Banner -->
   {% if weather_alerts %}
     <div style="background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); border-left: 5px solid #ea580c; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 2rem; box-shadow: 0 2px 4px rgba(234,88,12,0.1);">
@@ -401,8 +577,11 @@
     </div>
   {% endif %}
 
+  </div><!-- end overview pane -->
+
   <!-- My Produce Listings Table (Preserved & Enhanced with Freshness/Quality) -->
-  <div class="data-table-card" style="margin-bottom: 2.5rem;">
+  <div class="farmer-feature-pane" data-farmer-pane="listings">
+  <div id="listingsSection" class="data-table-card" style="margin-bottom: 2.5rem;">
     <div class="data-table-header">
       <div>
         <h2 style="font-size: 1.35rem; font-weight: 700;">{{ _t('my_farm_listings') }}</h2>
@@ -525,8 +704,11 @@
     {% endif %}
   </div>
 
+  </div><!-- end listings pane -->
+
   <!-- Sales, Payments & Escrow Settlement Section -->
-  <div class="data-table-card" style="margin-bottom: 2.5rem; border-top: 4px solid #16a34a;">
+  <div class="farmer-feature-pane" data-farmer-pane="escrow">
+  <div class="data-table-card" id="escrowSection" style="margin-bottom: 2.5rem; border-top: 4px solid #16a34a;">
     <div class="data-table-header">
       <div>
         <h2 style="font-size: 1.35rem; font-weight: 700; color: #0f172a;">
@@ -640,7 +822,10 @@
     {% endif %}
   </div>
 
+  </div><!-- end escrow pane -->
+
   <!-- Section 2 & 10: My Submitted Offers to Buyers -->
+  <div class="farmer-feature-pane" data-farmer-pane="offers">
   <div class="data-table-card" id="offersSection" style="margin-bottom: 2.5rem; border-top: 4px solid #16a34a;">
     <div class="data-table-header">
       <div>
@@ -1037,192 +1222,297 @@
     {% endif %}
   </div>
 
-  <!-- Purchase Orders & Enquiries Received with 6-stage lifecycle -->
-  <div class="data-table-card" id="ordersSection">
-    <div class="data-table-header">
-      <div>
-        <h2 style="font-size: 1.35rem; font-weight: 700;">{{ _t('recent_orders') }}</h2>
-        <span style="font-size: 0.85rem; color: var(--text-muted);">Purchase requests from registered buyers with delivery tracking</span>
+  <!-- Purchase Orders & Enquiries Received -->
+  <div class="data-table-card orders-hub-card" id="ordersSection">
+    <div class="orders-hub-header">
+      <div class="orders-hub-title-wrap">
+        <div class="orders-hub-badge">📦 {{ 'Orders & Procurement Hub' if lang == 'en' else 'ஆர்டர்கள் மற்றும் கொள்முதல் மையம்' }}</div>
+        <h2 class="orders-hub-title">{{ _t('recent_orders') }}</h2>
+        <p class="orders-hub-subtitle">
+          {{ 'Manage buyer purchase requests, review price offers, coordinate packing, and track fulfillment.' if lang == 'en' else 'வாங்குபவர்களின் கொள்முதல் கோரிக்கைகளை நிர்வகிக்கவும், விலையை மதிப்பாய்வு செய்யவும், டெலிவரி நிலையை கண்காணிக்கவும்.' }}
+        </p>
+      </div>
+
+      <!-- Quick Search -->
+      <div class="orders-search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="orderSearchInput" class="orders-search-input" placeholder="{{ 'Search by crop or buyer name...' if lang == 'en' else 'பயிர் அல்லது வாங்குபவரைத் தேடுங்கள்...' }}" onkeyup="filterOrdersList()">
       </div>
     </div>
 
     {% if orders %}
-      <div class="table-responsive">
-        <div class="table-scroll-hint"><span>👉 Swipe horizontally to view full table details</span></div>
-        <table class="custom-table">
-          <thead>
-            <tr>
-              <th>Order #</th>
-              <th>Produce</th>
-              <th>Buyer Information</th>
-              <th>Requested Qty & Price</th>
-              <th>Delivery / Message</th>
-              <th>Order Status</th>
-              <th>Smart Logistics</th>
-              <th style="text-align: right;">Update Lifecycle</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for o in orders %}
-              <tr>
-                <td>
-                  <strong>{{ o['order_code'] or ('#' ~ o['id']) }}</strong>
-                  {% if o['order_code'] %}
-                    <div style="font-size: 0.7rem; color: #64748b;">ID: #{{ o['id'] }}</div>
+      <!-- Interactive Status Filter Tabs -->
+      <div class="orders-filter-tabs" role="tablist">
+        <button type="button" class="order-filter-tab active" data-filter="all" onclick="setOrderFilter('all', this)">
+          <span>{{ 'All Orders' if lang == 'en' else 'அனைத்து ஆர்டர்கள்' }}</span>
+          <span class="tab-count-pill">{{ orders|length }}</span>
+        </button>
+        <button type="button" class="order-filter-tab tab-pending" data-filter="pending" onclick="setOrderFilter('pending', this)">
+          <span>⏳ {{ 'Action Required' if lang == 'en' else 'நடவடிக்கை தேவை' }}</span>
+          <span class="tab-count-pill pill-amber" id="countPendingTab">0</span>
+        </button>
+        <button type="button" class="order-filter-tab tab-processing" data-filter="processing" onclick="setOrderFilter('processing', this)">
+          <span>🌾 {{ 'In Preparation' if lang == 'en' else 'தயாரிப்பில் உள்ளது' }}</span>
+          <span class="tab-count-pill" id="countProcessingTab">0</span>
+        </button>
+        <button type="button" class="order-filter-tab tab-transit" data-filter="transit" onclick="setOrderFilter('transit', this)">
+          <span>🚚 {{ 'In Transit' if lang == 'en' else 'வழியில் உள்ளது' }}</span>
+          <span class="tab-count-pill" id="countTransitTab">0</span>
+        </button>
+        <button type="button" class="order-filter-tab tab-completed" data-filter="completed" onclick="setOrderFilter('completed', this)">
+          <span>✅ {{ 'Completed' if lang == 'en' else 'நிறைவடைந்தது' }}</span>
+          <span class="tab-count-pill pill-green" id="countCompletedTab">0</span>
+        </button>
+      </div>
+
+      <!-- Orders Card List -->
+      <div class="orders-card-list" id="ordersCardList">
+        {% for o in orders %}
+          {% set status_grp = 'pending' if o['status'] in ['Pending', 'Order Placed'] else ('processing' if o['status'] in ['Accepted', 'Confirmed', 'Packed', 'Ready for Collection', 'Ready for Pickup', 'Order Accepted'] else ('transit' if o['status'] in ['Shipped', 'In Transit', 'Out for Delivery'] else ('completed' if o['status'] in ['Delivered', 'Completed'] else 'other'))) %}
+          
+          <div class="farmer-order-card" data-status-group="{{ status_grp }}" data-crop="{{ o['crop_name']|lower }}" data-buyer="{{ o['buyer_name']|lower }}" data-order-code="{{ (o['order_code'] or ('#' ~ o['id']))|lower }}">
+            
+            <!-- Card Header -->
+            <div class="order-card-topbar">
+              <div class="order-code-badge-group">
+                <span class="order-code-pill">{{ o['order_code'] or ('#' ~ o['id']) }}</span>
+                
+                {% if o['status'] in ['Pending', 'Order Placed'] %}
+                  <span class="order-status-badge badge-pending">⏳ {{ 'Pending Action' if lang == 'en' else 'பரிசீலனையில் உள்ளது' }}</span>
+                {% elif o['status'] in ['Accepted', 'Confirmed', 'Order Accepted'] %}
+                  <span class="order-status-badge badge-accepted">🌾 {{ 'Order Confirmed' if lang == 'en' else 'உறுதிப்படுத்தப்பட்டது' }}</span>
+                {% elif o['status'] in ['Packed', 'Ready for Collection', 'Ready for Pickup'] %}
+                  <span class="order-status-badge badge-packed">📦 {{ 'Packed & Ready' if lang == 'en' else 'பேக் செய்யப்பட்டது' }}</span>
+                {% elif o['status'] in ['Shipped', 'In Transit', 'Out for Delivery'] %}
+                  <span class="order-status-badge badge-transit">🚚 {{ 'In Transit' if lang == 'en' else 'வழியில் உள்ளது' }}</span>
+                {% elif o['status'] in ['Delivered', 'Completed'] %}
+                  <span class="order-status-badge badge-completed">✅ {{ 'Delivered & Rescued' if lang == 'en' else 'டெலிவரி முடிந்தது' }}</span>
+                {% elif o['status'] in ['Rejected', 'Declined', 'Cancelled'] %}
+                  <span class="order-status-badge badge-cancelled">✕ {{ o['status'] }}</span>
+                {% else %}
+                  <span class="order-status-badge badge-neutral">{{ o['status'] }}</span>
+                {% endif %}
+
+                {% if o['payment_status'] in ['Paid', 'Payment Verified'] %}
+                  <span class="payment-status-badge badge-paid">💳 {{ 'Paid Online' if lang == 'en' else 'ஆன்லைனில் செலுத்தப்பட்டது' }}</span>
+                {% elif o['payment_status'] in ['Pending COD', 'Unpaid', 'COD Pending'] %}
+                  <span class="payment-status-badge badge-cod">💵 {{ 'Cash on Delivery' if lang == 'en' else 'பொருள் பெற்றதும் பணம்' }}</span>
+                {% endif %}
+              </div>
+
+              <div class="order-date-time">
+                <span>📅 {{ o['created_at'].split()[0] if ' ' in o['created_at'] else o['created_at'] }}</span>
+              </div>
+            </div>
+
+            <!-- Card Body Grid -->
+            <div class="order-card-body">
+              
+              <!-- Col 1: Produce & Total Value -->
+              <div class="order-col-produce">
+                <div class="produce-thumb-wrap">
+                  {% if o['photo'] %}
+                    <img src="{{ url_for('static', filename='uploads/' ~ o['photo']) }}" alt="{{ o['crop_name'] }}" class="order-produce-img" onerror="this.src='{{ url_for('static', filename='uploads/tomatoes.jpg') }}'">
+                  {% else %}
+                    <div class="order-produce-placeholder">🌾</div>
                   {% endif %}
-                </td>
-                <td>
-                  <a href="{{ url_for('listing_detail', listing_id=o['listing_id']) }}" style="font-weight: 700; color: #0f172a;">
+                </div>
+                <div class="produce-info">
+                  <a href="{{ url_for('listing_detail', listing_id=o['listing_id']) }}" class="order-crop-name" title="{{ o['crop_name'] }}">
                     {{ o['crop_name'] }}
                   </a>
-                  <div style="font-size: 0.75rem; color: #64748b;">
-                    Asking: ₹{{ "%.0f"|format(o['price_per_unit']) }} / {{ o['unit'] }}
+                  <div class="order-quantity-line">
+                    <span class="qty-highlight">{% if o['requested_quantity'] %}{{ o['requested_quantity'] }} {{ o['unit'] or 'kg' }}{% else %}Enquiry / Bulk{% endif %}</span>
+                    {% if o['offered_price'] or o['price_per_unit'] %}
+                      <span class="unit-rate">(@ ₹{{ "%.0f"|format(o['offered_price'] or o['price_per_unit'] or 0) }}/{{ o['unit'] or 'kg' }})</span>
+                    {% endif %}
+                  </div>
+                  <div class="order-total-price">
+                    {% if o['total_price'] %}
+                      ₹{{ "{:,.0f}".format(o['total_price']) }}
+                    {% elif o['requested_quantity'] and (o['offered_price'] or o['price_per_unit']) %}
+                      ₹{{ "{:,.0f}".format(o['requested_quantity'] * (o['offered_price'] or o['price_per_unit'])) }}
+                    {% else %}
+                      <span style="font-size: 0.95rem; font-weight: 600; color: #64748b;">Custom Offer</span>
+                    {% endif %}
                   </div>
                   {% if o['harvest_status'] %}
-                    <div style="margin-top: 0.25rem;">
-                      <span style="font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.45rem; border-radius: 4px; background: #ecfdf5; color: #166534; display: inline-block;">
-                        🌾 {{ o['harvest_status'] }}
-                      </span>
+                    <div class="harvest-status-pill">
+                      🌾 {{ o['harvest_status'] }}
                     </div>
                   {% endif %}
-                </td>
-                <td>
-                  <div style="font-weight: 700;">{{ o['buyer_name'] }}</div>
-                  <div style="font-size: 0.775rem; color: #64748b;">
-                    📞 {{ o['buyer_phone'] }}<br>
-                    ✉️ {{ o['buyer_email'] }}
-                  </div>
-                </td>
-                <td>
-                  {% if o['requested_quantity'] %}
-                    <div>Qty: <strong>{{ o['requested_quantity'] }}</strong> {{ o['unit'] }}</div>
-                  {% endif %}
-                  {% if o['offered_price'] %}
-                    <div style="color: #166534; font-weight: 700;">Offered: ₹{{ "%.0f"|format(o['offered_price']) }} / {{ o['unit'] }}</div>
-                  {% endif %}
-                  {% if o['total_price'] %}
-                    <div style="font-size: 0.8rem; color: #0f172a; font-weight: 600;">Total: ₹{{ "{:,.0f}".format(o['total_price']) }}</div>
-                  {% endif %}
-                </td>
-                <td style="max-width: 200px;">
-                  {% if o['delivery_preference'] %}
-                    <span style="font-size: 0.75rem; background: #f1f5f9; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600;">
-                      🚚 {{ o['delivery_preference'] }}
-                    </span>
-                  {% endif %}
-                  <div style="font-size: 0.85rem; color: #334155; margin-top: 0.35rem; line-height: 1.4;">
-                    {{ o['message'] }}
-                  </div>
-                  <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">
-                    {{ o['created_at'].split()[0] if ' ' in o['created_at'] else o['created_at'] }}
-                  </div>
-                </td>
-                <td>
-                  {% if o['status'] in ['Pending', 'Order Placed'] %}
-                    <span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Pending</span>
-                  {% elif o['status'] in ['Accepted', 'Confirmed', 'Order Accepted'] %}
-                    <span style="background: #dcfce7; color: #166534; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ o['status'] }}</span>
-                  {% elif o['status'] in ['Packed', 'Ready for Collection', 'Ready for Pickup'] %}
-                    <span style="background: #fef08a; color: #854d0e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Packed / Ready</span>
-                  {% elif o['status'] in ['Shipped', 'In Transit', 'Out for Delivery'] %}
-                    <span style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">In Transit</span>
-                  {% elif o['status'] in ['Delivered', 'Completed'] %}
-                    <span style="background: #dcfce7; color: #15803d; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Delivered & Rescued</span>
-                  {% elif o['status'] == 'Cancelled' %}
-                    <span style="background: #fee2e2; color: #991b1b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Cancelled</span>
-                  {% else %}
-                    <span style="background: #f1f5f9; color: #64748b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ o['status'] }}</span>
-                  {% endif %}
+                </div>
+              </div>
 
-                  <div style="margin-top: 0.35rem;">
-                    {% if o['payment_status'] in ['Paid', 'Payment Verified'] %}
-                      <span style="background: #dcfce7; color: #166534; font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.2rem;">
-                        💳 Paid
-                      </span>
-                    {% elif o['payment_status'] in ['Pending COD', 'Unpaid'] %}
-                      <span style="background: #e0f2fe; color: #0369a1; font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.2rem;">
-                        💵 COD
-                      </span>
-                    {% endif %}
+              <!-- Col 2: Buyer & Logistics Details -->
+              <div class="order-col-buyer">
+                <div class="buyer-profile-wrap">
+                  <div class="buyer-name-line">
+                    <span class="buyer-icon">👤</span>
+                    <strong class="buyer-name">{{ o['buyer_name'] }}</strong>
                   </div>
+                  <div class="buyer-contact-line">
+                    <span>📞 {{ o['buyer_phone'] }}</span>
+                    <span class="contact-sep">•</span>
+                    <span>✉️ {{ o['buyer_email'] }}</span>
+                  </div>
+                </div>
 
-                  {% if o['handover_otp'] and o['status'] in ['Confirmed', 'Accepted', 'Packed', 'Ready for Pickup', 'In Transit'] %}
-                    <div style="margin-top: 0.35rem; font-size: 0.725rem; color: #475569;">
-                      OTP: <strong style="color: #0f172a; font-family: monospace; font-size: 0.85rem;">{{ o['handover_otp'] }}</strong>
-                    </div>
-                  {% endif %}
-                </td>
-                <td>
-                  <a href="{{ url_for('track_order', order_id=o['id']) }}" class="btn btn-outline-primary btn-sm" style="white-space: nowrap;">
-                    🗺️ Route & Timeline
-                  </a>
-                </td>
-                <td>
-                  <div style="display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end;">
-                    <!-- Section 5: Harvest Update Button for Confirmed/Accepted Orders -->
-                    {% if o['status'] in ['Confirmed', 'Accepted', 'Packed', 'Ready for Collection', 'Ready for Pickup'] %}
-                      <button type="button" class="btn btn-primary btn-sm btn-update-harvest"
-                              style="background: #16a34a; border-color: #16a34a; font-weight: 700; font-size: 0.75rem; padding: 0.25rem 0.6rem; width: 100%; white-space: nowrap;"
-                              data-order-id="{{ o['id'] }}"
-                              data-order-code="{{ o['order_code'] or ('#' ~ o['id']) }}"
-                              data-crop="{{ o['crop_name']|escape }}"
-                              data-qty="{{ o['requested_quantity'] }}"
-                              data-status="{{ o['harvest_status'] or 'Harvest Pending' }}">
-                        🌾 Update Harvest & Quality
+                {% if o['delivery_preference'] %}
+                  <div class="delivery-pref-badge">
+                    🚚 {{ o['delivery_preference'] }}
+                  </div>
+                {% endif %}
+
+                {% if o['message'] %}
+                  <div class="buyer-msg-box" title="{{ o['message'] }}">
+                    <span class="msg-quote">“</span>{{ o['message'] }}<span class="msg-quote">”</span>
+                  </div>
+                {% endif %}
+
+                {% if o['handover_otp'] and o['status'] in ['Confirmed', 'Accepted', 'Packed', 'Ready for Pickup', 'In Transit', 'Ready for Collection'] %}
+                  <div class="handover-otp-box">
+                    <span class="otp-label">🔐 {{ 'Handover OTP:' if lang == 'en' else 'ஒப்படைப்பு OTP:' }}</span>
+                    <strong class="otp-code">{{ o['handover_otp'] }}</strong>
+                    <span class="otp-hint">{{ '(Share only when handing over)' if lang == 'en' else '(பொருளை ஒப்படைக்கும்போது கூறவும்)' }}</span>
+                  </div>
+                {% endif %}
+              </div>
+
+              <!-- Col 3: Clear Direct Action Controls -->
+              <div class="order-col-actions">
+                
+                <!-- STAGE 1: PENDING -->
+                {% if o['status'] in ['Pending', 'Order Placed'] %}
+                  <div class="primary-action-group">
+                    <form action="{{ url_for('update_order_status', order_id=o['id']) }}" method="POST" style="margin: 0; width: 100%;">
+                      <input type="hidden" name="status" value="Accepted">
+                      <button type="submit" class="btn btn-action-accept" id="btnAcceptOrder_{{ o['id'] }}">
+                        <span>✓</span> {{ 'Accept Order' if lang == 'en' else 'ஆர்டரை ஏற்கவும்' }}
                       </button>
-                    {% endif %}
-
-                    <!-- Lifecycle Update Form -->
-                    <form action="{{ url_for('update_order_status', order_id=o['id']) }}" method="POST" style="display: flex; gap: 0.35rem;">
-                      <select name="status" class="filter-select" style="font-size: 0.8rem; padding: 0.3rem 0.5rem; width: 145px;">
-                        <option value="Confirmed" {% if o['status'] == 'Confirmed' %}selected{% endif %}>Confirmed</option>
-                        <option value="Accepted" {% if o['status'] == 'Accepted' %}selected{% endif %}>Accept Request</option>
-                        <option value="Packed" {% if o['status'] in ['Packed', 'Ready for Collection'] %}selected{% endif %}>Mark Packed</option>
-                        <option value="Shipped" {% if o['status'] in ['Shipped', 'In Transit'] %}selected{% endif %}>Mark In Transit</option>
-                        <option value="Delivered" {% if o['status'] in ['Delivered', 'Completed'] %}selected{% endif %}>Mark Delivered</option>
-                        <option value="Rejected" {% if o['status'] == 'Rejected' %}selected{% endif %}>Reject</option>
-                      </select>
-                      <button type="submit" class="btn btn-secondary btn-sm" style="padding: 0.3rem 0.6rem;">Update</button>
                     </form>
+                    <form action="{{ url_for('update_order_status', order_id=o['id']) }}" method="POST" style="margin: 0; width: 100%;" onsubmit="return confirm('Decline this order request?');">
+                      <input type="hidden" name="status" value="Rejected">
+                      <button type="submit" class="btn btn-action-decline">
+                        <span>✕</span> {{ 'Decline' if lang == 'en' else 'நிராகரி' }}
+                      </button>
+                    </form>
+                  </div>
 
-                    <!-- Quick Actions -->
-                    <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end;">
-                      <a href="{{ url_for('chat_conversation', recipient_id=o['buyer_id']) }}?order_id={{ o['id'] }}" class="btn btn-primary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
-                        💬 Chat
-                      </a>
-                      {% if o['payment_status'] in ['Paid', 'Payment Verified'] %}
-                        <a href="{{ url_for('view_invoice', order_id=o['id']) }}" class="btn btn-outline-primary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
-                          🧾 Receipt
-                        </a>
-                      {% endif %}
-                      <a href="tel:{{ o['buyer_phone'] }}" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
-                        📞 Call
-                      </a>
-                      {% set clean_bphone = o['buyer_phone'].replace(' ', '').replace('-', '').replace('+91', '') %}
-                      <a href="https://wa.me/91{{ clean_bphone }}?text=Vanakkam%20{{ o['buyer_name'] }}%2C%20regarding%20your%20purchase%20order%20%23{{ o['id'] }}%20for%20{{ o['crop_name'] }}%20on%20FarmFresh%20Rescue." 
-                         target="_blank" rel="noopener noreferrer" class="btn btn-whatsapp btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
-                        💬 WA
-                      </a>
+                <!-- STAGE 2: ACCEPTED / CONFIRMED -->
+                {% elif o['status'] in ['Confirmed', 'Accepted', 'Order Accepted'] %}
+                  <div class="primary-action-group">
+                    <button type="button" class="btn btn-action-harvest btn-update-harvest"
+                            data-order-id="{{ o['id'] }}"
+                            data-order-code="{{ o['order_code'] or ('#' ~ o['id']) }}"
+                            data-crop="{{ o['crop_name']|escape }}"
+                            data-qty="{{ o['requested_quantity'] }}"
+                            data-status="{{ o['harvest_status'] or 'Harvest Pending' }}">
+                      🌾 {{ 'Update Harvest Weight' if lang == 'en' else 'அறுவடை எடை பதிவு' }}
+                    </button>
+                    <form action="{{ url_for('update_order_status', order_id=o['id']) }}" method="POST" style="margin: 0; width: 100%;">
+                      <input type="hidden" name="status" value="Packed">
+                      <button type="submit" class="btn btn-action-pack">
+                        📦 {{ 'Mark Packed & Ready' if lang == 'en' else 'பேக் செய்யப்பட்டது' }}
+                      </button>
+                    </form>
+                  </div>
+
+                <!-- STAGE 3: PACKED -->
+                {% elif o['status'] in ['Packed', 'Ready for Collection', 'Ready for Pickup'] %}
+                  <div class="primary-action-group">
+                    <form action="{{ url_for('update_order_status', order_id=o['id']) }}" method="POST" style="margin: 0; width: 100%;">
+                      <input type="hidden" name="status" value="Shipped">
+                      <button type="submit" class="btn btn-action-dispatch">
+                        🚚 {{ 'Mark In Transit' if lang == 'en' else 'வழியில் அனுப்பப்பட்டது' }}
+                      </button>
+                    </form>
+                    <a href="{{ url_for('track_order', order_id=o['id']) }}" class="btn btn-action-route">
+                      🗺️ {{ 'View Route & GPS' if lang == 'en' else 'வரைபடம் & வழித்தடம்' }}
+                    </a>
+                  </div>
+
+                <!-- STAGE 4: SHIPPED / IN TRANSIT -->
+                {% elif o['status'] in ['Shipped', 'In Transit', 'Out for Delivery'] %}
+                  <div class="primary-action-group">
+                    <form action="{{ url_for('update_order_status', order_id=o['id']) }}" method="POST" style="margin: 0; width: 100%;">
+                      <input type="hidden" name="status" value="Delivered">
+                      <button type="submit" class="btn btn-action-delivered">
+                        ✅ {{ 'Confirm Delivered' if lang == 'en' else 'டெலிவரி உறுதிசெய்' }}
+                      </button>
+                    </form>
+                    <a href="{{ url_for('track_order', order_id=o['id']) }}" class="btn btn-action-route">
+                      🗺️ {{ 'Live Delivery Tracking' if lang == 'en' else 'நேரலை கண்காணிப்பு' }}
+                    </a>
+                  </div>
+
+                <!-- STAGE 5: DELIVERED / COMPLETED -->
+                {% elif o['status'] in ['Delivered', 'Completed'] %}
+                  <div class="completed-badge-card">
+                    <span class="completed-icon">🎉</span>
+                    <div class="completed-text">
+                      <strong>{{ 'Order Fulfilled & Rescued' if lang == 'en' else 'ஆர்டர் வெற்றிகரமாக முடிந்தது' }}</strong>
+                      <span>{{ 'Food waste prevented!' if lang == 'en' else 'உணவு இழப்பு தவிர்க்கப்பட்டது!' }}</span>
                     </div>
                   </div>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+                  {% if o['payment_status'] in ['Paid', 'Payment Verified'] %}
+                    <a href="{{ url_for('view_invoice', order_id=o['id']) }}" class="btn btn-action-receipt">
+                      🧾 {{ 'Download Receipt' if lang == 'en' else 'ரசீது பதிவிறக்கம்' }}
+                    </a>
+                  {% endif %}
+
+                <!-- STAGE 6: REJECTED OR CANCELLED -->
+                {% else %}
+                  <div class="cancelled-badge-card">
+                    <span>Status: <strong>{{ o['status'] }}</strong></span>
+                  </div>
+                {% endif %}
+
+                <!-- Compact Communication Quick-Pills -->
+                <div class="order-secondary-actions">
+                  <a href="{{ url_for('chat_conversation', recipient_id=o['buyer_id']) }}?order_id={{ o['id'] }}" class="btn-sec-action btn-sec-chat" title="Chat with Buyer">
+                    💬 Chat
+                  </a>
+                  <a href="tel:{{ o['buyer_phone'] }}" class="btn-sec-action btn-sec-call" title="Call Buyer">
+                    📞 Call
+                  </a>
+                  {% set clean_bphone = (o['buyer_phone'] or '').replace(' ', '').replace('-', '').replace('+91', '') %}
+                  <a href="https://wa.me/91{{ clean_bphone }}?text=Vanakkam%20{{ o['buyer_name'] }}%2C%20regarding%20your%20purchase%20order%20%23{{ o['id'] }}%20for%20{{ o['crop_name'] }}%20on%20FarmFresh%20Rescue." 
+                     target="_blank" rel="noopener noreferrer" class="btn-sec-action btn-sec-wa" title="WhatsApp Message">
+                    🟢 WhatsApp
+                  </a>
+                  <a href="{{ url_for('track_order', order_id=o['id']) }}" class="btn-sec-action btn-sec-map" title="View Route">
+                    🗺️ Map
+                  </a>
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+        {% endfor %}
       </div>
+
+      <!-- Empty state when searching/filtering -->
+      <div id="ordersFilterEmpty" style="display: none; padding: 2.5rem 1.5rem; text-align: center; color: #64748b;">
+        <span style="font-size: 2rem; display: block; margin-bottom: 0.35rem;">🔍</span>
+        <div style="font-weight: 700; color: #0f172a; margin-bottom: 0.25rem;">{{ 'No matching orders found' if lang == 'en' else 'பொருந்தும் ஆர்டர்கள் எதுவும் இல்லை' }}</div>
+        <p style="font-size: 0.85rem; margin: 0;">{{ 'Try adjusting your search query or filter tab.' if lang == 'en' else 'தேடல் சொல் அல்லது வடிப்பானை மாற்றி முயற்சிக்கவும்.' }}</p>
+      </div>
+
     {% else %}
-      <div class="empty-state" style="padding: 2.5rem 1.5rem; text-align: center;">
+      <div class="empty-state" style="padding: 3rem 1.5rem; text-align: center;">
         <span class="empty-icon" style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">✉️</span>
         <h3 class="empty-title" style="font-size: 1.15rem; font-weight: 700;">{{ _t('no_enquiries_farmer') }}</h3>
-        <p class="empty-text" style="color: var(--text-muted); font-size: 0.9rem;">
-          When wholesale buyers, shops, and restaurants send purchase requests for your produce, they will appear here.
+        <p class="empty-text" style="color: var(--text-muted); font-size: 0.9rem; max-width: 460px; margin: 0 auto;">
+          {{ 'When wholesale buyers, shops, and restaurants send purchase requests for your produce, they will appear here with 1-click accept and delivery management.' if lang == 'en' else 'மொத்த வாங்குபவர்கள், கடைகள் மற்றும் உணவகங்கள் உங்கள் விளைபொருட்களுக்கான கொள்முதல் கோரிக்கைகளை அனுப்பும்போது, அவை இங்கே தோன்றும்.' }}
         </p>
       </div>
     {% endif %}
   </div>
 
-  <!-- MODAL: HARVEST & QUALITY UPDATE (Section 5) -->
+    <!-- MODAL: HARVEST & QUALITY UPDATE (Section 5) -->
   <div id="harvestUpdateModal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px);">
     <div style="background: white; border-radius: var(--radius-lg); max-width: 540px; width: 100%; box-shadow: var(--shadow-lg); overflow: hidden;">
       <div style="background: #15803d; color: white; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center;">
@@ -1329,5 +1619,80 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 });
+
+  // Interactive Orders Hub Filter & Search Functions
+  window.setOrderFilter = function(filterGroup, tabBtn) {
+    document.querySelectorAll('.order-filter-tab').forEach(t => t.classList.remove('active'));
+    if (tabBtn) tabBtn.classList.add('active');
+
+    const cards = document.querySelectorAll('.farmer-order-card');
+    cards.forEach(card => {
+      const grp = card.getAttribute('data-status-group');
+      if (filterGroup === 'all' || grp === filterGroup) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+    checkEmptyOrdersState();
+  };
+
+  window.filterOrdersList = function() {
+    const q = (document.getElementById('orderSearchInput')?.value || '').toLowerCase().trim();
+    const activeTab = document.querySelector('.order-filter-tab.active');
+    const activeFilter = activeTab ? activeTab.getAttribute('data-filter') : 'all';
+
+    const cards = document.querySelectorAll('.farmer-order-card');
+    cards.forEach(card => {
+      const grp = card.getAttribute('data-status-group');
+      const crop = card.getAttribute('data-crop') || '';
+      const buyer = card.getAttribute('data-buyer') || '';
+      const code = card.getAttribute('data-order-code') || '';
+
+      const matchesFilter = (activeFilter === 'all' || grp === activeFilter);
+      const matchesSearch = !q || crop.includes(q) || buyer.includes(q) || code.includes(q);
+
+      if (matchesFilter && matchesSearch) {
+        card.style.display = '';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+    checkEmptyOrdersState();
+  };
+
+  window.updateOrderTabCounts = function() {
+    const cards = document.querySelectorAll('.farmer-order-card');
+    let pending = 0, processing = 0, transit = 0, completed = 0;
+    cards.forEach(c => {
+      const g = c.getAttribute('data-status-group');
+      if (g === 'pending') pending++;
+      else if (g === 'processing') processing++;
+      else if (g === 'transit') transit++;
+      else if (g === 'completed') completed++;
+    });
+    const elP = document.getElementById('countPendingTab');
+    const elPr = document.getElementById('countProcessingTab');
+    const elT = document.getElementById('countTransitTab');
+    const elC = document.getElementById('countCompletedTab');
+    if (elP) elP.textContent = pending;
+    if (elPr) elPr.textContent = processing;
+    if (elT) elT.textContent = transit;
+    if (elC) elC.textContent = completed;
+  };
+
+  window.checkEmptyOrdersState = function() {
+    const cards = document.querySelectorAll('.farmer-order-card');
+    let visible = 0;
+    cards.forEach(c => { if (c.style.display !== 'none') visible++; });
+    const emptyEl = document.getElementById('ordersFilterEmpty');
+    if (emptyEl) {
+      emptyEl.style.display = visible === 0 ? 'block' : 'none';
+    }
+  };
+
+  // Initialize counts on load
+  updateOrderTabCounts();
+
 </script>
 {% endblock %}

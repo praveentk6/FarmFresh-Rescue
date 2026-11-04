@@ -30,6 +30,25 @@
 </head>
 <body class="lang-{{ lang }}">
 
+  {% set is_auth_page = (request.endpoint in ['login', 'login_post', 'login_farmer', 'login_buyer', 'login_admin', 'admin_login', 'register', 'register_post', 'register_farmer', 'register_buyer', 'forgot_password', 'reset_password']) or (not current_user and request.endpoint in ['index', 'login', 'marketplace_home', None]) %}
+
+  {% if is_auth_page %}
+  <!-- Clean Minimal Auth Header for New / Unauthenticated Users (No Home or Marketplace Navigation Links) -->
+  <header class="auth-navbar" id="authNavbar">
+    <div class="auth-nav-container">
+      <a href="{{ url_for('login') }}" class="nav-brand" id="authBrandLogo">
+        <span class="brand-leaf">🌾</span>
+        <span class="brand-text">FarmFresh <span class="brand-rescue">Rescue</span></span>
+      </a>
+      <div class="lang-switch-wrap" aria-label="Language Selector">
+        <a href="{{ url_for('set_language', lang_code='en') }}" class="lang-btn {% if lang == 'en' %}active{% endif %}" id="langEnBtn" title="English">EN</a>
+        <span class="lang-sep">|</span>
+        <a href="{{ url_for('set_language', lang_code='ta') }}" class="lang-btn {% if lang == 'ta' %}active{% endif %}" id="langTaBtn" title="தமிழ்">தமிழ்</a>
+      </div>
+    </div>
+  </header>
+  {% else %}
+
   <!-- Navigation Bar -->
   <header class="navbar" id="topNavbar">
     <div class="nav-container">
@@ -42,89 +61,122 @@
 
       <!-- 2. Center: Primary Navigation Links -->
       <nav class="nav-menu-wrapper" id="navMenuWrapper" aria-label="Main Navigation">
-        <ul class="nav-menu" id="navMenu">
-          <li>
-            <a href="{{ url_for('index') }}" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">
-              {{ _t('home') }}
-            </a>
-          </li>
-          <li>
-            <a href="{{ url_for('browse_listings') }}" class="nav-link {% if request.endpoint == 'browse_listings' and not request.args.get('urgency') %}active{% endif %}">
-              {{ _t('browse_produce') }}
-            </a>
-          </li>
-          <li>
-            <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="nav-link nav-urgent-link {% if request.args.get('urgency') == 'urgent_only' %}active{% endif %}">
-              ⚡ {{ _t('urgent_rescue') }}
-            </a>
-          </li>
-          <li>
-            <a href="{{ url_for('live_market_prices') }}" class="nav-link {% if request.endpoint == 'live_market_prices' %}active{% endif %}">
-              💹 {{ 'சந்தை விலை' if lang == 'ta' else 'Mandi Rates' }}
-            </a>
-          </li>
-          <li>
-            <a href="{{ url_for('demand_prediction') }}" class="nav-link {% if request.endpoint == 'demand_prediction' %}active{% endif %}">
-              📈 {{ 'தேவை கணிப்பு' if lang == 'ta' else 'Demand Trends' }}
-            </a>
-          </li>
-          <li>
-            <a href="{{ url_for('browse_rescue_products') }}" class="nav-link {% if request.endpoint in ['browse_rescue_products', 'rescue_product_detail', 'add_rescue_product', 'edit_rescue_product'] %}active{% endif %}" style="color: var(--primary); font-weight: 700;">
-              🛒 Rescue Marketplace
-            </a>
-          </li>
-          <li>
-            <a href="{{ url_for('find_sellers') }}" class="nav-link {% if request.endpoint in ['find_sellers', 'schedule_direct_meeting', 'list_direct_meetings', 'view_direct_meeting', 'inspect_product_meeting', 'negotiate_meeting_price', 'direct_sale_confirmation', 'view_direct_sale_receipt'] %}active{% endif %}">
-              🤝 Meet & Sell
-            </a>
-          </li>
-          <li>
-            <a href="{{ url_for('nearby_buyers') }}" class="nav-link {% if request.endpoint == 'nearby_buyers' %}active{% endif %}">
-              {{ _t('nearby_buyers') }}
-            </a>
-          </li>
-          <li>
-            <a href="{{ url_for('analytics_view') }}" class="nav-link {% if request.endpoint == 'analytics_view' %}active{% endif %}">
-              📊 {{ _t('analytics') }}
-            </a>
-          </li>
-
+                <ul class="nav-menu" id="navMenu">
           {% if current_user %}
-            <li>
-              <a href="{{ url_for('buyer_dashboard') if current_user['role'] == 'buyer' else (url_for('farmer_dashboard') if current_user['role'] == 'farmer' else url_for('admin_dashboard')) }}" class="nav-link {% if request.endpoint in ['buyer_dashboard', 'farmer_dashboard', 'admin_dashboard'] %}active{% endif %}" id="navMyOrdersLink">
-                📦 {{ _t('my_orders') }}
-              </a>
-            </li>
-            <li class="nav-profile-dropdown-wrapper" id="navProfileDropdownWrapper">
-              <a href="javascript:void(0)" class="nav-link" id="navUserProfileLink" onclick="toggleNavUserProfile(event)" aria-haspopup="true" aria-expanded="false" title="{{ _t('user_profile') }}">
-                👤 {{ current_user['name'].split()[0]|capitalize }} <span class="nav-dropdown-caret">▾</span>
-              </a>
-              <div class="nav-profile-subdropdown" id="navProfileSubdropdown">
-                <div class="subdropdown-header">
-                  <div class="subdropdown-name">{{ current_user['name'] }}</div>
-                  <div class="subdropdown-role role-{{ current_user['role'] }}">{{ _t('role_' ~ current_user['role']) }}</div>
-                </div>
-                <a href="{{ url_for('buyer_dashboard') if current_user['role'] == 'buyer' else (url_for('farmer_dashboard') if current_user['role'] == 'farmer' else url_for('admin_dashboard')) }}" class="subdropdown-item">
-                  <span class="subdropdown-icon">📦</span>
-                  <span>{{ 'Dashboard / Orders' if lang == 'en' else _t('my_orders') }}</span>
+            {% if current_user['role'] == 'farmer' %}
+              <!-- Farmer Portal Dedicated Navigation Links -->
+              <li>
+                <a href="{{ url_for('farmer_dashboard') }}" class="nav-link {% if request.endpoint == 'farmer_dashboard' %}active{% endif %}">
+                  🌾 {{ 'Farmer Portal' if lang == 'en' else 'விவசாயி தளம்' }}
                 </a>
-                <a href="{{ url_for('notifications_view') }}" class="subdropdown-item">
-                  <span class="subdropdown-icon">🔔</span>
-                  <span>{{ _t('notifications') }}</span>
-                  {% if unread_count > 0 %}<span class="notif-badge-pill">{{ unread_count }}</span>{% endif %}
+              </li>
+              <li>
+                <a href="{{ url_for('add_listing') }}" class="nav-link {% if request.endpoint == 'add_listing' %}active{% endif %}" style="color: var(--primary); font-weight: 700;">
+                  ➕ {{ _t('list_produce') }}
                 </a>
-                <div class="subdropdown-divider"></div>
-                <a href="{{ url_for('logout') }}" class="subdropdown-item subdropdown-logout" id="navMenuSubLogout">
-                  <span class="subdropdown-icon">🚪</span>
-                  <span>{{ _t('logout') }}</span>
+              </li>
+              <li>
+                <a href="{{ url_for('farmer_dashboard') }}#ordersSection" class="nav-link" id="navFarmerOrdersLink">
+                  📦 {{ _t('my_orders') }}
                 </a>
-              </div>
-            </li>
-            <li>
-              <a href="{{ url_for('logout') }}" class="nav-link nav-logout-link" id="navLogoutLink" title="{{ _t('logout') }}">
-                🚪 {{ _t('logout') }}
-              </a>
-            </li>
+              </li>
+              <li>
+                <a href="{{ url_for('nearby_buyers') }}" class="nav-link {% if request.endpoint == 'nearby_buyers' %}active{% endif %}">
+                  👥 {{ _t('nearby_buyers') }}
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('live_market_prices') }}" class="nav-link {% if request.endpoint == 'live_market_prices' %}active{% endif %}">
+                  💹 {{ 'சந்தை விலை' if lang == 'ta' else 'Mandi Rates' }}
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('demand_prediction') }}" class="nav-link {% if request.endpoint == 'demand_prediction' %}active{% endif %}">
+                  📈 {{ 'தேவை கணிப்பு' if lang == 'ta' else 'Demand Trends' }}
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('find_sellers') }}" class="nav-link {% if request.endpoint in ['find_sellers', 'schedule_direct_meeting', 'list_direct_meetings', 'view_direct_meeting', 'inspect_product_meeting', 'negotiate_meeting_price', 'direct_sale_confirmation', 'view_direct_sale_receipt'] %}active{% endif %}">
+                  🤝 {{ 'Meet & Sell' if lang == 'en' else 'நேரடி விற்பனை' }}
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('analytics_view') }}" class="nav-link {% if request.endpoint == 'analytics_view' %}active{% endif %}">
+                  📊 {{ _t('analytics') }}
+                </a>
+              </li>
+            {% elif current_user['role'] == 'buyer' %}
+              <!-- Buyer Portal Dedicated Navigation Links -->
+              <li>
+                <a href="{{ url_for('buyer_dashboard') }}" class="nav-link {% if request.endpoint == 'buyer_dashboard' %}active{% endif %}">
+                  🏢 {{ 'Buyer Portal' if lang == 'en' else 'வாங்குபவர் தளம்' }}
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('browse_listings') }}" class="nav-link {% if request.endpoint == 'browse_listings' and not request.args.get('urgency') %}active{% endif %}">
+                  🥕 {{ _t('browse_produce') }}
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="nav-link nav-urgent-link {% if request.args.get('urgency') == 'urgent_only' %}active{% endif %}">
+                  ⚡ {{ _t('urgent_rescue') }}
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('browse_rescue_products') }}" class="nav-link {% if request.endpoint in ['browse_rescue_products', 'rescue_product_detail', 'add_rescue_product', 'edit_rescue_product'] %}active{% endif %}" style="color: var(--primary); font-weight: 700;">
+                  🛒 {{ 'Rescue Market' if lang == 'en' else 'மீட்பு சந்தை' }}
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('buyer_dashboard') }}#buyerOrdersSection" class="nav-link" id="navBuyerOrdersLink">
+                  📦 {{ _t('my_orders') }}
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('buyer_dashboard') }}#postRequirementSection" class="nav-link">
+                  ➕ {{ _t('btn_post_req') }}
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('find_sellers') }}" class="nav-link {% if request.endpoint in ['find_sellers', 'schedule_direct_meeting', 'list_direct_meetings', 'view_direct_meeting', 'inspect_product_meeting', 'negotiate_meeting_price', 'direct_sale_confirmation', 'view_direct_sale_receipt'] %}active{% endif %}">
+                  🤝 {{ 'Meet Farmers' if lang == 'en' else 'விவசாயிகளை சந்திக்க' }}
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('live_market_prices') }}" class="nav-link {% if request.endpoint == 'live_market_prices' %}active{% endif %}">
+                  💹 {{ 'சந்தை விலை' if lang == 'ta' else 'Mandi Rates' }}
+                </a>
+              </li>
+            {% elif current_user['role'] == 'admin' %}
+              <!-- Admin Dedicated Navigation Links -->
+              <li>
+                <a href="{{ url_for('admin_dashboard') }}" class="nav-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}">
+                  ⚡ {{ _t('admin_panel') }}
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('browse_listings') }}" class="nav-link {% if request.endpoint == 'browse_listings' %}active{% endif %}">
+                  🥕 {{ _t('browse_produce') }}
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('nearby_buyers') }}" class="nav-link {% if request.endpoint == 'nearby_buyers' %}active{% endif %}">
+                  👥 {{ _t('nearby_buyers') }}
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('live_market_prices') }}" class="nav-link {% if request.endpoint == 'live_market_prices' %}active{% endif %}">
+                  💹 Mandi Rates
+                </a>
+              </li>
+              <li>
+                <a href="{{ url_for('analytics_view') }}" class="nav-link {% if request.endpoint == 'analytics_view' %}active{% endif %}">
+                  📊 {{ _t('analytics') }}
+                </a>
+              </li>
+            {% endif %}
+
+
           {% else %}
             <li>
               <a href="{{ url_for('login') }}" class="nav-link {% if request.endpoint == 'login' %}active{% endif %}" id="navLoginLink">
@@ -148,10 +200,9 @@
               </div>
             </li>
             <li class="mobile-only-nav">
-              <a href="{{ url_for('browse_rescue_products') }}" class="nav-link">🛒 Rescue Marketplace</a>
-            </li>
-            <li class="mobile-only-nav">
-              <a href="{{ url_for('list_direct_meetings') }}" class="nav-link">🤝 Direct Meetings</a>
+              <a href="{{ url_for('profile_view') }}" class="nav-link {% if request.endpoint == 'profile_view' %}active{% endif %}" style="font-weight: 600;">
+                👤 {{ _t('user_profile') }} ({{ 'User Details' if lang == 'en' else 'பயனர் விவரங்கள்' }})
+              </a>
             </li>
             <li class="mobile-only-nav">
               <a href="{{ url_for('notifications_view') }}" class="nav-link {% if request.endpoint == 'notifications_view' %}active{% endif %}">
@@ -159,19 +210,73 @@
               </a>
             </li>
             {% if current_user['role'] == 'farmer' %}
+              <!-- Farmer Mobile Links -->
               <li class="mobile-only-nav">
-                <a href="{{ url_for('add_listing') }}" class="nav-link" style="color: var(--primary); font-weight: 700;">+ {{ _t('list_produce') }}</a>
+                <a href="{{ url_for('farmer_dashboard') }}" class="nav-link {% if request.endpoint == 'farmer_dashboard' %}active{% endif %}">🌾 {{ 'Farmer Portal' if lang == 'en' else 'விவசாயி தளம்' }}</a>
               </li>
               <li class="mobile-only-nav">
-                <a href="{{ url_for('farmer_dashboard') }}" class="nav-link {% if request.endpoint == 'farmer_dashboard' %}active{% endif %}">📋 {{ _t('my_orders') }}</a>
+                <a href="{{ url_for('add_listing') }}" class="nav-link" style="color: var(--primary); font-weight: 700;">➕ {{ _t('list_produce') }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('farmer_dashboard') }}#ordersSection" class="nav-link">📦 {{ _t('my_orders') }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('nearby_buyers') }}" class="nav-link">👥 {{ _t('nearby_buyers') }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('live_market_prices') }}" class="nav-link">💹 {{ 'சந்தை விலை' if lang == 'ta' else 'Mandi Rates' }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('demand_prediction') }}" class="nav-link">📈 {{ 'தேவை கணிப்பு' if lang == 'ta' else 'Demand Trends' }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('find_sellers') }}" class="nav-link">🤝 {{ 'Meet & Sell' if lang == 'en' else 'நேரடி விற்பனை' }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('analytics_view') }}" class="nav-link">📊 {{ _t('analytics') }}</a>
               </li>
             {% elif current_user['role'] == 'buyer' %}
+              <!-- Buyer Mobile Links -->
               <li class="mobile-only-nav">
-                <a href="{{ url_for('buyer_dashboard') }}" class="nav-link {% if request.endpoint == 'buyer_dashboard' %}active{% endif %}">📋 {{ _t('my_orders') }}</a>
+                <a href="{{ url_for('buyer_dashboard') }}" class="nav-link {% if request.endpoint == 'buyer_dashboard' %}active{% endif %}">🏢 {{ 'Buyer Portal' if lang == 'en' else 'வாங்குபவர் தளம்' }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('browse_listings') }}" class="nav-link">🥕 {{ _t('browse_produce') }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="nav-link">⚡ {{ _t('urgent_rescue') }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('browse_rescue_products') }}" class="nav-link">🛒 {{ 'Rescue Market' if lang == 'en' else 'மீட்பு சந்தை' }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('buyer_dashboard') }}#buyerOrdersSection" class="nav-link">📦 {{ _t('my_orders') }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('buyer_dashboard') }}#postRequirementSection" class="nav-link">➕ {{ _t('btn_post_req') }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('find_sellers') }}" class="nav-link">🤝 {{ 'Meet Farmers' if lang == 'en' else 'விவசாயிகளை சந்திக்க' }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('live_market_prices') }}" class="nav-link">💹 {{ 'சந்தை விலை' if lang == 'ta' else 'Mandi Rates' }}</a>
               </li>
             {% elif current_user['role'] == 'admin' %}
+              <!-- Admin Mobile Links -->
               <li class="mobile-only-nav">
                 <a href="{{ url_for('admin_dashboard') }}" class="nav-link {% if request.endpoint == 'admin_dashboard' %}active{% endif %}">⚡ {{ _t('admin_panel') }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('browse_listings') }}" class="nav-link">🥕 {{ _t('browse_produce') }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('nearby_buyers') }}" class="nav-link">👥 {{ _t('nearby_buyers') }}</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('live_market_prices') }}" class="nav-link">💹 Mandi Rates</a>
+              </li>
+              <li class="mobile-only-nav">
+                <a href="{{ url_for('analytics_view') }}" class="nav-link">📊 {{ _t('analytics') }}</a>
               </li>
             {% endif %}
             <li class="mobile-only-nav">
@@ -187,6 +292,7 @@
           {% endif %}
         </ul>
       </nav>
+
 
       <!-- 3. Right: Controls, Notifications & User Profile -->
       <div class="nav-right-section" id="navRightSection">
@@ -237,6 +343,12 @@
 
             <div class="popover-divider"></div>
 
+            <!-- Item 2.5: User Profile & Details -->
+            <a href="{{ url_for('profile_view') }}" class="popover-item" id="userProfilePopoverLink" role="menuitem">
+              <span class="popover-item-icon">👤</span>
+              <span class="popover-item-text"><strong>{{ _t('user_profile') }}</strong> ({{ 'User Details' if lang == 'en' else 'பயனர் விவரங்கள்' }})</span>
+            </a>
+
             <!-- Item 3: My Orders / Dashboard -->
             {% if current_user['role'] == 'farmer' %}
               <a href="{{ url_for('farmer_dashboard') }}" class="popover-item" id="farmerDashBtn" role="menuitem">
@@ -271,7 +383,7 @@
             <div class="popover-divider"></div>
 
             <!-- Item 5: Logout -->
-            <a href="{{ url_for('logout') }}" class="popover-item popover-logout" id="logoutBtn" role="menuitem">
+            <a href="{{ url_for('logout') }}" class="popover-item popover-logout" id="logoutBtn" role="menuitem" style="color: #dc2626; font-weight: 700; background: #fff1f2; margin-top: 0.25rem; border-radius: 8px;">
               <span class="popover-item-icon">🚪</span>
               <span class="popover-item-text">{{ _t('logout') }}</span>
             </a>
@@ -298,6 +410,7 @@
 
     </div>
   </header>
+  {% endif %}
 
   <!-- Flash Messages Section -->
   <div class="container flash-container">
@@ -318,86 +431,95 @@
     {% block content %}{% endblock %}
   </main>
 
+  {% if not is_auth_page %}
   <!-- Footer -->
   <footer class="footer">
     <div class="container">
       <div class="footer-grid">
-        <div>
+        <!-- Col 1: Brand & Language -->
+        <div class="footer-col footer-col-brand">
           <div class="footer-brand-title">🌾 {{ _t('brand_name') }}</div>
           <p class="footer-text">
             {{ _t('hero_subtitle') }}
           </p>
-          <div style="margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center;">
-            <span style="font-size: 0.85rem; color: #94a3b8;">{{ _t('select_language') }}:</span>
-            <a href="{{ url_for('set_language', lang_code='en') }}" class="lang-btn {% if lang == 'en' %}active{% endif %}">English</a>
-            <span class="lang-sep">|</span>
-            <a href="{{ url_for('set_language', lang_code='ta') }}" class="lang-btn {% if lang == 'ta' %}active{% endif %}">தமிழ்</a>
+          <div class="footer-lang-selector">
+            <span class="footer-lang-label">{{ _t('select_language') }}:</span>
+            <div class="footer-lang-group">
+              <a href="{{ url_for('set_language', lang_code='en') }}" class="lang-btn {% if lang == 'en' %}active{% endif %}">English</a>
+              <span class="lang-sep">|</span>
+              <a href="{{ url_for('set_language', lang_code='ta') }}" class="lang-btn {% if lang == 'ta' %}active{% endif %}">தமிழ்</a>
+            </div>
           </div>
         </div>
 
-        <div>
+        <!-- Col 2: Marketplace Links -->
+        <div class="footer-col">
           <h4 class="footer-col-title">{{ _t('browse_produce') }}</h4>
           <ul class="footer-links">
-            <li><a href="{{ url_for('browse_listings', category='Vegetables') }}">Fresh Vegetables</a></li>
-            <li><a href="{{ url_for('browse_listings', category='Fruits') }}">Orchard Fruits</a></li>
-            <li><a href="{{ url_for('browse_listings', urgency='urgent_only') }}">⚡ {{ _t('urgent_rescue') }}</a></li>
-            <li><a href="{{ url_for('live_map_view') }}">🗺️ Nearby Producer & Buyer Map</a></li>
-            <li><a href="{{ url_for('live_market_prices') }}">💹 Mandi Wholesale Market Prices</a></li>
-            <li><a href="{{ url_for('weather_alerts_view') }}">🌦️ Agro-Weather Advisories</a></li>
-            <li><a href="{{ url_for('nearby_buyers') }}">🔍 {{ _t('nearby_buyers') }}</a></li>
-            <li><a href="{{ url_for('ai_assistant') }}">🤖 {{ _t('ai_assistant') }}</a></li>
+            <li><a href="{{ url_for('browse_listings', category='Vegetables') }}"><span class="footer-link-icon">🥕</span><span>Fresh Vegetables</span></a></li>
+            <li><a href="{{ url_for('browse_listings', category='Fruits') }}"><span class="footer-link-icon">🍎</span><span>Orchard Fruits</span></a></li>
+            <li><a href="{{ url_for('browse_listings', urgency='urgent_only') }}"><span class="footer-link-icon">🚨</span><span>{{ _t('urgent_rescue') }}</span></a></li>
+            <li><a href="{{ url_for('live_map_view') }}"><span class="footer-link-icon">🗺️</span><span>Nearby Farm Map</span></a></li>
+            <li><a href="{{ url_for('live_market_prices') }}"><span class="footer-link-icon">📊</span><span>Mandi Wholesale Prices</span></a></li>
+            <li><a href="{{ url_for('weather_alerts_view') }}"><span class="footer-link-icon">🌦️</span><span>Agro-Weather Advisories</span></a></li>
+            <li><a href="{{ url_for('nearby_buyers') }}"><span class="footer-link-icon">👥</span><span>{{ _t('nearby_buyers') }}</span></a></li>
+            <li><a href="{{ url_for('ai_assistant') }}"><span class="footer-link-icon">🤖</span><span>{{ _t('ai_assistant') }}</span></a></li>
           </ul>
         </div>
 
-        <div>
-          <h4 class="footer-col-title">{{ _t('my_dashboard') }}</h4>
+        <!-- Col 3: Portal & Account Navigation -->
+        <div class="footer-col">
+          <h4 class="footer-col-title">{{ _t('my_dashboard') if current_user else 'Account Portals' }}</h4>
           <ul class="footer-links">
-            {% set active_user = current_user if current_user else {'id': 9, 'name': 'Praveen', 'role': 'buyer', 'email': 'praveetk16@gmail.com'} %}
-        {% if true %}
-              {% if active_user['role'] == 'farmer' %}
-                <li><a href="{{ url_for('farmer_dashboard') }}">{{ _t('my_dashboard') }}</a></li>
-                <li><a href="{{ url_for('add_listing') }}">{{ _t('list_produce') }}</a></li>
-                <li><a href="{{ url_for('nearby_buyers') }}">{{ _t('nearby_buyers') }}</a></li>
-                <li><a href="{{ url_for('analytics_view') }}">{{ _t('analytics') }}</a></li>
-              {% elif active_user['role'] == 'buyer' %}
-                <li><a href="{{ url_for('buyer_dashboard') }}">{{ _t('my_orders') }}</a></li>
-                <li><a href="{{ url_for('browse_listings') }}">{{ _t('browse_produce') }}</a></li>
-              {% elif active_user['role'] == 'admin' %}
-                <li><a href="{{ url_for('admin_dashboard') }}">{{ _t('admin_panel') }}</a></li>
+            {% if current_user %}
+              {% if current_user['role'] == 'farmer' %}
+                <li><a href="{{ url_for('farmer_dashboard') }}"><span class="footer-link-icon">📊</span><span>{{ _t('my_dashboard') }}</span></a></li>
+                <li><a href="{{ url_for('add_listing') }}"><span class="footer-link-icon">🌾</span><span>{{ _t('list_produce') }}</span></a></li>
+                <li><a href="{{ url_for('nearby_buyers') }}"><span class="footer-link-icon">👥</span><span>{{ _t('nearby_buyers') }}</span></a></li>
+                <li><a href="{{ url_for('analytics_view') }}"><span class="footer-link-icon">📈</span><span>{{ _t('analytics') }}</span></a></li>
+              {% elif current_user['role'] == 'buyer' %}
+                <li><a href="{{ url_for('buyer_dashboard') }}"><span class="footer-link-icon">📦</span><span>{{ _t('my_orders') }}</span></a></li>
+                <li><a href="{{ url_for('browse_listings') }}"><span class="footer-link-icon">🛒</span><span>{{ _t('browse_produce') }}</span></a></li>
+              {% elif current_user['role'] == 'admin' %}
+                <li><a href="{{ url_for('admin_dashboard') }}"><span class="footer-link-icon">⚙️</span><span>{{ _t('admin_panel') }}</span></a></li>
               {% endif %}
+              <li><a href="{{ url_for('logout') }}"><span class="footer-link-icon">🚪</span><span>{{ 'Log Out' if lang == 'en' else 'வெளியேறு' }}</span></a></li>
             {% else %}
-              <li><a href="{{ url_for('login') }}">{{ _t('log_in') }}</a></li>
-              <li><a href="{{ url_for('register', role='farmer') }}">Register as Farmer</a></li>
-              <li><a href="{{ url_for('register', role='buyer') }}">Register as Buyer</a></li>
+              <li><a href="{{ url_for('login') }}"><span class="footer-link-icon">🔑</span><span>{{ _t('log_in') }}</span></a></li>
+              <li><a href="{{ url_for('register', role='farmer') }}"><span class="footer-link-icon">👨‍🌾</span><span>Register as Farmer</span></a></li>
+              <li><a href="{{ url_for('register', role='buyer') }}"><span class="footer-link-icon">🛒</span><span>Register as Buyer</span></a></li>
             {% endif %}
-            <li><a href="{{ url_for('about') }}">{{ _t('about_mission') }}</a></li>
+            <li><a href="{{ url_for('about') }}"><span class="footer-link-icon">ℹ️</span><span>{{ _t('about_mission') }}</span></a></li>
           </ul>
         </div>
 
-        <div>
+        <!-- Col 4: Farmer Support & Direct Help -->
+        <div class="footer-col">
           <h4 class="footer-col-title">Tamil Nadu Farmer Support</h4>
-          <p class="footer-text" style="font-size: 0.85rem; margin-bottom: 0.75rem;">
-            Ottanchathiram, Rayakottai, Pollachi, Ooty, Erode & Kaveri Delta regions.
+          <p class="footer-text" style="font-size: 0.85rem; margin-bottom: 0.85rem;">
+            Serving Ottanchathiram, Rayakottai, Pollachi, Ooty, Erode & Kaveri Delta agricultural zones.
           </p>
-          <div style="font-size: 0.85rem; color: #94a3b8; line-height: 1.5;">
-            📞 Support: 1800-425-FARM<br>
-            📍 Regional Hub: Chennai, Madurai & Coimbatore, TN<br>
-            ✉️ Email: rescue@farmfresh.org
-          </div>
+          <ul class="footer-links footer-contact-list">
+            <li><span class="footer-link-icon">📞</span><span>Toll-Free: <strong>1800-425-FARM</strong></span></li>
+            <li><span class="footer-link-icon">🏢</span><span>Hubs: Chennai, Madurai & Coimbatore</span></li>
+            <li><span class="footer-link-icon">✉️</span><span>Email: <strong>rescue@farmfresh.org</strong></span></li>
+            <li><span class="footer-link-icon">🛡️</span><span>Zero Platform Commission</span></li>
+          </ul>
         </div>
       </div>
 
       <div class="footer-bottom">
-        <div>
-          &copy; {{ now_year }} FarmFresh Rescue. Direct Agricultural Marketplace for Waste Prevention.
+        <div class="footer-bottom-left">
+          <span>&copy; {{ now_year }} FarmFresh Rescue. Direct Agricultural Marketplace.</span>
         </div>
-        <div style="color: #64748b; font-size: 0.8rem;">
-          * Urgency badges are calculated from harvest dates, farmer freshness notices, and listing duration to prioritize clearance.
+        <div class="footer-bottom-right">
+          * Freshness indicators & urgency metrics are verified with Tamil Nadu mandi spot rates to minimize farm waste.
         </div>
       </div>
     </div>
   </footer>
 
+  {% if current_user %}
   <!-- Floating AI FarmFresh Chatbot Widget -->
   <div class="chatbot-container" id="chatbotContainer">
     <!-- Chatbot Floating Window -->
@@ -466,6 +588,104 @@
       <span class="launcher-label">{{ 'AI உதவி' if lang == 'ta' else 'AI Chat' }}</span>
     </button>
   </div>
+  {% endif %}
+  {% else %}
+  <!-- Clean Minimal Auth Footer -->
+  <footer class="auth-simple-footer" id="authSimpleFooter">
+    <div class="container">
+      <div class="auth-footer-inner">
+        <span class="auth-footer-item">&copy; {{ now_year }} FarmFresh Rescue</span>
+        <span class="auth-footer-dot" aria-hidden="true">&bull;</span>
+        <span class="auth-footer-item">Tamil Nadu Direct Agricultural Marketplace</span>
+        <span class="auth-footer-dot" aria-hidden="true">&bull;</span>
+        <span class="auth-footer-item">{{ 'Zero Waste Food Rescue Initiative' if lang == 'en' else 'உணவு வீணாவதைத் தடுக்கும் முயற்சி' }}</span>
+      </div>
+    </div>
+  </footer>
+  {% endif %}
+
+    {% if current_user %}
+  <!-- Floating Bottom-Left User Profile & Logout Dock -->
+  <aside class="dock-profile-container" id="dockProfileContainer" aria-label="User Account Quick Dock">
+    
+    <!-- Upward Popover Menu -->
+    <div class="dock-profile-menu" id="dockProfileMenu" role="menu" aria-label="Profile and Session Menu">
+      <div class="dock-profile-header">
+        <div class="dock-avatar role-{{ current_user['role'] }}">
+          {{ current_user['name'][0]|upper }}
+        </div>
+        <div class="dock-user-info">
+          <div class="dock-user-name">{{ current_user['name'] }}</div>
+          <div class="dock-user-role role-{{ current_user['role'] }}">
+            {{ _t('role_' ~ current_user['role']) }} &bull; <span class="dock-online-text">{{ 'Online' if lang == 'en' else 'செயலில்' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="dock-details-list">
+        {% if current_user.get('email') %}
+          <div class="dock-detail-item">
+            <span class="dock-detail-icon">✉️</span>
+            <span class="dock-detail-text" title="{{ current_user['email'] }}">{{ current_user['email'] }}</span>
+          </div>
+        {% endif %}
+        {% if current_user.get('phone') %}
+          <div class="dock-detail-item">
+            <span class="dock-detail-icon">📞</span>
+            <span class="dock-detail-text">+91 {{ current_user['phone'] }}</span>
+          </div>
+        {% endif %}
+        {% if current_user.get('location') or current_user.get('district') %}
+          <div class="dock-detail-item">
+            <span class="dock-detail-icon">📍</span>
+            <span class="dock-detail-text">{{ current_user.get('location') or '' }}{% if current_user.get('location') and current_user.get('district') %}, {% endif %}{{ current_user.get('district') or 'Tamil Nadu' }}</span>
+          </div>
+        {% endif %}
+      </div>
+
+      <div class="dock-divider"></div>
+
+      <!-- Navigation Links -->
+      <a href="{{ url_for('profile_view') }}" class="dock-menu-link" id="dockViewProfileBtn" role="menuitem">
+        <span class="dock-link-icon">👤</span>
+        <span class="dock-link-text"><strong>{{ _t('user_profile') }}</strong> ({{ 'View & Edit Details' if lang == 'en' else 'விவரங்களை திருத்து' }})</span>
+      </a>
+
+      {% if current_user['role'] == 'farmer' %}
+        <a href="{{ url_for('farmer_dashboard') }}" class="dock-menu-link" role="menuitem">
+          <span class="dock-link-icon">🌾</span>
+          <span class="dock-link-text">{{ 'Farmer Dashboard' if lang == 'en' else _t('my_orders') }}</span>
+        </a>
+      {% elif current_user['role'] == 'buyer' %}
+        <a href="{{ url_for('buyer_dashboard') }}" class="dock-menu-link" role="menuitem">
+          <span class="dock-link-icon">🛒</span>
+          <span class="dock-link-text">{{ 'Buyer Dashboard' if lang == 'en' else _t('my_orders') }}</span>
+        </a>
+      {% endif %}
+
+      <div class="dock-divider"></div>
+
+      <!-- Prominent Logout Action -->
+      <a href="{{ url_for('logout') }}" class="dock-logout-btn" id="dockLogoutBtn" role="menuitem">
+        <span class="dock-logout-icon">🚪</span>
+        <span class="dock-logout-text">{{ _t('logout') }}</span>
+      </a>
+    </div>
+
+    <!-- Bottom-Left Profile Pill Trigger -->
+    <button type="button" class="dock-profile-trigger" id="dockProfileTrigger" aria-expanded="false" aria-haspopup="true" title="Click to view Profile and Log Out">
+      <div class="dock-trigger-avatar role-{{ current_user['role'] }}">
+        {{ current_user['name'][0]|upper }}
+        <span class="dock-status-dot" aria-hidden="true"></span>
+      </div>
+      <div class="dock-trigger-meta">
+        <span class="dock-trigger-name">{{ current_user['name'].split()[0]|capitalize }}</span>
+        <span class="dock-trigger-role">{{ _t('role_' ~ current_user['role']) }}</span>
+      </div>
+      <span class="dock-trigger-arrow" aria-hidden="true">▲</span>
+    </button>
+  </aside>
+  {% endif %}
 
   <!-- Main JavaScript File -->
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>

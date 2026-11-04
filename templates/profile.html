@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+
+{% block title %}{{ _t('user_profile') }} - FarmFresh Rescue{% endblock %}
+
+{% block content %}
+<div class="container profile-page-container" style="padding-top: 2rem; padding-bottom: 4rem;">
+
+  <!-- Breadcrumb & Top Bar -->
+  <div class="profile-top-bar" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.5rem;">
+    <div>
+      <a href="{{ url_for('farmer_dashboard') if user['role'] == 'farmer' else (url_for('buyer_dashboard') if user['role'] == 'buyer' else url_for('admin_dashboard')) }}" class="btn btn-outline-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 0.4rem;">
+        &larr; {{ 'Back to Dashboard' if lang == 'en' else 'டாஷ்போர்டுக்கு திரும்புக' }}
+      </a>
+    </div>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm" style="display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600;">
+        <span>🚪</span> {{ _t('logout') }}
+      </a>
+    </div>
+  </div>
+
+  <!-- Profile Hero Header Card -->
+  <div class="profile-hero-card" style="background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.04); margin-bottom: 2rem;">
+    <div class="profile-hero-content" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1.5rem;">
+      <div style="display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap;">
+        <!-- Avatar Circle -->
+        <div class="profile-avatar-large role-{{ user['role'] }}" style="width: 80px; height: 80px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.25rem; font-weight: 800; color: #ffffff; box-shadow: 0 4px 14px rgba(0,0,0,0.15);">
+          {{ user['name'][0]|upper }}
+        </div>
+        <!-- User Core Details -->
+        <div>
+          <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.35rem;">
+            <h1 style="font-size: 1.65rem; font-weight: 800; margin: 0; color: #0f172a;">{{ user['name'] }}</h1>
+            <span class="user-role-badge role-{{ user['role'] }}" style="font-size: 0.8rem; font-weight: 700; padding: 0.25rem 0.65rem; border-radius: 9999px;">
+              {{ _t('role_' ~ user['role']) }}
+            </span>
+          </div>
+          <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; font-size: 0.9rem; color: #64748b;">
+            <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+              <span>✉️</span> <strong>{{ user['email'] }}</strong>
+              <span style="background: #dcfce7; color: #166534; font-size: 0.7rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 4px;">✓ Verified</span>
+            </span>
+            {% if user['phone'] %}
+              <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+                <span>📞</span> {{ user['phone'] }}
+              </span>
+            {% endif %}
+            <span style="display: inline-flex; align-items: center; gap: 0.35rem;">
+              <span>🗓️</span> {{ 'Member since' if lang == 'en' else 'இணைந்த நாள்' }}: {{ user['created_at'].split()[0] if user['created_at'] else 'Recently' }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Action Buttons -->
+      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap;">
+        <a href="{{ url_for('logout') }}" class="btn btn-outline-danger" style="display: inline-flex; align-items: center; gap: 0.4rem; font-weight: 600;">
+          <span>🚪</span> {{ 'Log Out of Account' if lang == 'en' else 'கணக்கிலிருந்து வெளியேறு' }}
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Activity & Impact KPI Cards -->
+  <div class="profile-stats-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem; margin-bottom: 2rem;">
+    {% if user['role'] == 'farmer' %}
+      <div class="stat-card" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+        <div style="width: 48px; height: 48px; border-radius: 10px; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🌾</div>
+        <div>
+          <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">{{ stats.get('active_listings', 0) }}</div>
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 600;">{{ 'Active Produce Listings' if lang == 'en' else 'செயலில் உள்ள பயிர்கள்' }}</div>
+        </div>
+      </div>
+      <div class="stat-card" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+        <div style="width: 48px; height: 48px; border-radius: 10px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">📦</div>
+        <div>
+          <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">{{ stats.get('total_orders', 0) }}</div>
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 600;">{{ 'Purchase Enquiries' if lang == 'en' else 'கொள்முதல் கோரிக்கைகள்' }}</div>
+        </div>
+      </div>
+      <div class="stat-card" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+        <div style="width: 48px; height: 48px; border-radius: 10px; background: #fef3c7; color: #d97706; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">✅</div>
+        <div>
+          <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">{{ stats.get('completed_orders', 0) }}</div>
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 600;">{{ 'Completed Orders' if lang == 'en' else 'வெற்றிகரமான விற்பனைகள்' }}</div>
+        </div>
+      </div>
+    {% elif user['role'] == 'buyer' %}
+      <div class="stat-card" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+        <div style="width: 48px; height: 48px; border-radius: 10px; background: #eff6ff; color: #2563eb; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">🛒</div>
+        <div>
+          <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">{{ stats.get('total_orders', 0) }}</div>
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 600;">{{ 'Purchase Requests' if lang == 'en' else 'அனுப்பிய கோரிக்கைகள்' }}</div>
+        </div>
+      </div>
+      <div class="stat-card" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+        <div style="width: 48px; height: 48px; border-radius: 10px; background: #ecfdf5; color: #059669; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">✅</div>
+        <div>
+          <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">{{ stats.get('completed_orders', 0) }}</div>
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 600;">{{ 'Completed Deliveries' if lang == 'en' else 'பெற்ற பொருட்கள்' }}</div>
+        </div>
+      </div>
+      <div class="stat-card" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+        <div style="width: 48px; height: 48px; border-radius: 10px; background: #fef3c7; color: #d97706; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">📋</div>
+        <div>
+          <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">{{ stats.get('posted_requirements', 0) }}</div>
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 600;">{{ 'Posted Requirements' if lang == 'en' else 'தேவைகள்' }}</div>
+        </div>
+      </div>
+    {% else %}
+      <div class="stat-card" style="background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; padding: 1.25rem; display: flex; align-items: center; gap: 1rem;">
+        <div style="width: 48px; height: 48px; border-radius: 10px; background: #fef2f2; color: #dc2626; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">⚙️</div>
+        <div>
+          <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a;">{{ stats.get('total_users', 0) }}</div>
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 600;">Platform Accounts</div>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- Main 2-Column Grid -->
+  <div class="profile-main-grid" style="display: grid; grid-template-columns: 1.6fr 1fr; gap: 2rem;">
+
+    <!-- Left Column: Edit Profile Details -->
+    <div class="profile-card" style="background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
+      <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 1rem;">
+        <span style="font-size: 1.4rem;">👤</span>
+        <div>
+          <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0; color: #0f172a;">{{ 'Personal & Contact Details' if lang == 'en' else 'சுயவிவரம் மற்றும் தொடர்பு தகவல்கள்' }}</h2>
+          <p style="font-size: 0.825rem; color: #64748b; margin: 0;">{{ 'Update your name, contact phone number, and primary location.' if lang == 'en' else 'உங்கள் பெயர், தொடர்பு எண் மற்றும் இருப்பிடத்தை மாற்றவும்.' }}</p>
+        </div>
+      </div>
+
+      <form action="{{ url_for('profile_view') }}" method="POST">
+        <input type="hidden" name="action" value="update_profile">
+
+        <!-- Name -->
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label class="form-label" for="profileName" style="font-weight: 600; font-size: 0.875rem; color: #334155; margin-bottom: 0.4rem; display: block;">
+            {{ 'Full Name' if lang == 'en' else 'முழு பெயர்' }} <span style="color: #ef4444;">*</span>
+          </label>
+          <input type="text" id="profileName" name="name" class="form-control" value="{{ user['name'] }}" required style="width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.65rem 0.85rem; font-size: 0.95rem;">
+        </div>
+
+        <!-- Email (Read-Only) -->
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label class="form-label" for="profileEmail" style="font-weight: 600; font-size: 0.875rem; color: #334155; margin-bottom: 0.4rem; display: block;">
+            {{ 'Email Address' if lang == 'en' else 'மின்னஞ்சல் முகவரி' }} <span style="font-size: 0.75rem; color: #64748b;">({{ 'Permanent Login ID' if lang == 'en' else 'மாற்ற முடியாது' }})</span>
+          </label>
+          <input type="email" id="profileEmail" class="form-control" value="{{ user['email'] }}" disabled style="width: 100%; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 8px; padding: 0.65rem 0.85rem; font-size: 0.95rem; color: #64748b; cursor: not-allowed;">
+        </div>
+
+        <!-- Phone Number -->
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label class="form-label" for="profilePhone" style="font-weight: 600; font-size: 0.875rem; color: #334155; margin-bottom: 0.4rem; display: block;">
+            {{ 'Mobile Phone Number' if lang == 'en' else 'கைப்பேசி எண்' }} <span style="color: #ef4444;">*</span>
+          </label>
+          <div style="display: flex; align-items: center; border: 1px solid #cbd5e1; border-radius: 8px; overflow: hidden;">
+            <span style="background: #f1f5f9; padding: 0.65rem 0.85rem; font-size: 0.9rem; color: #475569; border-right: 1px solid #cbd5e1; font-weight: 600;">+91</span>
+            <input type="tel" id="profilePhone" name="phone" class="form-control" value="{{ user['phone'] }}" placeholder="9876543210" pattern="[0-9]{10}" maxlength="10" required style="border: none; padding: 0.65rem 0.85rem; font-size: 0.95rem; width: 100%; outline: none;">
+          </div>
+          <span style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; display: block;">{{ '10-digit Indian mobile number for order notifications and SMS updates.' if lang == 'en' else 'ஆர்டர் மற்றும் வாட்ஸ்அப் தொடர்பிற்கான 10 இலக்க எண்.' }}</span>
+        </div>
+
+        <!-- Location: Village / Town -->
+        <div class="form-group" style="margin-bottom: 1.25rem;">
+          <label class="form-label" for="profileLocation" style="font-weight: 600; font-size: 0.875rem; color: #334155; margin-bottom: 0.4rem; display: block;">
+            {{ 'Village / Town / Street' if lang == 'en' else 'கிராமம் / ஊர் / முகவரி' }}
+          </label>
+          <input type="text" id="profileLocation" name="location" class="form-control" value="{{ user['location'] or '' }}" placeholder="e.g. Ottanchathiram, Pollachi, Mettupalayam" style="width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.65rem 0.85rem; font-size: 0.95rem;">
+        </div>
+
+        <!-- District & PIN Code Grid -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+          <div class="form-group">
+            <label class="form-label" for="profileDistrict" style="font-weight: 600; font-size: 0.875rem; color: #334155; margin-bottom: 0.4rem; display: block;">
+              {{ 'District' if lang == 'en' else 'மாவட்டம்' }}
+            </label>
+            <select id="profileDistrict" name="district" class="form-control" style="width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.65rem 0.85rem; font-size: 0.95rem; background: #ffffff;">
+              <option value="">{{ 'Select District' if lang == 'en' else 'மாவட்டம் தேர்வுசெய்க' }}</option>
+              {% for d in districts %}
+                <option value="{{ d }}" {% if user['district'] == d %}selected{% endif %}>{{ d }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="profilePin" style="font-weight: 600; font-size: 0.875rem; color: #334155; margin-bottom: 0.4rem; display: block;">
+              {{ 'PIN Code' if lang == 'en' else 'அஞ்சல் குறியீடு' }}
+            </label>
+            <input type="text" id="profilePin" name="pin_code" class="form-control" value="{{ user['pin_code'] or '' }}" placeholder="624619" maxlength="6" pattern="[0-9]{6}" style="width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.65rem 0.85rem; font-size: 0.95rem;">
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block btn-lg" style="width: 100%; font-weight: 700; padding: 0.75rem 1.25rem; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+          <span>💾</span> {{ 'Save Profile Details' if lang == 'en' else 'விவரங்களை சேமிக்கவும்' }}
+        </button>
+      </form>
+    </div>
+
+    <!-- Right Column: Password & Logout Zone -->
+    <div style="display: flex; flex-direction: column; gap: 2rem;">
+
+      <!-- Change Password Card -->
+      <div class="profile-card" style="background: #ffffff; border-radius: 16px; border: 1px solid #e2e8f0; padding: 2rem; box-shadow: 0 4px 20px rgba(0,0,0,0.03);">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid #f1f5f9; padding-bottom: 1rem;">
+          <span style="font-size: 1.4rem;">🔒</span>
+          <div>
+            <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0; color: #0f172a;">{{ 'Security & Password' if lang == 'en' else 'கடவுச்சொல் மாற்றுதல்' }}</h2>
+            <p style="font-size: 0.825rem; color: #64748b; margin: 0;">{{ 'Update your account access credentials.' if lang == 'en' else 'உங்கள் புதிய கடவுச்சொல்லை அமைக்கவும்.' }}</p>
+          </div>
+        </div>
+
+        <form action="{{ url_for('profile_view') }}" method="POST">
+          <input type="hidden" name="action" value="change_password">
+
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label" for="currentPassword" style="font-weight: 600; font-size: 0.875rem; color: #334155; margin-bottom: 0.4rem; display: block;">
+              {{ 'Current Password' if lang == 'en' else 'தற்போதைய கடவுச்சொல்' }} <span style="color: #ef4444;">*</span>
+            </label>
+            <input type="password" id="currentPassword" name="current_password" class="form-control" required style="width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.65rem 0.85rem; font-size: 0.95rem;">
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label class="form-label" for="newPassword" style="font-weight: 600; font-size: 0.875rem; color: #334155; margin-bottom: 0.4rem; display: block;">
+              {{ 'New Password' if lang == 'en' else 'புதிய கடவுச்சொல்' }} <span style="color: #ef4444;">*</span>
+            </label>
+            <input type="password" id="newPassword" name="new_password" class="form-control" minlength="6" required style="width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.65rem 0.85rem; font-size: 0.95rem;">
+            <span style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem; display: block;">{{ 'At least 6 characters required.' if lang == 'en' else 'குறைந்தபட்சம் 6 எழுத்துக்கள் தேவை.' }}</span>
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.25rem;">
+            <label class="form-label" for="confirmPassword" style="font-weight: 600; font-size: 0.875rem; color: #334155; margin-bottom: 0.4rem; display: block;">
+              {{ 'Confirm New Password' if lang == 'en' else 'புதிய கடவுச்சொல்லை உறுதிப்படுத்துக' }} <span style="color: #ef4444;">*</span>
+            </label>
+            <input type="password" id="confirmPassword" name="confirm_password" class="form-control" minlength="6" required style="width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 0.65rem 0.85rem; font-size: 0.95rem;">
+          </div>
+
+          <button type="submit" class="btn btn-outline-primary btn-block" style="width: 100%; font-weight: 700; padding: 0.65rem 1.25rem; border-radius: 8px; display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+            <span>🔑</span> {{ 'Update Password' if lang == 'en' else 'கடவுச்சொல்லை மாற்று' }}
+          </button>
+        </form>
+      </div>
+
+      <!-- Account Session & Prominent Logout Card -->
+      <div class="profile-card profile-logout-card" style="background: #fff1f2; border-radius: 16px; border: 1px solid #fecdd3; padding: 1.75rem; box-shadow: 0 4px 15px rgba(225,29,72,0.06);">
+        <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem;">
+          <span style="font-size: 1.35rem;">🚪</span>
+          <h3 style="font-size: 1.15rem; font-weight: 700; margin: 0; color: #9f1239;">{{ 'Account Session & Log Out' if lang == 'en' else 'கணக்கு அமர்வு & வெளியேறுதல்' }}</h3>
+        </div>
+        <p style="font-size: 0.85rem; color: #881337; line-height: 1.5; margin-bottom: 1.25rem;">
+          {{ 'Ready to end your session? Logging out securely clears your authentication cookies on this browser. You can log back in at any time.' if lang == 'en' else 'உங்கள் அமர்வை முடிக்க தயாரா? வெளியேறுவது உங்கள் கணக்கை பாதுகாப்பாக மூடும்.' }}
+        </p>
+        <a href="{{ url_for('logout') }}" class="btn btn-danger btn-block btn-lg" id="profilePageLogoutBtn" style="width: 100%; font-weight: 700; padding: 0.75rem 1.25rem; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 0.5rem; background: #e11d48; border-color: #e11d48; box-shadow: 0 4px 12px rgba(225, 29, 72, 0.25);">
+          <span>🚪</span> {{ 'Log Out Now' if lang == 'en' else 'இப்போது வெளியேறு' }}
+        </a>
+      </div>
+
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+

@@ -1,4 +1,5 @@
 import os
+import re
 import sqlite3
 import json
 from datetime import datetime, date, timedelta
@@ -39,8 +40,14 @@ from database import (
     record_direct_negotiation, confirm_direct_negotiation_agreement,
     initiate_or_update_direct_sale, confirm_direct_sale_step,
     get_direct_sale_by_id, get_direct_sales_for_user,
-    get_direct_chat_messages, send_direct_chat_message
+    get_direct_chat_messages, send_direct_chat_message,
+    create_broadcast_announcement, get_active_broadcast_announcements,
+    get_all_broadcast_announcements, toggle_broadcast_announcement_status,
+    delete_broadcast_announcement, generate_user_email_verification_token,
+    verify_user_email_by_token, admin_toggle_user_verification,
+    get_recent_email_activity_logs
 )
+import email_service
 from razorpay_gateway import (
     create_razorpay_order, verify_razorpay_signature,
     verify_webhook_signature, RAZORPAY_KEY_ID
@@ -484,6 +491,8 @@ def index():
 @app.route('/home')
 @app.route('/marketplace')
 def marketplace_home():
+    if not g.user:
+        return redirect(url_for('login'))
     conn = get_db()
     cursor = conn.cursor()
 
@@ -894,6 +903,18 @@ def _perform_registration(data, target_role):
         url_for('farmer_dashboard') if target_role == 'farmer' else url_for('buyer_dashboard')
     )
     log_activity("User Registered", f"New {target_role} registered: {name} ({email})", email)
+    # Generate email verification token and trigger verification email dispatch
+    try:
+        verif_token = generate_user_email_verification_token(user['id'])
+        if verif_token:
+            email_service.send_verification_email(
+                user_email=user['email'],
+                user_name=user['name'],
+                token=verif_token,
+                base_url=request.host_url
+            )
+    except Exception as em_err:
+        print(f"[Verification Email Dispatch Error] {em_err}")
     return True, None, user
 
 # ==========================================
@@ -1007,6 +1028,203 @@ def register_farmer():
 @app.route('/register/buyer')
 def register_buyer():
     return render_template('register.html', active_role='buyer')
+
+@app.route('/verify-email/<token>')
+def verify_email_route(token):
+    ok, msg, user = verify_user_email_by_token(token)
+    if ok:
+        flash(f"🎉 {msg}", "success")
+        log_activity("Email Verified", f"User {user['email']} verified email address via link", user['email'])
+        if g.user:
+            return redirect(url_for(_role_dashboard_endpoint(g.user['role'])))
+        return redirect(url_for('login'))
+    else:
+        flash(f"⚠️ {msg}", "danger")
+        return redirect(url_for('login'))
+
+@app.route('/resend-verification', methods=['GET', 'POST'])
+def resend_verification_route():
+    email = None
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+    elif g.user:
+        email = g.user.get('email')
+
+    if not email:
+        flash("Please provide your registered email address to resend verification.", "warning")
+        return redirect(url_for('login'))
+
+    user = auth_service.get_user_by_email(email)
+    if not user:
+        flash("No account found with that email address.", "danger")
+        return redirect(url_for('login'))
+
+    if user.get('email_verified') == 1:
+        flash("Your email address is already verified! You can log in.", "info")
+        return redirect(url_for('login'))
+
+    token = generate_user_email_verification_token(user['id'])
+    if token:
+        success, send_msg = email_service.send_verification_email(
+            user_email=user['email'],
+            user_name=user['name'],
+            token=token,
+            base_url=request.host_url
+        )
+        flash(f"✉️ Verification email sent to {email}. Please check your inbox and spam folder.", "success")
+    else:
+        flash("Failed to generate verification token. Please try again.", "danger")
+
+    if g.user:
+        return redirect(url_for(_role_dashboard_endpoint(g.user['role'])))
+    return redirect(url_for('login'))
+
+
+TAMIL_NADU_DISTRICTS = [
+    "Ariyalur", "Chengalpattu", "Chennai", "Coimbatore", "Cuddalore", "Dharmapuri",
+    "Dindigul", "Erode", "Kallakurichi", "Kanchipuram", "Kanyakumari", "Karur",
+    "Krishnagiri", "Madurai", "Mayiladuthurai", "Nagapattinam", "Namakkal", "Nilgiris",
+    "Perambalur", "Pudukkottai", "Ramanathapuram", "Ranipet", "Salem", "Sivaganga",
+    "Tenkasi", "Thanjavur", "Theni", "Thoothukudi", "Tiruchirappalli", "Tirunelveli",
+    "Tirupathur", "Tiruppur", "Tiruvallur", "Tiruvannamalai", "Tiruvarur", "Vellore",
+    "Viluppuram", "Virudhunagar"
+]
+
+@app.route('/profile', methods=['GET', 'POST'])
+@login_required
+def profile_view():
+    """
+    User Profile & Account Details View.
+    Allows viewing user details, editing profile, updating password, and logging out.
+    """
+    user_id = g.user['id']
+    conn = get_db()
+    cursor = conn.cursor()
+
+    if request.method == 'POST':
+        action = request.form.get('action', 'update_profile')
+
+        if action == 'update_profile':
+            name = request.form.get('name', '').strip()
+            phone = request.form.get('phone', '').strip()
+            location = request.form.get('location', '').strip()
+            district = request.form.get('district', '').strip()
+            pin_code = request.form.get('pin_code', '').strip()
+
+            if not name:
+                flash("Name cannot be empty.", "danger")
+                return redirect(url_for('profile_view'))
+
+            clean_phone = re.sub(r'[\s\-\+]', '', phone)
+            if clean_phone and len(clean_phone) > 10 and clean_phone.startswith('91'):
+                clean_phone = clean_phone[2:]
+            if clean_phone and (len(clean_phone) != 10 or not clean_phone.isdigit()):
+                flash("Please provide a valid 10-digit Indian phone number.", "warning")
+                return redirect(url_for('profile_view'))
+
+            try:
+                cursor.execute("""
+                    UPDATE users 
+                    SET name = ?, phone = ?, location = ?, district = ?, pin_code = ?
+                    WHERE id = ?
+                """, (name, clean_phone or phone, location, district, pin_code, user_id))
+                conn.commit()
+
+                # If farmer, update name and contact on active listings as well
+                if g.user['role'] == 'farmer':
+                    cursor.execute("""
+                        UPDATE listings 
+                        SET farmer_name = ?, farmer_phone = ?, village_town = ?, district = ?
+                        WHERE farmer_id = ?
+                    """, (name, clean_phone or phone, location, district, user_id))
+                    conn.commit()
+
+                session['user_name'] = name
+                flash("Profile details updated successfully!", "success")
+            except Exception as e:
+                conn.rollback()
+                flash(f"Failed to update profile: {e}", "danger")
+
+            return redirect(url_for('profile_view'))
+
+        elif action == 'change_password':
+            current_pw = request.form.get('current_password', '')
+            new_pw = request.form.get('new_password', '')
+            confirm_pw = request.form.get('confirm_password', '')
+
+            cursor.execute("SELECT password_hash FROM users WHERE id = ?", (user_id,))
+            user_row = cursor.fetchone()
+
+            if not user_row or not auth_service.verify_password(current_pw, user_row['password_hash']):
+                flash("Current password is incorrect.", "danger")
+                return redirect(url_for('profile_view'))
+
+            if len(new_pw) < 6:
+                flash("New password must be at least 6 characters long.", "warning")
+                return redirect(url_for('profile_view'))
+
+            if new_pw != confirm_pw:
+                flash("New password and confirmation do not match.", "warning")
+                return redirect(url_for('profile_view'))
+
+            try:
+                new_hash = auth_service.hash_password(new_pw)
+                cursor.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user_id))
+                conn.commit()
+                flash("Password updated successfully! Please use your new password next time you log in.", "success")
+            except Exception as e:
+                conn.rollback()
+                flash(f"Failed to update password: {e}", "danger")
+
+            return redirect(url_for('profile_view'))
+
+    # GET Request: Fetch user record and computed activity statistics
+    cursor.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    user_data = cursor.fetchone()
+    if not user_data:
+        flash("User record not found.", "danger")
+        return redirect(url_for('index'))
+
+    stats = {}
+    if user_data['role'] == 'farmer':
+        cursor.execute("SELECT COUNT(*) as count FROM listings WHERE farmer_id = ?", (user_id,))
+        stats['total_listings'] = cursor.fetchone()['count']
+        cursor.execute("SELECT COUNT(*) as count FROM listings WHERE farmer_id = ? AND status = 'Available'", (user_id,))
+        stats['active_listings'] = cursor.fetchone()['count']
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM enquiries e
+            JOIN listings l ON e.listing_id = l.id
+            WHERE l.farmer_id = ?
+        """, (user_id,))
+        stats['total_orders'] = cursor.fetchone()['count']
+        cursor.execute("""
+            SELECT COUNT(*) as count FROM enquiries e
+            JOIN listings l ON e.listing_id = l.id
+            WHERE l.farmer_id = ? AND e.status IN ('Completed', 'Delivered')
+        """, (user_id,))
+        stats['completed_orders'] = cursor.fetchone()['count']
+    elif user_data['role'] == 'buyer':
+        cursor.execute("SELECT COUNT(*) as count FROM enquiries WHERE buyer_id = ?", (user_id,))
+        stats['total_orders'] = cursor.fetchone()['count']
+        cursor.execute("SELECT COUNT(*) as count FROM enquiries WHERE buyer_id = ? AND status IN ('Completed', 'Delivered')", (user_id,))
+        stats['completed_orders'] = cursor.fetchone()['count']
+        cursor.execute("SELECT COUNT(*) as count FROM buyer_requirements WHERE buyer_id = ?", (user_id,))
+        stats['posted_requirements'] = cursor.fetchone()['count']
+    else:
+        cursor.execute("SELECT COUNT(*) as count FROM users")
+        stats['total_users'] = cursor.fetchone()['count']
+        cursor.execute("SELECT COUNT(*) as count FROM listings")
+        stats['total_listings'] = cursor.fetchone()['count']
+
+    conn.close()
+
+    return render_template(
+        'profile.html',
+        user=dict(user_data),
+        stats=stats,
+        districts=TAMIL_NADU_DISTRICTS
+    )
+
 
 @app.route('/logout', methods=['GET', 'POST'])
 def logout():
@@ -3385,7 +3603,8 @@ def farmer_dashboard():
         cod_pending_revenue=cod_pending_revenue,
         farmer_rescue_products=get_farmer_rescue_products(farmer_id),
         farmer_meetings=get_farmer_meetings(farmer_id),
-        farmer_direct_sales=get_direct_sales_for_user(farmer_id, 'farmer')
+        farmer_direct_sales=get_direct_sales_for_user(farmer_id, 'farmer'),
+        active_broadcasts=get_active_broadcast_announcements(role='farmer', district=g.user.get('district') or g.user.get('location'))
     )
 
 @app.route('/buyer/dashboard')
@@ -3509,7 +3728,8 @@ def buyer_dashboard():
         buyer_rescued_kg=buyer_rescued_kg,
         shared_rescue_products=get_shared_rescue_products()[:8],
         buyer_meetings=get_buyer_meetings(g.user['id']),
-        buyer_direct_sales=get_direct_sales_for_user(g.user['id'], 'buyer')
+        buyer_direct_sales=get_direct_sales_for_user(g.user['id'], 'buyer'),
+        active_broadcasts=get_active_broadcast_announcements(role='buyer', district=g.user.get('district') or g.user.get('location'))
     )
 
 @app.route('/admin/dashboard')
@@ -3605,11 +3825,39 @@ def admin_dashboard():
     total_payment_volume = sum(float(p['amount']) for p in admin_payments if p['payment_status'] == 'Paid')
     refund_requests = [p for p in admin_payments if p['refund_status'] == 'Requested']
 
+    # Announcements
+    announcements = get_all_broadcast_announcements(limit=100)
+    cursor.execute("SELECT COUNT(*) FROM broadcast_announcements WHERE is_active = 1")
+    active_announcements_count = cursor.fetchone()[0]
+
+    # Email & User verification stats
+    smtp_config = email_service.get_smtp_config()
+    email_logs = get_recent_email_activity_logs(limit=30)
+    cursor.execute("SELECT COUNT(*) FROM users WHERE email_verified = 1")
+    verified_users_count = cursor.fetchone()[0]
+    cursor.execute("SELECT COUNT(*) FROM users WHERE email_verified = 0 OR email_verified IS NULL")
+    unverified_users_count = cursor.fetchone()[0]
+
+    # Direct Meetings & Direct Sales review
+    cursor.execute("SELECT * FROM direct_meetings ORDER BY id DESC LIMIT 50")
+    all_meetings = cursor.fetchall()
+    cursor.execute("SELECT * FROM direct_sales ORDER BY id DESC LIMIT 50")
+    all_direct_sales = cursor.fetchall()
+
     conn.close()
 
     return render_template(
         'admin_dashboard.html',
         total_users=total_users,
+        announcements=announcements,
+        active_announcements_count=active_announcements_count,
+        smtp_config=smtp_config,
+        email_logs=email_logs,
+        default_templates=email_service.DEFAULT_COMMUNICATION_TEMPLATES,
+        verified_users_count=verified_users_count,
+        unverified_users_count=unverified_users_count,
+        meetings=all_meetings,
+        direct_sales=all_direct_sales,
         total_farmers=total_farmers,
         total_buyers=total_buyers,
         total_listings=total_listings,
@@ -3708,6 +3956,182 @@ def admin_reset_sample_data():
     except Exception as e:
         flash(f"Error refreshing sample data: {e}", "danger")
     return redirect(url_for('admin_dashboard'))
+
+@app.route('/admin/verify-user/<int:user_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_verify_user(user_id):
+    ok, msg = admin_toggle_user_verification(user_id)
+    if ok:
+        flash(f"✓ {msg}", "success")
+        log_activity("Admin User Verification Toggle", f"Admin changed verification status for user #{user_id}")
+    else:
+        flash(f"⚠️ {msg}", "danger")
+    return redirect(url_for('admin_dashboard') + '#users')
+
+@app.route('/admin/send-verification/<int:user_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_send_verification(user_id):
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, name, email FROM users WHERE id = ?", (user_id,))
+    target = cursor.fetchone()
+    conn.close()
+    if not target:
+        flash("User not found.", "danger")
+        return redirect(url_for('admin_dashboard') + '#users')
+
+    token = generate_user_email_verification_token(target['id'])
+    if token:
+        ok, send_msg = email_service.send_verification_email(
+            user_email=target['email'],
+            user_name=target['name'],
+            token=token,
+            base_url=request.host_url
+        )
+        flash(f"✉️ Verification dispatch triggered for {target['name']} ({target['email']}): {send_msg}", "info")
+    else:
+        flash("Failed to generate token.", "danger")
+    return redirect(url_for('admin_dashboard') + '#users')
+
+@app.route('/admin/test-smtp', methods=['POST'])
+@login_required
+@admin_required
+def admin_test_smtp():
+    recipient = request.form.get('recipient_email', '').strip()
+    if not recipient:
+        recipient = g.user.get('email', 'admin@farmfresh.org')
+    ok, send_msg = email_service.test_smtp_connection(recipient, base_url=request.host_url)
+    if ok:
+        flash(f"🧪 SMTP Diagnostic: {send_msg}", "success")
+    else:
+        flash(f"⚠️ SMTP Diagnostic Failed: {send_msg}", "warning")
+    return redirect(url_for('admin_dashboard') + '#smtp')
+
+@app.route('/admin/smtp/save-config', methods=['POST'])
+@login_required
+@admin_required
+def admin_save_smtp_config():
+    server = request.form.get('smtp_server', 'smtp.gmail.com').strip()
+    port = request.form.get('smtp_port', '587').strip()
+    username = request.form.get('smtp_username', '').strip()
+    password = request.form.get('smtp_password', '').strip()
+    use_tls = request.form.get('smtp_use_tls', '1') in ('1', 'true', 'yes')
+    sender_name = request.form.get('smtp_sender_name', 'FarmFresh Rescue Admin').strip()
+    
+    try:
+        port_num = int(port)
+    except ValueError:
+        port_num = 587
+        
+    ok, msg = email_service.save_smtp_config(
+        server=server,
+        port=port_num,
+        username=username,
+        password=password if password != '' else None,
+        use_tls=use_tls,
+        sender_name=sender_name
+    )
+    if ok:
+        flash("✓ SMTP Configuration settings saved successfully!", "success")
+    else:
+        flash(f"⚠️ Error saving SMTP settings: {msg}", "danger")
+    return redirect(url_for('admin_dashboard') + '#smtp')
+
+@app.route('/admin/email-broadcast/send', methods=['POST'])
+@login_required
+@admin_required
+def admin_send_email_broadcast():
+    audience = request.form.get('target_audience', 'both').strip().lower()
+    subject = request.form.get('subject', '').strip()
+    html_content = request.form.get('html_content', '').strip()
+    single_email = request.form.get('single_email', '').strip()
+    
+    if not subject or not html_content:
+        flash("Subject and email message content are required.", "danger")
+        return redirect(url_for('admin_dashboard') + '#smtp')
+        
+    ok, msg, sent_count, fail_count = email_service.send_broadcast_communication(
+        target_audience=audience,
+        subject=subject,
+        html_content=html_content,
+        single_email=single_email,
+        base_url=request.host_url
+    )
+    if ok:
+        flash(f"📢 {msg}", "success")
+    else:
+        flash(f"⚠️ Broadcast dispatch failed: {msg}", "danger")
+        
+    return redirect(url_for('admin_dashboard') + '#smtp')
+
+@app.route('/admin/announcements/create', methods=['POST'])
+@login_required
+@admin_required
+def admin_create_announcement():
+    title = request.form.get('title', '').strip()
+    message = request.form.get('message', '').strip()
+    category = request.form.get('category', 'General').strip()
+    severity = request.form.get('severity', 'Info').strip()
+    target_role = request.form.get('target_role', 'all').strip().lower()
+    target_district = request.form.get('target_district', 'All Tamil Nadu').strip()
+    action_link = request.form.get('action_link', '').strip() or None
+    action_text = request.form.get('action_text', '').strip() or None
+    expires_days = request.form.get('expires_days', '7').strip()
+    
+    try:
+        expires_days = int(expires_days)
+    except ValueError:
+        expires_days = 7
+
+    if not title or not message:
+        flash("Announcement title and message are required.", "danger")
+        return redirect(url_for('admin_dashboard') + '#broadcasts')
+
+    ok, msg, ann_id = create_broadcast_announcement(
+        title=title,
+        message=message,
+        category=category,
+        severity=severity,
+        target_role=target_role,
+        target_district=target_district,
+        action_link=action_link,
+        action_text=action_text,
+        expires_days=expires_days,
+        created_by=g.user.get('id')
+    )
+
+    if ok:
+        flash(f"📢 Broadcast Announcement #{ann_id} successfully published!", "success")
+        log_activity("Broadcast Created", f"Admin published broadcast: '{title}' ({category} / {severity})")
+    else:
+        flash(f"Error publishing broadcast: {msg}", "danger")
+    return redirect(url_for('admin_dashboard') + '#broadcasts')
+
+@app.route('/admin/announcements/toggle/<int:announcement_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_toggle_announcement(announcement_id):
+    ok, msg = toggle_broadcast_announcement_status(announcement_id)
+    if ok:
+        flash(f"📢 {msg}", "info")
+        log_activity("Broadcast Status Toggled", f"Admin toggled status for announcement #{announcement_id}")
+    else:
+        flash(f"Error: {msg}", "danger")
+    return redirect(url_for('admin_dashboard') + '#broadcasts')
+
+@app.route('/admin/announcements/delete/<int:announcement_id>', methods=['POST'])
+@login_required
+@admin_required
+def admin_delete_announcement(announcement_id):
+    ok, msg = delete_broadcast_announcement(announcement_id)
+    if ok:
+        flash(f"🗑️ {msg}", "info")
+        log_activity("Broadcast Deleted", f"Admin deleted announcement #{announcement_id}")
+    else:
+        flash(f"Error: {msg}", "danger")
+    return redirect(url_for('admin_dashboard') + '#broadcasts')
 
 # Convenience routes for direct navigation
 @app.route('/my-orders')

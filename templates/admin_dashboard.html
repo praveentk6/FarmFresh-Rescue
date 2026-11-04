@@ -3,595 +3,1952 @@
 {% block title %}Admin Control Center - FarmFresh Rescue{% endblock %}
 
 {% block content %}
-<div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
+<style>
+  /* Admin Portal: Full-bleed SaaS app layout - Window NEVER scrolls, Sidebar NEVER moves */
+  .footer {
+    display: none !important;
+  }
+  html, body {
+    height: 100vh !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    background-color: #f8fafc;
+  }
+  .navbar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    height: 4.25rem !important;
+    z-index: 1050 !important;
+  }
+  #mainContent {
+    margin-top: 4.25rem !important;
+    height: calc(100vh - 4.25rem) !important;
+    height: calc(100dvh - 4.25rem) !important;
+    overflow: hidden !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  .admin-portal-wrapper {
+    display: flex !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: hidden !important;
+    position: relative !important;
+  }
+  .admin-sidebar {
+    position: fixed !important;
+    top: 4.25rem !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    width: 280px !important;
+    min-width: 280px !important;
+    max-width: 280px !important;
+    height: calc(100vh - 4.25rem) !important;
+    height: calc(100dvh - 4.25rem) !important;
+    overflow-y: auto !important;
+    z-index: 100 !important;
+    background: #ffffff !important;
+    border-right: 1px solid #e2e8f0 !important;
+    flex-shrink: 0 !important;
+  }
+  .admin-main-area {
+    margin-left: 280px !important;
+    width: calc(100% - 280px) !important;
+    height: 100% !important;
+    overflow-y: auto !important;
+    padding: 1.75rem 2.25rem 4rem !important;
+    box-sizing: border-box !important;
+  }
+  @media (max-width: 992px) {
+    .admin-sidebar {
+      top: 0 !important;
+      height: 100vh !important;
+      transform: translateX(-100%) !important;
+    }
+    .admin-sidebar.show-mobile {
+      transform: translateX(0) !important;
+    }
+    .admin-main-area {
+      margin-left: 0 !important;
+      width: 100% !important;
+      padding: 1.25rem 1rem 3rem !important;
+    }
+  }
+</style>
+
+<!-- Mobile Topbar for Small Screens (<992px) -->
+<div class="admin-mobile-bar">
+  <div style="display: flex; align-items: center; gap: 0.65rem;">
+    <div class="admin-brand-icon" style="width: 32px; height: 32px; font-size: 1rem;">🌾</div>
+    <div>
+      <div style="font-weight: 800; font-size: 0.95rem; color: #0f172a;">FarmFresh Admin</div>
+      <div style="font-size: 0.7rem; color: #64748b;">Tamil Nadu Control Center</div>
+    </div>
+  </div>
+  <button type="button" class="admin-mobile-toggle" id="adminSidebarToggle">
+    <span>☰ Menu</span>
+  </button>
+</div>
+
+<!-- Mobile Sidebar Backdrop Overlay -->
+<div class="admin-sidebar-backdrop" id="adminSidebarBackdrop"></div>
+
+<div class="admin-portal-wrapper">
   
-  <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem; margin-bottom: 2rem;">
-    <div>
-      <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.35rem;">Platform Administration</div>
-      <h1 style="font-size: 2.25rem;">Agricultural Waste Prevention Control Center</h1>
-      <p style="color: var(--text-muted); font-size: 0.95rem;">
-        Monitor registered users, active produce listings, waste rescue KPIs, and platform transactions across Tamil Nadu.
-      </p>
-    </div>
-    <div>
-      <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-lg" style="border-color: #ef4444; color: #ef4444; font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem;" id="adminDashboardLogoutBtn">
-        🚪 {{ _t('logout') }}
-      </a>
-    </div>
-  </div>
-
-  <!-- Admin KPI Counters -->
-  <div class="dashboard-grid-kpis">
-    <div class="kpi-card highlight">
-      <div>
-        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">TOTAL USERS</div>
-        <div class="kpi-num" style="color: var(--primary);">{{ total_users }}</div>
-        <div style="font-size: 0.75rem; color: #64748b;">{{ total_farmers }} Farmers &bull; {{ total_buyers }} Buyers</div>
-      </div>
-      <div class="kpi-icon">👥</div>
-    </div>
-
-    <div class="kpi-card">
-      <div>
-        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">AVAILABLE PRODUCE</div>
-        <div class="kpi-num" style="color: #059669;">{{ available_listings }}</div>
-        <div style="font-size: 0.75rem; color: #64748b;">Out of {{ total_listings }} Total Listings</div>
-      </div>
-      <div class="kpi-icon">🥦</div>
-    </div>
-
-    <div class="kpi-card urgent">
-      <div>
-        <div style="font-size: 0.8rem; color: #ea580c; font-weight: 700;">NEEDS ATTENTION (3+ d)</div>
-        <div class="kpi-num" style="color: var(--urgent-red);">{{ urgent_count }}</div>
-        <div style="font-size: 0.75rem; color: #ea580c;">High Risk of Spoilage</div>
-      </div>
-      <div class="kpi-icon">⚠️</div>
-    </div>
-
-    <div class="kpi-card">
-      <div>
-        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">RESCUED & SOLD</div>
-        <div class="kpi-num" style="color: #0284c7;">{{ sold_listings }}</div>
-        <div style="font-size: 0.75rem; color: #64748b;">{{ total_enquiries }} Total Buyer Enquiries</div>
-      </div>
-      <div class="kpi-icon">🎉</div>
-    </div>
-
-    <div class="kpi-card" style="border-left: 4px solid #16a34a;">
-      <div>
-        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">VERIFIED RESCUED PRODUCE</div>
-        <div class="kpi-num" style="color: #16a34a;">{{ "%.0f"|format(total_rescued_kg) }} <span style="font-size: 1.1rem; font-weight: 600;">kg</span></div>
-        <div style="font-size: 0.75rem; color: #64748b;">Direct Waste Diverted</div>
-      </div>
-      <div class="kpi-icon">♻️</div>
-    </div>
-
-    <div class="kpi-card" style="border-left: 4px solid #059669;">
-      <div>
-        <div style="font-size: 0.8rem; color: var(--text-muted); font-weight: 700;">TOTAL PLATFORM REVENUE</div>
-        <div class="kpi-num" style="color: #059669;">₹{{ "%.0f"|format(platform_revenue) }}</div>
-        <div style="font-size: 0.75rem; color: #64748b;">Completed Trade Volume</div>
-      </div>
-      <div class="kpi-icon">💰</div>
-    </div>
-  </div>
-
-  <!-- Admin Quick Actions Bar -->
-  <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 2rem; align-items: center; justify-content: space-between; background: #fff; padding: 1rem 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05);">
-    <div style="display: flex; align-items: center; gap: 0.5rem;">
-      <span style="font-size: 1.25rem;">⚡</span>
-      <span style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">Administrative AI & Audit Tools:</span>
-    </div>
-    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
-      <a href="{{ url_for('export_analytics_csv') }}" class="btn btn-outline-primary btn-sm" style="display: inline-flex; align-items: center; gap: 0.35rem;">
-        <span>📥</span> Download Sales & Waste Audit CSV
-      </a>
-      <a href="{{ url_for('demand_prediction') }}" class="btn btn-outline-primary btn-sm" style="display: inline-flex; align-items: center; gap: 0.35rem;">
-        <span>📈</span> AI Demand Prediction
-      </a>
-    </div>
-  </div>
-  <!-- Section: Demonstration & Sample Produce Control -->
-  <div class="data-table-card" id="sample-data" style="
-    border-left: 5px solid #f59e0b;
-    background: linear-gradient(to right, #ffffff, #fffdf5);
-    margin-bottom: 2rem;
-  ">
-    <div class="data-table-header" style="border-bottom: 1px solid #fef3c7; padding-bottom: 1rem;">
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <span style="font-size: 1.75rem;">🧪</span>
+  <!-- LEFT SIDEBAR -->
+  <aside class="admin-sidebar" id="adminSidebar">
+    
+    <!-- Sidebar Brand Header -->
+    <div class="admin-sidebar-header">
+      <div class="admin-brand-tag">
+        <div class="admin-brand-icon">🌾</div>
         <div>
-          <h2 style="font-size: 1.35rem; color: #92400e; margin-bottom: 0.2rem;">
-            Demonstration & Sample Produce Management
-          </h2>
-          <span style="font-size: 0.85rem; color: #78350f;">
-            Manage the 10 vegetable demonstration records displayed on the Browse Produce page for project evaluation.
-          </span>
+          <div class="admin-brand-title">FarmFresh Admin</div>
+          <div class="admin-brand-sub">Control Center &bull; TN</div>
         </div>
       </div>
-      <div>
-        {% if demo_listings_count > 0 %}
-          <span style="
-            background: #fef3c7;
-            color: #92400e;
-            font-weight: 700;
-            font-size: 0.8rem;
-            padding: 0.35rem 0.75rem;
-            border-radius: 999px;
-            border: 1px solid #fde68a;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-          ">
-            <span style="width: 8px; height: 8px; background: #16a34a; border-radius: 50%; display: inline-block;"></span>
-            {{ demo_listings_count }} Demo Vegetables Active
-          </span>
-        {% else %}
-          <span style="
-            background: #f1f5f9;
-            color: #475569;
-            font-weight: 700;
-            font-size: 0.8rem;
-            padding: 0.35rem 0.75rem;
-            border-radius: 999px;
-            border: 1px solid #cbd5e1;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.4rem;
-          ">
-            <span style="width: 8px; height: 8px; background: #94a3b8; border-radius: 50%; display: inline-block;"></span>
-            No Sample Data (Real Produce Only)
-          </span>
-        {% endif %}
+    </div>
+
+    <!-- Admin Profile Badge -->
+    <div class="admin-sidebar-profile">
+      <div class="admin-profile-avatar">
+        {{ current_user['name'][0]|upper if current_user and current_user['name'] else 'A' }}
+      </div>
+      <div class="admin-profile-info">
+        <div class="admin-profile-name" title="{{ current_user['name'] }}">{{ current_user['name'] }}</div>
+        <div class="admin-profile-role">
+          <span style="width: 7px; height: 7px; background: #16a34a; border-radius: 50%; display: inline-block;"></span>
+          Moderator &bull; Admin
+        </div>
       </div>
     </div>
 
-    <div style="padding: 1.25rem 1.5rem;">
-      <p style="font-size: 0.9rem; color: #475569; line-height: 1.5; margin-bottom: 1.25rem;">
-        Sample listings are clearly tagged with <strong style="color: #92400e;">[SAMPLE]</strong> in Browse Produce so buyers and evaluators understand they are demonstration data. As an administrator, you can remove them before live deployment or reset them with current harvest dates anytime.
-      </p>
+    <!-- Sidebar Navigation Links -->
+    <nav class="admin-sidebar-nav">
+      
+      <a href="#overview" class="admin-nav-item active" data-tab="overview">
+        <div class="admin-nav-left">
+          <span class="admin-nav-icon">📊</span>
+          <span>Overview & KPIs</span>
+        </div>
+        <span class="admin-nav-badge">TN</span>
+      </a>
 
-      <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;">
-        <!-- Reset / Re-seed Button -->
-        <form action="{{ url_for('admin_reset_sample_data') }}" method="POST" style="margin: 0;"
-              onsubmit="return confirm('Refresh all 10 demonstration vegetable listings with current harvest dates and realistic Tamil Nadu wholesale prices?');">
-          <button type="submit" class="btn btn-primary btn-sm" id="btn-reset-sample-data" style="display: inline-flex; align-items: center; gap: 0.4rem;">
-            <span>🔄</span> {% if demo_listings_count > 0 %}Refresh / Update Sample Data{% else %}Seed 10 Sample Vegetables{% endif %}
-          </button>
-        </form>
+      <a href="#broadcasts" class="admin-nav-item" data-tab="broadcasts">
+        <div class="admin-nav-left">
+          <span class="admin-nav-icon">📢</span>
+          <span>Broadcast Alerts</span>
+        </div>
+        <span class="admin-nav-badge {% if active_announcements_count and active_announcements_count > 0 %}badge-alert{% endif %}">
+          {{ active_announcements_count or 0 }}
+        </span>
+      </a>
 
-        <!-- Remove Button -->
-        {% if demo_listings_count > 0 %}
-          <form action="{{ url_for('admin_remove_sample_data') }}" method="POST" style="margin: 0;"
-                onsubmit="return confirm('Are you sure you want to completely remove all 10 demonstration vegetable listings from the marketplace?');">
-            <button type="submit" class="btn btn-danger btn-sm" id="btn-remove-sample-data" style="display: inline-flex; align-items: center; gap: 0.4rem;">
-              <span>🗑️</span> Remove All Sample Data
-            </button>
-          </form>
-        {% endif %}
+      <a href="#users" class="admin-nav-item" data-tab="users">
+        <div class="admin-nav-left">
+          <span class="admin-nav-icon">👥</span>
+          <span>Users & Email Verif.</span>
+        </div>
+        <span class="admin-nav-badge {% if unverified_users_count and unverified_users_count > 0 %}badge-alert{% endif %}">
+          {{ total_users }}
+        </span>
+      </a>
 
-        <!-- Quick link to view on Browse Produce -->
-        <a href="{{ url_for('browse_listings') }}" class="btn btn-outline-primary btn-sm" style="display: inline-flex; align-items: center; gap: 0.4rem;">
-          <span>👀</span> Preview on Browse Produce
+      <a href="#listings" class="admin-nav-item" data-tab="listings">
+        <div class="admin-nav-left">
+          <span class="admin-nav-icon">🥕</span>
+          <span>Produce Listings</span>
+        </div>
+        <span class="admin-nav-badge">{{ total_listings }}</span>
+      </a>
+
+      <a href="#orders" class="admin-nav-item" data-tab="orders">
+        <div class="admin-nav-left">
+          <span class="admin-nav-icon">📦</span>
+          <span>Orders & Enquiries</span>
+        </div>
+        <span class="admin-nav-badge">{{ total_enquiries }}</span>
+      </a>
+
+      <a href="#payments" class="admin-nav-item" data-tab="payments">
+        <div class="admin-nav-left">
+          <span class="admin-nav-icon">💳</span>
+          <span>Payments & Escrow</span>
+        </div>
+        <span class="admin-nav-badge">{{ paid_payments_count }}</span>
+      </a>
+
+      <a href="#meetings" class="admin-nav-item" data-tab="meetings">
+        <div class="admin-nav-left">
+          <span class="admin-nav-icon">🤝</span>
+          <span>In-Person Meetings</span>
+        </div>
+        <span class="admin-nav-badge">{{ meetings|length if meetings else 0 }}</span>
+      </a>
+
+      <a href="#smtp" class="admin-nav-item" data-tab="smtp">
+        <div class="admin-nav-left">
+          <span class="admin-nav-icon">📧</span>
+          <span>SMTP & Diagnostics</span>
+        </div>
+        <span class="admin-nav-badge" style="font-size: 0.65rem;">
+          {{ 'Live' if smtp_config.is_configured else 'Sim' }}
+        </span>
+      </a>
+
+      <a href="#logs" class="admin-nav-item" data-tab="logs">
+        <div class="admin-nav-left">
+          <span class="admin-nav-icon">📜</span>
+          <span>Audit & Logs</span>
+        </div>
+        <span class="admin-nav-badge">{{ logs|length if logs else 0 }}</span>
+      </a>
+
+      <a href="#sample-data" class="admin-nav-item" data-tab="sample-data">
+        <div class="admin-nav-left">
+          <span class="admin-nav-icon">🧪</span>
+          <span>Sample Produce</span>
+        </div>
+        <span class="admin-nav-badge">{{ demo_listings_count or 0 }}</span>
+      </a>
+
+    </nav>
+
+    <!-- Sidebar Bottom Controls -->
+    <div class="admin-sidebar-footer">
+      <div style="font-size: 0.72rem; color: #64748b; font-weight: 700; text-transform: uppercase; margin-bottom: 0.2rem;">Quick Role Switch</div>
+      <div style="display: flex; gap: 0.4rem;">
+        <a href="{{ url_for('farmer_dashboard') }}" class="admin-quick-switch-btn" style="flex: 1;" title="Switch to Farmer View">
+          <span>🌾</span> Farmer
         </a>
-
-        <!-- CLI Tip -->
-        <div style="font-size: 0.775rem; color: #64748b; margin-left: auto; display: flex; align-items: center; gap: 0.35rem;">
-          <span>💻 CLI:</span>
-          <code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: monospace;">python seed_vegetables.py --remove</code>
-          <span>or</span>
-          <code style="background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-family: monospace;">--reset</code>
-        </div>
+        <a href="{{ url_for('buyer_dashboard') }}" class="admin-quick-switch-btn" style="flex: 1;" title="Switch to Buyer View">
+          <span>🛒</span> Buyer
+        </a>
       </div>
+      <a href="{{ url_for('logout') }}" class="admin-sidebar-logout-btn" id="adminSidebarLogoutBtn">
+        <span>🚪</span> Log Out
+      </a>
     </div>
-  </div>
 
-  <!-- Section: AI Market Demand Intelligence Summary -->
-  <div class="data-table-card" style="border-left: 5px solid #2563eb; margin-bottom: 2rem;">
-    <div class="data-table-header" style="border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem;">
-      <div style="display: flex; align-items: center; gap: 0.75rem;">
-        <span style="font-size: 1.75rem;">📈</span>
-        <div>
-          <h2 style="font-size: 1.35rem; color: #1e3a8a; margin-bottom: 0.2rem;">
-            AI Market Demand Intelligence
-          </h2>
-          <span style="font-size: 0.85rem; color: #475569;">
-            Live algorithmic evaluation of buyer procurement inquiries vs available marketplace stock
-          </span>
-        </div>
-      </div>
+  </aside>
+
+  <!-- MAIN CONTENT AREA -->
+  <main class="admin-main-area">
+
+    <!-- Top Area Greetings & Action Bar -->
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1.75rem; background: #ffffff; padding: 1.1rem 1.4rem; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
       <div>
-        <a href="{{ url_for('demand_prediction') }}" class="btn btn-outline-primary btn-sm" style="display: inline-flex; align-items: center; gap: 0.35rem;">
-          View Full Demand Analytics &rarr;
+        <div style="font-size: 0.8rem; color: #166534; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+          FarmFresh Rescue &bull; Tamil Nadu Statewide Dashboard
+        </div>
+        <h1 style="font-size: 1.65rem; font-weight: 800; color: #0f172a; margin: 0.2rem 0 0 0;" id="adminCurrentTabTitle">
+          Agricultural Waste Prevention Control Center
+        </h1>
+      </div>
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+        <a href="#broadcasts" class="btn btn-primary btn-sm admin-tab-jump-btn" data-target-tab="broadcasts" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+          <span>📢</span> Compose Broadcast
+        </a>
+        <a href="{{ url_for('export_analytics_csv') }}" class="btn btn-outline-primary btn-sm" style="display: inline-flex; align-items: center; gap: 0.35rem;" title="Download CSV Report">
+          <span>📥</span> Export CSV
+        </a>
+        <a href="{{ url_for('demand_prediction') }}" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+          <span>📈</span> AI Demand Intel
         </a>
       </div>
     </div>
-    <div style="padding: 1.25rem 1.5rem;">
-      {% if demand_summary and demand_summary.predictions %}
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
-          {% for p in demand_summary.predictions[:4] %}
-            <div style="background: {% if p.demand_level == 'High Demand' %}#f0fdf4{% elif p.demand_level == 'Oversupplied' %}#fff1f2{% else %}#f8fafc{% endif %}; border: 1px solid {% if p.demand_level == 'High Demand' %}#bbf7d0{% elif p.demand_level == 'Oversupplied' %}#fecdd3{% else %}#e2e8f0{% endif %}; border-radius: 10px; padding: 1rem;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                <span style="font-weight: 700; font-size: 1.05rem; color: #0f172a;">{{ p.crop_name }}</span>
-                <span style="font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 999px; background: {% if p.demand_level == 'High Demand' %}#16a34a{% elif p.demand_level == 'Oversupplied' %}#e11d48{% else %}#2563eb{% endif %}; color: #fff;">
-                  {{ p.demand_level }}
-                </span>
+
+    <!-- ======================================================================
+         TAB 1: OVERVIEW & IMPACT METRICS
+         ====================================================================== -->
+    <div class="admin-tab-pane active" id="pane-overview">
+      
+      <!-- Primary Impact KPI Metric Cards -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        
+        <div class="metric-card" style="border-left: 4px solid #16a34a; background: #ffffff; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Total Registered Users</div>
+          <div style="font-size: 1.85rem; font-weight: 800; color: #0f172a; margin: 0.3rem 0;">{{ total_users }}</div>
+          <div style="font-size: 0.75rem; color: #166534; font-weight: 600;">
+            🌾 {{ total_farmers }} Farmers &bull; 🛒 {{ total_buyers }} Buyers
+          </div>
+        </div>
+
+        <div class="metric-card" style="border-left: 4px solid #0284c7; background: #ffffff; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Email Verification Status</div>
+          <div style="font-size: 1.85rem; font-weight: 800; color: #0284c7; margin: 0.3rem 0;">{{ verified_users_count or 0 }}</div>
+          <div style="font-size: 0.75rem; color: {% if unverified_users_count and unverified_users_count > 0 %}#d97706{% else %}#166534{% endif %}; font-weight: 600;">
+            ✓ Verified Users ({% if unverified_users_count and unverified_users_count > 0 %}{{ unverified_users_count }} Unverified{% else %}100% Complete{% endif %})
+          </div>
+        </div>
+
+        <div class="metric-card" style="border-left: 4px solid #f59e0b; background: #ffffff; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Marketplace Produce Listings</div>
+          <div style="font-size: 1.85rem; font-weight: 800; color: #0f172a; margin: 0.3rem 0;">{{ total_listings }}</div>
+          <div style="font-size: 0.75rem; color: #d97706; font-weight: 600;">
+            🟢 {{ available_listings }} Available &bull; 🔴 {{ sold_listings }} Sold
+          </div>
+        </div>
+
+        <div class="metric-card" style="border-left: 4px solid #dc2626; background: #ffffff; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Produce at Risk of Spoilage</div>
+          <div style="font-size: 1.85rem; font-weight: 800; color: #dc2626; margin: 0.3rem 0;">{{ urgent_count }}</div>
+          <div style="font-size: 0.75rem; color: #dc2626; font-weight: 600;">Urgent Rescue Batches</div>
+        </div>
+
+        <div class="metric-card" style="border-left: 4px solid #10b981; background: #ffffff; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Total Food Rescued</div>
+          <div style="font-size: 1.85rem; font-weight: 800; color: #0f172a; margin: 0.3rem 0;">{{ "{:,.0f}".format(total_rescued_kg or 0) }} kg</div>
+          <div style="font-size: 0.75rem; color: #166534; font-weight: 600;">
+            🌱 {{ "{:,.0f}".format((total_rescued_kg or 0) * 1.9) }} kg CO2 Prevented
+          </div>
+        </div>
+
+        <div class="metric-card" style="border-left: 4px solid #6366f1; background: #ffffff; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+          <div style="font-size: 0.8rem; color: #64748b; font-weight: 700; text-transform: uppercase;">Platform Trade Volume</div>
+          <div style="font-size: 1.85rem; font-weight: 800; color: #0f172a; margin: 0.3rem 0;">₹{{ "{:,.2f}".format(platform_revenue or 0) }}</div>
+          <div style="font-size: 0.75rem; color: #4338ca; font-weight: 600;">{{ total_enquiries }} Total Completed Trades</div>
+        </div>
+
+      </div>
+
+      <!-- AI Market Demand Intelligence Summary -->
+      <div class="data-table-card" style="border-left: 5px solid #2563eb; margin-bottom: 2rem;">
+        <div class="data-table-header" style="border-bottom: 1px solid #e2e8f0; padding-bottom: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.75rem;">📈</span>
+            <div>
+              <h2 style="font-size: 1.25rem; color: #1e3a8a; margin-bottom: 0.2rem;">
+                AI Market Demand Intelligence
+              </h2>
+              <span style="font-size: 0.85rem; color: #475569;">
+                Algorithmic evaluation of buyer procurement demand vs active Tamil Nadu marketplace inventory
+              </span>
+            </div>
+          </div>
+          <div>
+            <a href="{{ url_for('demand_prediction') }}" class="btn btn-outline-primary btn-sm" style="display: inline-flex; align-items: center; gap: 0.35rem;">
+              Full Analytics Report &rarr;
+            </a>
+          </div>
+        </div>
+        <div style="padding: 1.25rem 1.5rem;">
+          {% if demand_summary and demand_summary.predictions %}
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin-bottom: 1rem;">
+              {% for p in demand_summary.predictions[:4] %}
+                <div style="background: {% if p.demand_level == 'High Demand' %}#f0fdf4{% elif p.demand_level == 'Oversupplied' %}#fff1f2{% else %}#f8fafc{% endif %}; border: 1px solid {% if p.demand_level == 'High Demand' %}#bbf7d0{% elif p.demand_level == 'Oversupplied' %}#fecdd3{% else %}#e2e8f0{% endif %}; border-radius: 10px; padding: 1rem;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                    <span style="font-weight: 700; font-size: 1.05rem; color: #0f172a;">{{ p.crop_name }}</span>
+                    <span style="font-size: 0.72rem; font-weight: 700; padding: 0.2rem 0.55rem; border-radius: 999px; background: {% if p.demand_level == 'High Demand' %}#16a34a{% elif p.demand_level == 'Oversupplied' %}#e11d48{% else %}#2563eb{% endif %}; color: #fff;">
+                      {{ p.demand_level }}
+                    </span>
+                  </div>
+                  <div style="font-size: 0.85rem; color: #475569; margin-bottom: 0.4rem;">
+                    Score: <strong>{{ p.demand_index }}/100</strong> &bull; Buyer Demand: {{ p.buyer_demand_kg }} kg &bull; Supply: {{ p.supply_kg }} kg
+                  </div>
+                  <div style="font-size: 0.8rem; color: #64748b; font-style: italic;">
+                    {{ p.recommendation }}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div style="background: #f8fafc; padding: 1.25rem; border-radius: 8px; text-align: center; color: #64748b; font-size: 0.9rem;">
+              ℹ️ Demand prediction model initializes dynamically as buyers submit requirements and orders.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ======================================================================
+         TAB 2: BROADCAST ANNOUNCEMENTS & WEATHER ALERTS
+         ====================================================================== -->
+    <div class="admin-tab-pane" id="pane-broadcasts">
+      
+      <!-- Broadcast Alert Authoring Studio -->
+      <div class="data-table-card" style="border-left: 5px solid #ea580c; margin-bottom: 2rem;">
+        <div class="data-table-header" style="border-bottom: 1px solid #fed7aa; padding-bottom: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.75rem;">📢</span>
+            <div>
+              <h2 style="font-size: 1.35rem; color: #9a3412; margin-bottom: 0.2rem;">
+                Platform Announcement & Weather Alert Broadcast Studio
+              </h2>
+              <span style="font-size: 0.85rem; color: #7c2d12;">
+                Post official advisories, severe weather warnings, and government subsidy schemes to Farmers and Buyers across Tamil Nadu.
+              </span>
+            </div>
+          </div>
+          <div>
+            <span style="background: #ffedd5; color: #9a3412; font-weight: 700; font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 999px;">
+              ⚡ Live Statewide Dispatch
+            </span>
+          </div>
+        </div>
+
+        <div style="padding: 1.5rem;">
+          
+          <!-- One-Click Preset Templates -->
+          <div style="margin-bottom: 1.5rem; background: #fff7ed; border: 1px solid #ffedd5; border-radius: 10px; padding: 1rem;">
+            <div style="font-size: 0.825rem; font-weight: 700; color: #9a3412; margin-bottom: 0.5rem;">
+              ⚡ Quick Load Preset Advisories:
+            </div>
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+              <button type="button" class="btn btn-sm btn-secondary preset-broadcast-btn"
+                      data-title="IMD Coastal Thunderstorm & Heavy Rain Alert"
+                      data-category="Weather Alert"
+                      data-severity="Warning"
+                      data-role="farmer"
+                      data-district="Nagapattinam"
+                      data-message="IMD Chennai forecasts heavy to very heavy rainfall across coastal delta districts over the next 48 hours. Farmers are advised to harvest mature produce immediately, secure drainage channels, and move harvested bags to elevated storage facilities."
+                      data-link="/nearby-buyers"
+                      data-linktext="Find Nearby Storage & Buyers">
+                ⛈️ Coastal Rain Warning
+              </button>
+              <button type="button" class="btn btn-sm btn-secondary preset-broadcast-btn"
+                      data-title="50% Solar Cold Storage Subsidy Application Window Open"
+                      data-category="Scheme / Subsidy"
+                      data-severity="Info"
+                      data-role="farmer"
+                      data-district="All Tamil Nadu"
+                      data-message="Tamil Nadu Department of Agricultural Marketing has released the 2026 Solar Micro-Cold Storage subsidy scheme for smallholder farmer groups. Up to ₹1.5 Lakhs financial assistance provided per installation."
+                      data-link="https://tnhorticulture.tn.gov.in"
+                      data-linktext="View Government Portal">
+                🌾 Cold Storage Subsidy
+              </button>
+              <button type="button" class="btn btn-sm btn-secondary preset-broadcast-btn"
+                      data-title="High Demand Spot Procurement: Shallots & Tomatoes"
+                      data-category="Market Advisory"
+                      data-severity="Advisory"
+                      data-role="all"
+                      data-district="Dindigul"
+                      data-message="Chennai Wholesale & Hotel Federations have opened priority direct spot purchase windows for Grade-A shallots (chinna vengayam) and country tomatoes at +12% over Koyambedu baseline rates. Fast settlement guaranteed."
+                      data-link="/browse"
+                      data-linktext="Explore Available Lots">
+                📈 Spot Procurement Week
+              </button>
+              <button type="button" class="btn btn-sm btn-secondary preset-broadcast-btn"
+                      data-title="Highway Logistics Advisory: Salem-Namakkal Corridor Delay"
+                      data-category="Logistics"
+                      data-severity="Warning"
+                      data-role="all"
+                      data-district="Salem"
+                      data-message="Culvert repair works on NH-44 near Salem toll plaza causing 2-3 hours transit delays for refrigerated produce trucks. Plan evening dispatches accordingly to prevent temperature excursions."
+                      data-link=""
+                      data-linktext="">
+                🚚 Highway Logistics Advisory
+              </button>
+            </div>
+          </div>
+
+          <!-- Broadcast Submission Form -->
+          <form action="{{ url_for('admin_create_announcement') }}" method="POST" id="broadcastForm">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem;">
+              
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  Announcement Title *
+                </label>
+                <input type="text" name="title" id="broadcast_title" class="form-control" placeholder="e.g. Cyclone Advisory: Coastal Tamil Nadu" required>
               </div>
-              <div style="font-size: 0.85rem; color: #475569; margin-bottom: 0.4rem;">
-                Index: <strong>{{ p.demand_index }}/100</strong> &bull; Buyer Demand: {{ p.buyer_demand_kg }} kg &bull; Active Supply: {{ p.supply_kg }} kg
+
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  Category *
+                </label>
+                <select name="category" id="broadcast_category" class="form-control" required>
+                  <option value="Weather Alert">⛈️ Weather Alert</option>
+                  <option value="Platform Update">📢 Platform Update</option>
+                  <option value="Scheme / Subsidy">🌾 Scheme / Subsidy</option>
+                  <option value="Market Advisory">📈 Market Advisory</option>
+                  <option value="Logistics">🚚 Logistics & Transport</option>
+                  <option value="General">ℹ️ General Notice</option>
+                </select>
               </div>
-              <div style="font-size: 0.8rem; color: #64748b; font-style: italic;">
-                {{ p.recommendation }}
+
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  Severity Level *
+                </label>
+                <select name="severity" id="broadcast_severity" class="form-control" required>
+                  <option value="Info">ℹ️ Info (Blue banner)</option>
+                  <option value="Advisory">⚠️ Advisory (Amber banner)</option>
+                  <option value="Warning">⚡ Warning (Orange banner)</option>
+                  <option value="Critical">🚨 Critical (Red emergency banner)</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  Target Audience *
+                </label>
+                <select name="target_role" id="broadcast_role" class="form-control" required>
+                  <option value="all">🌐 All Users (Farmers & Buyers)</option>
+                  <option value="farmer">🌾 Farmers Only</option>
+                  <option value="buyer">🛒 Buyers Only</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  Target District *
+                </label>
+                <select name="target_district" id="broadcast_district" class="form-control" required>
+                  <option value="All Tamil Nadu">Statewide (All 38 Districts)</option>
+                  <option value="Ariyalur">Ariyalur</option>
+                  <option value="Chengalpattu">Chengalpattu</option>
+                  <option value="Chennai">Chennai</option>
+                  <option value="Coimbatore">Coimbatore</option>
+                  <option value="Cuddalore">Cuddalore</option>
+                  <option value="Dharmapuri">Dharmapuri</option>
+                  <option value="Dindigul">Dindigul</option>
+                  <option value="Erode">Erode</option>
+                  <option value="Kallakurichi">Kallakurichi</option>
+                  <option value="Kanchipuram">Kanchipuram</option>
+                  <option value="Kanyakumari">Kanyakumari</option>
+                  <option value="Karur">Karur</option>
+                  <option value="Krishnagiri">Krishnagiri</option>
+                  <option value="Madurai">Madurai</option>
+                  <option value="Mayiladuthurai">Mayiladuthurai</option>
+                  <option value="Nagapattinam">Nagapattinam</option>
+                  <option value="Namakkal">Namakkal</option>
+                  <option value="Nilgiris">Nilgiris</option>
+                  <option value="Perambalur">Perambalur</option>
+                  <option value="Pudukkottai">Pudukkottai</option>
+                  <option value="Ramanathapuram">Ramanathapuram</option>
+                  <option value="Ranipet">Ranipet</option>
+                  <option value="Salem">Salem</option>
+                  <option value="Sivaganga">Sivaganga</option>
+                  <option value="Tenkasi">Tenkasi</option>
+                  <option value="Thanjavur">Thanjavur</option>
+                  <option value="Theni">Theni</option>
+                  <option value="Thoothukudi">Thoothukudi</option>
+                  <option value="Tiruchirappalli">Tiruchirappalli</option>
+                  <option value="Tirunelveli">Tirunelveli</option>
+                  <option value="Tirupathur">Tirupathur</option>
+                  <option value="Tiruppur">Tiruppur</option>
+                  <option value="Tiruvallur">Tiruvallur</option>
+                  <option value="Tiruvannamalai">Tiruvannamalai</option>
+                  <option value="Tiruvarur">Tiruvarur</option>
+                  <option value="Vellore">Vellore</option>
+                  <option value="Viluppuram">Viluppuram</option>
+                  <option value="Virudhunagar">Virudhunagar</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  Broadcast Validity
+                </label>
+                <select name="expires_days" class="form-control">
+                  <option value="1">1 Day</option>
+                  <option value="3">3 Days</option>
+                  <option value="7" selected>7 Days (Standard)</option>
+                  <option value="14">14 Days</option>
+                  <option value="30">30 Days (Long-term scheme)</option>
+                </select>
+              </div>
+
+            </div>
+
+            <div style="margin-bottom: 1.25rem;">
+              <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                Bulletin Advisory Message *
+              </label>
+              <textarea name="message" id="broadcast_message" rows="3" class="form-control" placeholder="Provide clear, actionable details for farmers and buyers..." required></textarea>
+            </div>
+
+            <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1.5rem;">
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  Action Button Link (Optional)
+                </label>
+                <input type="text" name="action_link" id="broadcast_link" class="form-control" placeholder="e.g. /nearby-buyers or external URL">
+              </div>
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  Button Label
+                </label>
+                <input type="text" name="action_text" id="broadcast_linktext" class="form-control" placeholder="e.g. View Guidelines">
               </div>
             </div>
-          {% endfor %}
+
+            <button type="submit" class="btn btn-primary btn-lg" style="font-weight: 800; display: inline-flex; align-items: center; gap: 0.5rem;">
+              <span>📢</span> Publish Broadcast Bulletin to Platform
+            </button>
+          </form>
+
         </div>
-      {% else %}
-        <div style="background: #f8fafc; padding: 1.25rem; border-radius: 8px; text-align: center; color: #64748b; font-size: 0.9rem;">
-          ℹ️ Demand prediction model initializes when buyers place procurement requirements and enquiries.
-        </div>
-      {% endif %}
-      <div style="font-size: 0.75rem; color: #94a3b8; display: flex; align-items: center; gap: 0.35rem; margin-top: 0.5rem;">
-        <span>🔍 Model Transparency:</span>
-        <span>Ranks crops based on live buyer enquiry volume, target procurement requirements, and current unsold inventory. Real database transactions only.</span>
       </div>
-    </div>
-  </div>
 
-  <!-- Section 1: Listings Moderation -->
-  <div class="data-table-card">
-    <div class="data-table-header">
-      <div>
-        <h2 style="font-size: 1.35rem;">Manage & Moderate Produce Listings</h2>
-        <span style="font-size: 0.85rem; color: var(--text-muted);">Review listings, detect duplicates, or remove inappropriate posts</span>
-      </div>
-      <a href="{{ url_for('add_listing') }}" class="btn btn-outline-primary btn-sm">+ Add Listing</a>
-    </div>
-
-    <div class="table-responsive">
-      <div class="table-scroll-hint"><span>👉 Swipe horizontally to view full table details</span></div>
-      <table class="custom-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Crop Name</th>
-            <th>Farmer</th>
-            <th>Location</th>
-            <th>Stock & Rate</th>
-            <th>Age / Status</th>
-            <th style="text-align: right;">Moderation Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for l in listings %}
-            <tr>
-              <td>#{{ l['id'] }}</td>
-              <td>
-                <a href="{{ url_for('listing_detail', listing_id=l['id']) }}" style="font-weight: 700;">{{ l['crop_name'] }}</a>
-                <div style="font-size: 0.75rem; color: #64748b;">{{ l['category'] }}</div>
-              </td>
-              <td>
-                <div style="font-weight: 600;">{{ l['farmer_name'] }}</div>
-                <div style="font-size: 0.75rem; color: #64748b;">{{ l['farmer_phone'] }}</div>
-              </td>
-              <td>{{ l['village_town'] }}, {{ l['district'] }}</td>
-              <td>
-                <strong>{{ l['quantity'] }} {{ l['unit'] }}</strong><br>
-                ₹{{ "%.0f"|format(l['price_per_unit']) }} / {{ l['unit'] }}
-              </td>
-              <td>
-                {% set days_old, age_label = calculate_listing_age(l['created_at']) %}
-                {% if is_needs_attention(l) %}
-                  <span class="badge-urgent" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">{{ age_label }}</span>
-                {% else %}
-                  <span style="font-size: 0.8rem; color: #475569;">{{ age_label }}</span>
-                {% endif %}
-                <div style="font-size: 0.75rem; font-weight: 700; margin-top: 0.2rem; color: {% if l['status'] == 'Available' %}#15803d{% else %}#64748b{% endif %};">
-                  {{ l['status'] }}
-                </div>
-              </td>
-              <td>
-                <div class="action-btns" style="justify-content: flex-end;">
-                  <!-- Toggle Status -->
-                  <form action="{{ url_for('toggle_listing_status', listing_id=l['id']) }}" method="POST">
-                    <button type="submit" class="btn btn-sm btn-secondary" title="Toggle status">
-                      {% if l['status'] == 'Available' %}Mark Sold{% else %}Make Available{% endif %}
-                    </button>
-                  </form>
-
-                  <!-- Edit -->
-                  <a href="{{ url_for('edit_listing', listing_id=l['id']) }}" class="btn btn-sm btn-secondary">
-                    ✏️
-                  </a>
-
-                  <!-- Delete -->
-                  <form action="{{ url_for('delete_listing', listing_id=l['id']) }}" method="POST" class="confirm-delete">
-                    <button type="submit" class="btn btn-sm btn-danger" title="Remove Listing">
-                      🗑️
-                    </button>
-                  </form>
-                </div>
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Section 2: User Accounts Management -->
-  <div class="data-table-card">
-    <div class="data-table-header">
-      <div>
-        <h2 style="font-size: 1.35rem;">Registered User Directory</h2>
-        <span style="font-size: 0.85rem; color: var(--text-muted);">Manage farmers, buyers, and administrators</span>
-      </div>
-    </div>
-
-    <div class="table-responsive">
-      <div class="table-scroll-hint"><span>👉 Swipe horizontally to view full table details</span></div>
-      <table class="custom-table">
-        <thead>
-          <tr>
-            <th>User</th>
-            <th>Role</th>
-            <th>Contact Details</th>
-            <th>Location</th>
-            <th>Type</th>
-            <th>Registered Date</th>
-            <th style="text-align: right;">Action</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for u in users %}
-            <tr>
-              <td>
-                <div style="font-weight: 700; color: #0f172a;">{{ u['name'] }}</div>
-                <div style="font-size: 0.75rem; color: #64748b;">ID #{{ u['id'] }}</div>
-              </td>
-              <td>
-                <span class="user-badge role-{{ u['role'] }}">
-                  {{ u['role'].capitalize() }}
-                </span>
-              </td>
-              <td>
-                <div>📞 {{ u['phone'] }}</div>
-                <div style="font-size: 0.775rem; color: #64748b;">✉️ {{ u['email'] }}</div>
-              </td>
-              <td>{{ u['location'] or '-' }}</td>
-              <td>{{ u['user_type'] or '-' }}</td>
-              <td>{{ u['created_at'].split()[0] if ' ' in u['created_at'] else u['created_at'] }}</td>
-              <td style="text-align: right;">
-                {% if u['id'] != current_user['id'] %}
-                  <form action="{{ url_for('admin_delete_user', user_id=u['id']) }}" method="POST" class="confirm-delete" style="display: inline;">
-                    <button type="submit" class="btn btn-danger btn-sm" title="Delete User">
-                      Delete
-                    </button>
-                  </form>
-                {% else %}
-                  <span style="font-size: 0.8rem; color: #166534; font-weight: 600;">(Current Admin)</span>
-                {% endif %}
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  <!-- Section: Payments, Escrow & Gateway Audit Center -->
-  <div class="data-table-card" style="margin-bottom: 2rem; border-top: 4px solid #16a34a;">
-    <div class="data-table-header">
-      <div>
-        <h2 style="font-size: 1.35rem; color: #0f172a;">💳 Razorpay Payments & Gateway Escrow Audit</h2>
-        <span style="font-size: 0.85rem; color: var(--text-muted);">
-          Monitor marketplace payment volume, online gateway collections, Cash on Delivery handovers, and process refund requests
-        </span>
-      </div>
-      <div>
-        {% if refund_requests and refund_requests|length > 0 %}
-          <span style="background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; font-weight: 700; font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 999px;">
-            ⚠️ {{ refund_requests|length }} Pending Refund Request(s)
+      <!-- Active & Historical Announcements Table -->
+      <div class="data-table-card">
+        <div class="data-table-header">
+          <div>
+            <h2 style="font-size: 1.25rem;">Broadcast Bulletins Registry</h2>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Manage active and archived alerts displayed across farmer and buyer dashboards</span>
+          </div>
+          <span class="badge" style="background: #e2e8f0; color: #334155; font-size: 0.8rem; font-weight: 700; padding: 0.35rem 0.75rem;">
+            {{ announcements|length if announcements else 0 }} Bulletins Total
           </span>
+        </div>
+
+        <div class="table-responsive">
+          <table class="custom-table" style="font-size: 0.875rem;">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Bulletin Title & Message</th>
+                <th>Category</th>
+                <th>Severity</th>
+                <th>Target Audience</th>
+                <th>District</th>
+                <th>Valid Until</th>
+                <th>Status</th>
+                <th style="text-align: right;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if announcements and announcements|length > 0 %}
+                {% for a in announcements %}
+                  <tr>
+                    <td>#{{ a['id'] }}</td>
+                    <td style="max-width: 320px;">
+                      <div style="font-weight: 700; color: #0f172a; margin-bottom: 0.2rem;">{{ a['title'] }}</div>
+                      <div style="font-size: 0.785rem; color: #475569; line-height: 1.4;">{{ a['message'] }}</div>
+                      {% if a['action_link'] %}
+                        <div style="font-size: 0.72rem; color: #166534; font-weight: 600; margin-top: 0.25rem;">
+                          🔗 {{ a['action_text'] or 'Action Link' }} ({{ a['action_link'] }})
+                        </div>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <span style="font-weight: 600; font-size: 0.775rem;">{{ a['category'] }}</span>
+                    </td>
+                    <td>
+                      <span class="badge" style="background: {% if a['severity'] == 'Critical' %}#dc2626{% elif a['severity'] == 'Warning' %}#ea580c{% elif a['severity'] == 'Advisory' %}#d97706{% else %}#0284c7{% endif %}; color: #ffffff; font-size: 0.72rem; padding: 0.2rem 0.55rem; border-radius: 6px; font-weight: 700;">
+                        {{ a['severity'] }}
+                      </span>
+                    </td>
+                    <td>
+                      <span class="user-badge role-{{ a['target_role'] }}" style="font-size: 0.75rem;">
+                        {{ a['target_role']|upper }}
+                      </span>
+                    </td>
+                    <td>
+                      <span style="font-size: 0.8rem; font-weight: 600; color: #334155;">
+                        {{ a['target_district'] or 'All Tamil Nadu' }}
+                      </span>
+                    </td>
+                    <td style="font-size: 0.8rem; color: #64748b; white-space: nowrap;">
+                      {{ a['expires_at'] or 'No expiry' }}
+                    </td>
+                    <td>
+                      {% if a['is_active'] == 1 %}
+                        <span style="background: #dcfce7; color: #166534; font-weight: 700; font-size: 0.75rem; padding: 0.2rem 0.55rem; border-radius: 999px;">
+                          🟢 Active
+                        </span>
+                      {% else %}
+                        <span style="background: #f1f5f9; color: #64748b; font-weight: 700; font-size: 0.75rem; padding: 0.2rem 0.55rem; border-radius: 999px;">
+                          ⚪ Inactive
+                        </span>
+                      {% endif %}
+                    </td>
+                    <td style="text-align: right;">
+                      <div style="display: flex; gap: 0.35rem; justify-content: flex-end; align-items: center;">
+                        <!-- Toggle Status -->
+                        <form action="{{ url_for('admin_toggle_announcement', announcement_id=a['id']) }}" method="POST" style="display: inline;">
+                          <button type="submit" class="btn btn-sm btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.75rem;" title="Toggle Bulletin Status">
+                            {% if a['is_active'] == 1 %}Deactivate{% else %}Activate{% endif %}
+                          </button>
+                        </form>
+
+                        <!-- Delete -->
+                        <form action="{{ url_for('admin_delete_announcement', announcement_id=a['id']) }}" method="POST" style="display: inline;" onsubmit="return confirm('Permanently delete broadcast bulletin #{{ a['id'] }}?');">
+                          <button type="submit" class="btn btn-sm btn-danger" style="padding: 0.25rem 0.55rem; font-size: 0.75rem;" title="Delete Bulletin">
+                            🗑️
+                          </button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="9" style="text-align: center; padding: 2rem; color: #64748b;">
+                    No broadcast bulletins published yet. Use the studio above to author your first statewide advisory.
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ======================================================================
+         TAB 3: USER MANAGEMENT & EMAIL VERIFICATION
+         ====================================================================== -->
+    <div class="admin-tab-pane" id="pane-users">
+      
+      <!-- User Directory with Email Verification Badges & 1-Click Verification -->
+      <div class="data-table-card">
+        <div class="data-table-header" style="flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 style="font-size: 1.35rem;">Registered User Directory & Email Verification</h2>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">
+              Manage farmers, wholesale buyers, verification credentials, and user account status
+            </span>
+          </div>
+
+          <!-- User Filters & Search -->
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+            <input type="text" id="userDirectorySearch" placeholder="🔍 Search name, email, district..." class="form-control" style="width: 220px; font-size: 0.85rem; padding: 0.4rem 0.75rem;">
+            <select id="userRoleFilter" class="form-control" style="width: 140px; font-size: 0.85rem; padding: 0.4rem 0.75rem;">
+              <option value="all">All Roles</option>
+              <option value="farmer">🌾 Farmers</option>
+              <option value="buyer">🛒 Buyers</option>
+              <option value="admin">🛡️ Admins</option>
+            </select>
+            <select id="userVerifFilter" class="form-control" style="width: 150px; font-size: 0.85rem; padding: 0.4rem 0.75rem;">
+              <option value="all">All Verification</option>
+              <option value="verified">✓ Verified Only</option>
+              <option value="unverified">⏳ Unverified Only</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <div class="table-scroll-hint"><span>👉 Swipe horizontally to view full table details</span></div>
+          <table class="custom-table" id="usersTable" style="font-size: 0.875rem;">
+            <thead>
+              <tr>
+                <th>User Details</th>
+                <th>Role</th>
+                <th>Email Verification</th>
+                <th>Contact & Location</th>
+                <th>Registered Date</th>
+                <th>Account Status</th>
+                <th style="text-align: right;">Moderation & Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for u in users %}
+                <tr class="user-row" data-role="{{ u['role'] }}" data-verified="{{ '1' if u['email_verified'] == 1 else '0' }}">
+                  <td>
+                    <div style="font-weight: 700; color: #0f172a;">{{ u['name'] }}</div>
+                    <div style="font-size: 0.75rem; color: #64748b;">UID #{{ u['id'] }} &bull; {{ u['user_type'] or 'Standard' }}</div>
+                  </td>
+                  <td>
+                    <span class="user-badge role-{{ u['role'] }}">
+                      {{ u['role'].capitalize() }}
+                    </span>
+                  </td>
+                  <td>
+                    {% if u['email_verified'] == 1 %}
+                      <span style="background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; font-weight: 700; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 999px; display: inline-flex; align-items: center; gap: 0.3rem;">
+                        <span>✓</span> Verified
+                      </span>
+                      {% if u['verified_at'] %}
+                        <div style="font-size: 0.7rem; color: #64748b; margin-top: 0.2rem;">{{ u['verified_at'][:10] }}</div>
+                      {% endif %}
+                    {% else %}
+                      <span style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-weight: 700; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 999px; display: inline-flex; align-items: center; gap: 0.3rem;">
+                        <span>⏳</span> Unverified
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div>📞 {{ u['phone'] }}</div>
+                    <div style="font-size: 0.775rem; color: #475569;">✉️ {{ u['email'] }}</div>
+                    <div style="font-size: 0.75rem; color: #64748b;">📍 {{ u['location'] or u['district'] or '-' }}</div>
+                  </td>
+                  <td style="white-space: nowrap; font-size: 0.8rem; color: #64748b;">
+                    {{ u['created_at'].split()[0] if ' ' in u['created_at'] else u['created_at'] }}
+                  </td>
+                  <td>
+                    {% if u['is_active'] == 1 %}
+                      <span style="background: #dcfce7; color: #166534; font-weight: 700; font-size: 0.75rem; padding: 0.2rem 0.55rem; border-radius: 999px;">
+                        Active
+                      </span>
+                    {% else %}
+                      <span style="background: #fee2e2; color: #991b1b; font-weight: 700; font-size: 0.75rem; padding: 0.2rem 0.55rem; border-radius: 999px;">
+                        Suspended
+                      </span>
+                    {% endif %}
+                  </td>
+                  <td style="text-align: right;">
+                    <div style="display: flex; gap: 0.35rem; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+                      
+                      <!-- 1-Click Verification Toggle Button -->
+                      <form action="{{ url_for('admin_verify_user', user_id=u['id']) }}" method="POST" style="display: inline;">
+                        <button type="submit" class="btn btn-sm {% if u['email_verified'] == 1 %}btn-outline{% else %}btn-success{% endif %}" style="padding: 0.25rem 0.55rem; font-size: 0.75rem; {% if u['email_verified'] != 1 %}background: #16a34a; border-color: #16a34a; color: white;{% endif %}" title="Toggle Email Verification Status">
+                          {% if u['email_verified'] == 1 %}Mark Unverified{% else %}✓ Verify User{% endif %}
+                        </button>
+                      </form>
+
+                      <!-- Resend Email Verification Dispatch -->
+                      <form action="{{ url_for('admin_send_verification', user_id=u['id']) }}" method="POST" style="display: inline;">
+                        <button type="submit" class="btn btn-sm btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.75rem;" title="Send Verification Link via Email">
+                          ✉️ Send Link
+                        </button>
+                      </form>
+
+                      {% if u['id'] != current_user['id'] %}
+                        <!-- Toggle User Active / Suspended -->
+                        <form action="{{ url_for('admin_toggle_user_status', user_id=u['id']) }}" method="POST" style="display: inline;">
+                          <button type="submit" class="btn btn-sm btn-secondary" style="padding: 0.25rem 0.55rem; font-size: 0.75rem;" title="Toggle Active / Suspended">
+                            {% if u['is_active'] == 1 %}Suspend{% else %}Activate{% endif %}
+                          </button>
+                        </form>
+
+                        <!-- Delete User -->
+                        <form action="{{ url_for('admin_delete_user', user_id=u['id']) }}" method="POST" style="display: inline;" onsubmit="return confirm('Permanently remove user {{ u['name'] }}?');">
+                          <button type="submit" class="btn btn-danger btn-sm" style="padding: 0.25rem 0.55rem; font-size: 0.75rem;" title="Delete User">
+                            🗑️
+                          </button>
+                        </form>
+                      {% else %}
+                        <span style="font-size: 0.75rem; color: #166534; font-weight: 700;">(You)</span>
+                      {% endif %}
+
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ======================================================================
+         TAB 4: PRODUCE LISTINGS MODERATION
+         ====================================================================== -->
+    <div class="admin-tab-pane" id="pane-listings">
+      
+      <div class="data-table-card">
+        <div class="data-table-header" style="flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 style="font-size: 1.35rem;">Manage & Moderate Produce Listings</h2>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Review listings, detect price anomalies, or remove inappropriate posts</span>
+          </div>
+          <div style="display: flex; gap: 0.5rem;">
+            <a href="{{ url_for('add_listing') }}" class="btn btn-primary btn-sm">+ Post Listing</a>
+            <a href="{{ url_for('browse_listings') }}" class="btn btn-secondary btn-sm" target="_blank">View Marketplace &rarr;</a>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <div class="table-scroll-hint"><span>👉 Swipe horizontally to view full table details</span></div>
+          <table class="custom-table" style="font-size: 0.875rem;">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Crop Name</th>
+                <th>Farmer</th>
+                <th>Location</th>
+                <th>Stock & Rate</th>
+                <th>Age / Urgency</th>
+                <th>Status</th>
+                <th style="text-align: right;">Moderation Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for l in listings %}
+                <tr>
+                  <td>#{{ l['id'] }}</td>
+                  <td>
+                    <a href="{{ url_for('listing_detail', listing_id=l['id']) }}" style="font-weight: 700; color: #0f172a;">{{ l['crop_name'] }}</a>
+                    <div style="font-size: 0.75rem; color: #64748b;">{{ l['category'] }}</div>
+                  </td>
+                  <td>
+                    <div style="font-weight: 600;">{{ l['farmer_name'] }}</div>
+                    <div style="font-size: 0.75rem; color: #64748b;">{{ l['farmer_phone'] }}</div>
+                  </td>
+                  <td>{{ l['village_town'] }}, {{ l['district'] }}</td>
+                  <td>
+                    <strong>{{ l['quantity'] }} {{ l['unit'] }}</strong><br>
+                    ₹{{ "%.0f"|format(l['price_per_unit']) }} / {{ l['unit'] }}
+                  </td>
+                  <td>
+                    {% set days_old, age_label = calculate_listing_age(l['created_at']) %}
+                    {% if is_needs_attention(l) %}
+                      <span class="badge-urgent" style="font-size: 0.75rem; padding: 0.2rem 0.5rem;">{{ age_label }}</span>
+                    {% else %}
+                      <span style="font-size: 0.8rem; color: #475569;">{{ age_label }}</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <div style="font-size: 0.75rem; font-weight: 700; color: {% if l['status'] == 'Available' %}#15803d{% else %}#64748b{% endif %};">
+                      {{ l['status'] }}
+                    </div>
+                  </td>
+                  <td>
+                    <div class="action-btns" style="justify-content: flex-end;">
+                      <form action="{{ url_for('toggle_listing_status', listing_id=l['id']) }}" method="POST">
+                        <button type="submit" class="btn btn-sm btn-secondary" title="Toggle status">
+                          {% if l['status'] == 'Available' %}Mark Sold{% else %}Make Available{% endif %}
+                        </button>
+                      </form>
+                      <a href="{{ url_for('edit_listing', listing_id=l['id']) }}" class="btn btn-sm btn-secondary" title="Edit Listing">
+                        ✏️
+                      </a>
+                      <form action="{{ url_for('delete_listing', listing_id=l['id']) }}" method="POST" class="confirm-delete">
+                        <button type="submit" class="btn btn-sm btn-danger" title="Remove Listing">
+                          🗑️
+                        </button>
+                      </form>
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ======================================================================
+         TAB 5: ORDERS & ENQUIRIES AUDIT
+         ====================================================================== -->
+    <div class="admin-tab-pane" id="pane-orders">
+      
+      <div class="data-table-card">
+        <div class="data-table-header">
+          <div>
+            <h2 style="font-size: 1.35rem;">Platform Orders & Procurement Enquiries</h2>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Real-time ledger of trade commitments, fulfillment milestones, and delivery handovers</span>
+          </div>
+          <span class="badge" style="background: #e2e8f0; color: #334155; font-size: 0.8rem; font-weight: 700; padding: 0.35rem 0.75rem;">
+            {{ enquiries|length if enquiries else 0 }} Recent Orders
+          </span>
+        </div>
+
+        <div class="table-responsive">
+          <table class="custom-table" style="font-size: 0.875rem;">
+            <thead>
+              <tr>
+                <th>Order #</th>
+                <th>Produce & Quantity</th>
+                <th>Buyer</th>
+                <th>Farmer</th>
+                <th>Total Value</th>
+                <th>Order Status</th>
+                <th>Payment</th>
+                <th style="text-align: right;">Timeline & Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if enquiries and enquiries|length > 0 %}
+                {% for e in enquiries %}
+                  <tr>
+                    <td><strong>#{{ e['id'] }}</strong></td>
+                    <td>
+                      <div style="font-weight: 700; color: #0f172a;">{{ e['crop_name'] }}</div>
+                      <div style="font-size: 0.75rem; color: #64748b;">{{ e['requested_quantity'] }} kg requested</div>
+                    </td>
+                    <td>
+                      <div style="font-weight: 600;">{{ e['buyer_name'] }}</div>
+                      <div style="font-size: 0.72rem; color: #64748b;">{{ e['buyer_phone'] }}</div>
+                    </td>
+                    <td>
+                      <div style="font-weight: 600;">{{ e['farmer_name'] }}</div>
+                    </td>
+                    <td>
+                      <strong style="color: #166534;">₹{{ "{:,.2f}".format(e['total_price'] or 0) }}</strong>
+                    </td>
+                    <td>
+                      <span class="status-badge status-{{ (e['status'] or 'pending')|lower|replace(' ', '-') }}">
+                        {{ e['status'] }}
+                      </span>
+                    </td>
+                    <td>
+                      <span style="font-size: 0.75rem; font-weight: 600;">
+                        {{ e['payment_status'] or 'Pending' }}
+                      </span>
+                    </td>
+                    <td style="text-align: right;">
+                      <a href="{{ url_for('track_order', order_id=e['id']) }}" class="btn btn-sm btn-outline-primary" style="padding: 0.25rem 0.6rem; font-size: 0.75rem;">
+                        Track 11-Stage &rarr;
+                      </a>
+                    </td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="8" style="text-align: center; padding: 2rem; color: #64748b;">
+                    No order commitments recorded yet.
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ======================================================================
+         TAB 6: PAYMENTS & ESCROW AUDIT
+         ====================================================================== -->
+    <div class="admin-tab-pane" id="pane-payments">
+      
+      <div class="data-table-card" style="border-top: 4px solid #16a34a;">
+        <div class="data-table-header">
+          <div>
+            <h2 style="font-size: 1.35rem; color: #0f172a;">💳 Razorpay Payments & Gateway Escrow Audit</h2>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">
+              Monitor marketplace payment volume, online gateway collections, Cash on Delivery handovers, and process refund requests
+            </span>
+          </div>
+          <div>
+            {% if refund_requests and refund_requests|length > 0 %}
+              <span style="background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; font-weight: 700; font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 999px;">
+                ⚠️ {{ refund_requests|length }} Pending Refund Request(s)
+              </span>
+            {% else %}
+              <span style="background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; font-weight: 700; font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 999px;">
+                ✓ All Gateway Settlements Healthy
+              </span>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Payment KPI Grid -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; padding: 1.25rem 1.25rem 0.5rem;">
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 1rem;">
+            <div style="font-size: 0.75rem; font-weight: 700; color: #166534; text-transform: uppercase;">Total Payment Volume</div>
+            <div style="font-size: 1.5rem; font-weight: 800; color: #166534; margin-top: 0.25rem;">
+              ₹{{ "{:,.2f}".format(total_payment_volume or 0) }}
+            </div>
+            <div style="font-size: 0.72rem; color: #166534;">Cumulative trade throughput</div>
+          </div>
+
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem;">
+            <div style="font-size: 0.75rem; font-weight: 700; color: #0f172a; text-transform: uppercase;">Paid Online Orders</div>
+            <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a; margin-top: 0.25rem;">
+              {{ paid_payments_count }}
+            </div>
+            <div style="font-size: 0.72rem; color: #64748b;">UPI, Cards & Net Banking</div>
+          </div>
+
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 1rem;">
+            <div style="font-size: 0.75rem; font-weight: 700; color: #1e40af; text-transform: uppercase;">Pending COD Orders</div>
+            <div style="font-size: 1.5rem; font-weight: 800; color: #1e40af; margin-top: 0.25rem;">
+              {{ pending_payments_count }}
+            </div>
+            <div style="font-size: 0.72rem; color: #1e40af;">Cash collected at delivery</div>
+          </div>
+
+          <div style="background: {% if refund_requests and refund_requests|length > 0 %}#fef2f2; border: 1px solid #fecaca;{% else %}#f8fafc; border: 1px solid #e2e8f0;{% endif %} border-radius: 8px; padding: 1rem;">
+            <div style="font-size: 0.75rem; font-weight: 700; color: {% if refund_requests and refund_requests|length > 0 %}#991b1b{% else %}#64748b{% endif %}; text-transform: uppercase;">Refund Requests</div>
+            <div style="font-size: 1.5rem; font-weight: 800; color: {% if refund_requests and refund_requests|length > 0 %}#991b1b{% else %}#0f172a{% endif %}; margin-top: 0.25rem;">
+              {{ refund_requests|length if refund_requests else 0 }}
+            </div>
+            <div style="font-size: 0.72rem; color: #64748b;">Buyer escrow disputes</div>
+          </div>
+        </div>
+
+        <!-- Payments Audit Table -->
+        {% if payments %}
+          <div class="table-responsive" style="margin-top: 1rem;">
+            <table class="custom-table" style="font-size: 0.85rem;">
+              <thead>
+                <tr>
+                  <th>Txn / Order #</th>
+                  <th>Produce</th>
+                  <th>Buyer & Farmer</th>
+                  <th>Amount</th>
+                  <th>Method</th>
+                  <th>Gateway Status</th>
+                  <th>Refund Review</th>
+                  <th style="text-align: right;">Audit Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for p in payments %}
+                  <tr>
+                    <td>
+                      <strong>#{{ p['order_id'] }}</strong>
+                      {% if p['razorpay_payment_id'] %}
+                        <div style="font-size: 0.7rem; color: #64748b; font-family: monospace;">{{ p['razorpay_payment_id'] }}</div>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div style="font-weight: 700;">{{ p['crop_name'] }}</div>
+                      <div style="font-size: 0.75rem; color: #64748b;">{{ p['quantity'] }} {{ p['unit'] }}</div>
+                    </td>
+                    <td>
+                      <div>Buyer: <strong>{{ p['buyer_name'] }}</strong></div>
+                      <div style="font-size: 0.75rem; color: #64748b;">Farmer: {{ p['farmer_name'] }}</div>
+                    </td>
+                    <td>
+                      <strong style="color: #166534; font-size: 0.95rem;">₹{{ "{:,.2f}".format(p['amount']) }}</strong>
+                    </td>
+                    <td>
+                      <span style="font-size: 0.75rem; background: #f1f5f9; padding: 0.2rem 0.45rem; border-radius: 4px; font-weight: 600;">
+                        {% if 'COD' in (p['payment_method'] or '') %}💵 COD{% else %}💳 Razorpay ({{ p['payment_method'] or 'Online' }}){% endif %}
+                      </span>
+                    </td>
+                    <td>
+                      {% if p['payment_status'] == 'Paid' %}
+                        <span style="background: #dcfce7; color: #166534; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+                          ✓ Paid
+                        </span>
+                      {% elif p['payment_status'] == 'Pending COD' %}
+                        <span style="background: #e0f2fe; color: #0369a1; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+                          💵 COD Pending
+                        </span>
+                      {% elif p['payment_status'] == 'Refunded' %}
+                        <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+                          ↩️ Refunded
+                        </span>
+                      {% else %}
+                        <span style="background: #fee2e2; color: #991b1b; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
+                          {{ p['payment_status'] }}
+                        </span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if p['refund_status'] == 'Refund Requested' %}
+                        <span style="background: #fef3c7; color: #b45309; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;">
+                          ⚠️ Requested
+                        </span>
+                      {% elif p['refund_status'] == 'Refunded' %}
+                        <span style="background: #f1f5f9; color: #64748b; font-size: 0.75rem; font-weight: 600;">
+                          Approved
+                        </span>
+                      {% elif p['refund_status'] == 'Refund Rejected' %}
+                        <span style="background: #fee2e2; color: #991b1b; font-size: 0.75rem; font-weight: 600;">
+                          Rejected
+                        </span>
+                      {% else %}
+                        <span style="color: #94a3b8; font-size: 0.75rem;">None</span>
+                      {% endif %}
+                    </td>
+                    <td style="text-align: right;">
+                      <div style="display: flex; gap: 0.35rem; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
+                        <a href="{{ url_for('view_invoice', order_id=p['order_id']) }}" class="btn btn-outline-primary btn-sm" target="_blank" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                          🧾 Invoice
+                        </a>
+                        {% if p['refund_status'] == 'Refund Requested' %}
+                          <form action="{{ url_for('admin_process_refund', payment_id=p['id']) }}" method="POST" style="display: inline;" onsubmit="return confirm('Approve refund of ₹{{ p['amount'] }} for Order #{{ p['order_id'] }}?');">
+                            <input type="hidden" name="action" value="approve">
+                            <button type="submit" class="btn btn-sm btn-success" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background: #16a34a; border-color: #16a34a; color: white;">
+                              ✓ Approve
+                            </button>
+                          </form>
+                          <form action="{{ url_for('admin_process_refund', payment_id=p['id']) }}" method="POST" style="display: inline;" onsubmit="return confirm('Reject refund request for Order #{{ p['order_id'] }}?');">
+                            <input type="hidden" name="action" value="reject">
+                            <button type="submit" class="btn btn-sm btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
+                              ✕ Reject
+                            </button>
+                          </form>
+                        {% endif %}
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
         {% else %}
-          <span style="background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; font-weight: 700; font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 999px;">
-            ✓ All Gateway Settlements Healthy
-          </span>
+          <div style="padding: 2.5rem 1.5rem; text-align: center; color: #64748b;">
+            <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">💳</span>
+            <div style="font-weight: 700; color: #0f172a; margin-bottom: 0.25rem;">No Payment Records Found</div>
+            <p style="font-size: 0.85rem; margin: 0;">Online orders and Cash on Delivery handovers will be logged here for gateway reconciliation.</p>
+          </div>
         {% endif %}
       </div>
+
     </div>
 
-    <!-- Payment KPI Grid -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; padding: 1.25rem 1.25rem 0.5rem;">
-      <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 1rem;">
-        <div style="font-size: 0.75rem; font-weight: 700; color: #166534; text-transform: uppercase;">Total Payment Volume</div>
-        <div style="font-size: 1.5rem; font-weight: 800; color: #166534; margin-top: 0.25rem;">
-          ₹{{ "{:,.2f}".format(total_payment_volume or 0) }}
+    <!-- ======================================================================
+         TAB 7: DIRECT MEETINGS & SPOT SALES
+         ====================================================================== -->
+    <div class="admin-tab-pane" id="pane-meetings">
+      
+      <div class="data-table-card">
+        <div class="data-table-header">
+          <div>
+            <h2 style="font-size: 1.35rem;">🤝 Direct In-Person Farm Meetings & Spot Sales</h2>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">
+              Track buyers meeting farmers in person at farms and spot markets across Tamil Nadu
+            </span>
+          </div>
+          <span class="badge" style="background: #e2e8f0; color: #334155; font-size: 0.8rem; font-weight: 700; padding: 0.35rem 0.75rem;">
+            {{ meetings|length if meetings else 0 }} Scheduled Meetings
+          </span>
         </div>
-        <div style="font-size: 0.72rem; color: #166534;">Cumulative trade throughput</div>
-      </div>
 
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 1rem;">
-        <div style="font-size: 0.75rem; font-weight: 700; color: #0f172a; text-transform: uppercase;">Paid Online Orders</div>
-        <div style="font-size: 1.5rem; font-weight: 800; color: #0f172a; margin-top: 0.25rem;">
-          {{ paid_payments_count }}
-        </div>
-        <div style="font-size: 0.72rem; color: #64748b;">UPI, Cards & Net Banking</div>
-      </div>
-
-      <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 1rem;">
-        <div style="font-size: 0.75rem; font-weight: 700; color: #1e40af; text-transform: uppercase;">Pending COD Orders</div>
-        <div style="font-size: 1.5rem; font-weight: 800; color: #1e40af; margin-top: 0.25rem;">
-          {{ pending_payments_count }}
-        </div>
-        <div style="font-size: 0.72rem; color: #1e40af;">Cash collected at delivery</div>
-      </div>
-
-      <div style="background: {% if refund_requests and refund_requests|length > 0 %}#fef2f2; border: 1px solid #fecaca;{% else %}#f8fafc; border: 1px solid #e2e8f0;{% endif %} border-radius: 8px; padding: 1rem;">
-        <div style="font-size: 0.75rem; font-weight: 700; color: {% if refund_requests and refund_requests|length > 0 %}#991b1b{% else %}#64748b{% endif %}; text-transform: uppercase;">Refund Requests</div>
-        <div style="font-size: 1.5rem; font-weight: 800; color: {% if refund_requests and refund_requests|length > 0 %}#991b1b{% else %}#0f172a{% endif %}; margin-top: 0.25rem;">
-          {{ refund_requests|length if refund_requests else 0 }}
-        </div>
-        <div style="font-size: 0.72rem; color: #64748b;">Buyer escrow disputes</div>
-      </div>
-    </div>
-
-    <!-- Payments Audit Table -->
-    {% if payments %}
-      <div class="table-responsive" style="margin-top: 1rem;">
-        <table class="custom-table" style="font-size: 0.85rem;">
-          <thead>
-            <tr>
-              <th>Txn / Order #</th>
-              <th>Produce</th>
-              <th>Buyer & Farmer</th>
-              <th>Amount</th>
-              <th>Method</th>
-              <th>Gateway Status</th>
-              <th>Refund Review</th>
-              <th style="text-align: right;">Audit Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for p in payments %}
+        <div class="table-responsive">
+          <table class="custom-table" style="font-size: 0.875rem;">
+            <thead>
               <tr>
-                <td>
-                  <strong>#{{ p['order_id'] }}</strong>
-                  {% if p['razorpay_payment_id'] %}
-                    <div style="font-size: 0.7rem; color: #64748b; font-family: monospace;">{{ p['razorpay_payment_id'] }}</div>
-                  {% endif %}
-                </td>
-                <td>
-                  <div style="font-weight: 700;">{{ p['crop_name'] }}</div>
-                  <div style="font-size: 0.75rem; color: #64748b;">{{ p['quantity'] }} {{ p['unit'] }}</div>
-                </td>
-                <td>
-                  <div>Buyer: <strong>{{ p['buyer_name'] }}</strong></div>
-                  <div style="font-size: 0.75rem; color: #64748b;">Farmer: {{ p['farmer_name'] }}</div>
-                </td>
-                <td>
-                  <strong style="color: #166534; font-size: 0.95rem;">₹{{ "{:,.2f}".format(p['amount']) }}</strong>
-                </td>
-                <td>
-                  <span style="font-size: 0.75rem; background: #f1f5f9; padding: 0.2rem 0.45rem; border-radius: 4px; font-weight: 600;">
-                    {% if 'COD' in (p['payment_method'] or '') %}💵 COD{% else %}💳 Razorpay ({{ p['payment_method'] or 'Online' }}){% endif %}
-                  </span>
-                </td>
-                <td>
-                  {% if p['payment_status'] == 'Paid' %}
-                    <span style="background: #dcfce7; color: #166534; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
-                      ✓ Paid
-                    </span>
-                  {% elif p['payment_status'] == 'Pending COD' %}
-                    <span style="background: #e0f2fe; color: #0369a1; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
-                      💵 COD Pending
-                    </span>
-                  {% elif p['payment_status'] == 'Refunded' %}
-                    <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
-                      ↩️ Refunded
-                    </span>
-                  {% else %}
-                    <span style="background: #fee2e2; color: #991b1b; padding: 0.2rem 0.5rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700;">
-                      {{ p['payment_status'] }}
-                    </span>
-                  {% endif %}
-                </td>
-                <td>
-                  {% if p['refund_status'] == 'Refund Requested' %}
-                    <span style="background: #fef3c7; color: #b45309; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 700;">
-                      ⚠️ Requested
-                    </span>
-                  {% elif p['refund_status'] == 'Refunded' %}
-                    <span style="background: #f1f5f9; color: #64748b; font-size: 0.75rem; font-weight: 600;">
-                      Approved
-                    </span>
-                  {% elif p['refund_status'] == 'Refund Rejected' %}
-                    <span style="background: #fee2e2; color: #991b1b; font-size: 0.75rem; font-weight: 600;">
-                      Rejected
-                    </span>
-                  {% else %}
-                    <span style="color: #94a3b8; font-size: 0.75rem;">None</span>
-                  {% endif %}
-                </td>
-                <td style="text-align: right;">
-                  <div style="display: flex; gap: 0.35rem; justify-content: flex-end; align-items: center; flex-wrap: wrap;">
-                    <a href="{{ url_for('view_invoice', order_id=p['order_id']) }}" class="btn btn-outline-primary btn-sm" target="_blank" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
-                      🧾 Invoice
-                    </a>
-
-                    {% if p['refund_status'] == 'Refund Requested' %}
-                      <!-- Approve Refund -->
-                      <form action="{{ url_for('admin_process_refund', payment_id=p['id']) }}" method="POST" style="display: inline;" onsubmit="return confirm('Approve refund of ₹{{ p['amount'] }} for Order #{{ p['order_id'] }}?');">
-                        <input type="hidden" name="action" value="approve">
-                        <button type="submit" class="btn btn-sm btn-success" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background: #16a34a; border-color: #16a34a; color: white;">
-                          ✓ Approve
-                        </button>
-                      </form>
-
-                      <!-- Reject Refund -->
-                      <form action="{{ url_for('admin_process_refund', payment_id=p['id']) }}" method="POST" style="display: inline;" onsubmit="return confirm('Reject refund request for Order #{{ p['order_id'] }}?');">
-                        <input type="hidden" name="action" value="reject">
-                        <button type="submit" class="btn btn-sm btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
-                          ✕ Reject
-                        </button>
-                      </form>
-                    {% endif %}
-                  </div>
-                </td>
+                <th>Meeting #</th>
+                <th>Buyer</th>
+                <th>Farmer</th>
+                <th>Proposed Date & Time</th>
+                <th>Meeting Location</th>
+                <th>Status</th>
+                <th>Created At</th>
               </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {% if meetings and meetings|length > 0 %}
+                {% for m in meetings %}
+                  <tr>
+                    <td><strong>#{{ m['id'] }}</strong></td>
+                    <td>
+                      <div style="font-weight: 700;">{{ m['buyer_name'] }}</div>
+                      <div style="font-size: 0.75rem; color: #64748b;">{{ m['buyer_phone'] }}</div>
+                    </td>
+                    <td>
+                      <div style="font-weight: 700;">{{ m['farmer_name'] }}</div>
+                      <div style="font-size: 0.75rem; color: #64748b;">{{ m['farmer_phone'] }}</div>
+                    </td>
+                    <td>
+                      <div style="font-weight: 600; color: #0369a1;">📅 {{ m['proposed_date'] }}</div>
+                      <div style="font-size: 0.75rem; color: #64748b;">⏰ {{ m['proposed_time'] }}</div>
+                    </td>
+                    <td>
+                      <div style="font-size: 0.85rem;">📍 {{ m['meeting_location'] }}</div>
+                      {% if m['purpose'] %}
+                        <div style="font-size: 0.75rem; color: #64748b;">{{ m['purpose'] }}</div>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <span class="badge" style="background: {% if m['status'] == 'Confirmed' %}#dcfce7; color: #166534;{% elif m['status'] == 'Pending' %}#fef3c7; color: #92400e;{% else %}#f1f5f9; color: #475569;{% endif %} padding: 0.25rem 0.6rem; border-radius: 999px; font-weight: 700;">
+                        {{ m['status'] }}
+                      </span>
+                    </td>
+                    <td style="font-size: 0.785rem; color: #64748b; white-space: nowrap;">
+                      {{ m['created_at'][:16] if m['created_at'] else '-' }}
+                    </td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="7" style="text-align: center; padding: 2rem; color: #64748b;">
+                    No in-person farm meetings scheduled yet.
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
       </div>
-    {% else %}
-      <div style="padding: 2.5rem 1.5rem; text-align: center; color: #64748b;">
-        <span style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">💳</span>
-        <div style="font-weight: 700; color: #0f172a; margin-bottom: 0.25rem;">No Payment Records Found</div>
-        <p style="font-size: 0.85rem; margin: 0;">Online orders and Cash on Delivery handovers will be logged here for gateway reconciliation.</p>
-      </div>
-    {% endif %}
-  </div>
 
-  <!-- Section 3: Platform Audit & Activity Logs -->
-  <div class="data-table-card">
-    <div class="data-table-header">
-      <div>
-        <h2 style="font-size: 1.35rem;">Platform Audit & Activity Log</h2>
-        <span style="font-size: 0.85rem; color: var(--text-muted);">Real-time tracking of platform transactions, listings, and updates</span>
-      </div>
     </div>
 
-    <div class="table-responsive">
-      <div class="table-scroll-hint"><span>👉 Swipe horizontally to view full table details</span></div>
-      <table class="custom-table">
-        <thead>
-          <tr>
-            <th>Timestamp</th>
-            <th>Action</th>
-            <th>Details</th>
-            <th>User</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for log in logs %}
-            <tr>
-              <td style="font-size: 0.8rem; color: #64748b; white-space: nowrap;">
-                {{ log['created_at'] }}
-              </td>
-              <td>
-                <span style="font-weight: 700; font-size: 0.85rem; color: var(--primary-dark);">
-                  {{ log['action'] }}
-                </span>
-              </td>
-              <td style="font-size: 0.85rem;">{{ log['details'] }}</td>
-              <td style="font-size: 0.8rem; color: #64748b;">{{ log['user_email'] }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+    <!-- ======================================================================
+         TAB 8: SMTP CONFIGURATION & TARGETED EMAIL BROADCASTS
+         ====================================================================== -->
+    <div class="admin-tab-pane" id="pane-smtp">
+      
+      <!-- 1. Interactive SMTP Configuration Card -->
+      <div class="data-table-card" style="border-left: 5px solid #0284c7; margin-bottom: 2rem;">
+        <div class="data-table-header" style="border-bottom: 1px solid #e0f2fe; padding-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.75rem;">⚙️</span>
+            <div>
+              <h2 style="font-size: 1.35rem; color: #0369a1; margin-bottom: 0.2rem;">
+                SMTP Server Credentials & Configuration
+              </h2>
+              <span style="font-size: 0.85rem; color: #075985;">
+                Configure dynamic SMTP server credentials, authenticated sender account, and Google App Passwords
+              </span>
+            </div>
+          </div>
+          <div>
+            <span style="background: {% if smtp_config.is_configured %}#dcfce7; color: #166534; border: 1px solid #bbf7d0;{% else %}#fef3c7; color: #92400e; border: 1px solid #fde68a;{% endif %} font-weight: 700; font-size: 0.825rem; padding: 0.4rem 0.85rem; border-radius: 999px;">
+              {% if smtp_config.is_configured %}🟢 Live SMTP Ready{% else %}⚪ Simulator Mode (Needs App Password){% endif %}
+            </span>
+          </div>
+        </div>
 
+        <div style="padding: 1.5rem;">
+          
+          <!-- Instructions Callout for Google App Passwords -->
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 1rem 1.25rem; margin-bottom: 1.5rem;">
+            <div style="font-weight: 700; color: #166534; font-size: 0.9rem; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.4rem;">
+              <span>💡</span> Setting up Gmail with an App Password (e.g. for {{ smtp_config.username }}):
+            </div>
+            <div style="font-size: 0.825rem; color: #166534; line-height: 1.5;">
+              1. Enable <strong>2-Step Verification</strong> on your Google Account (<a href="https://myaccount.google.com/security" target="_blank" style="color: #15803d; text-decoration: underline; font-weight: 700;">Google Security</a>).<br>
+              2. Visit <a href="https://myaccount.google.com/apppasswords" target="_blank" style="color: #15803d; text-decoration: underline; font-weight: 700;">myaccount.google.com/apppasswords</a> and generate an app password named <em>FarmFresh</em>.<br>
+              3. Copy the 16-character password into the <strong>App Password</strong> field below and click <strong>Save SMTP Settings</strong>.
+            </div>
+          </div>
+
+          <!-- SMTP Settings Edit Form -->
+          <form action="{{ url_for('admin_save_smtp_config') }}" method="POST" id="smtpSettingsForm">
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1.25rem; margin-bottom: 1.25rem;">
+              
+              <!-- Field 1: SMTP Host -->
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  SMTP Server Host *
+                </label>
+                <input type="text" name="smtp_server" class="form-control" value="{{ smtp_config.server }}" placeholder="smtp.gmail.com" required>
+                <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.25rem;">Standard: smtp.gmail.com or smtp.sendgrid.net</div>
+              </div>
+
+              <!-- Field 2: Port -->
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  Port & Protocol *
+                </label>
+                <input type="number" name="smtp_port" class="form-control" value="{{ smtp_config.port }}" placeholder="587" required>
+                <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.25rem;">Port 587 (TLS) or 465 (SSL)</div>
+              </div>
+
+              <!-- Field 3: Encryption -->
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  Encryption Method *
+                </label>
+                <select name="smtp_use_tls" class="form-control" required>
+                  <option value="1" {% if smtp_config.use_tls %}selected{% endif %}>TLS Encryption (Recommended - Port 587)</option>
+                  <option value="0" {% if not smtp_config.use_tls %}selected{% endif %}>No Encryption / Plain (Local Mailhog)</option>
+                </select>
+                <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.25rem;">STARTTLS secure tunnel handshake</div>
+              </div>
+
+              <!-- Field 4: Authenticated Sender -->
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  Authenticated Sender Email *
+                </label>
+                <input type="email" name="smtp_username" class="form-control" value="{{ smtp_config.username }}" placeholder="Pp274142@gmail.com" required>
+                <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.25rem;">Used for SMTP authentication login</div>
+              </div>
+
+              <!-- Field 5: App Password -->
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  App Password / SMTP Password *
+                </label>
+                <div style="position: relative;">
+                  <input type="password" name="smtp_password" id="smtpPasswordField" class="form-control" value="{{ smtp_config.password }}" placeholder="Enter 16-char App Password" style="padding-right: 42px;">
+                  <button type="button" id="btnToggleSmtpPassword" style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1.1rem; color: #64748b;" title="Toggle Password Visibility">
+                    👁️
+                  </button>
+                </div>
+                <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.25rem;">Leave untouched to keep currently active password</div>
+              </div>
+
+              <!-- Field 6: Sender Name -->
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  Sender Display Name
+                </label>
+                <input type="text" name="smtp_sender_name" class="form-control" value="{{ smtp_config.sender_name or 'FarmFresh Rescue Admin' }}" placeholder="FarmFresh Rescue Admin">
+                <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.25rem;">Name shown in recipient inbox</div>
+              </div>
+
+            </div>
+
+            <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+              <button type="submit" class="btn btn-primary" style="font-weight: 800; display: inline-flex; align-items: center; gap: 0.4rem;">
+                <span>💾</span> Save & Activate SMTP Configuration
+              </button>
+              <div style="font-size: 0.8rem; color: #64748b;">
+                Changes take effect instantly for email verification, alerts, and broadcasts without server restart.
+              </div>
+            </div>
+          </form>
+
+          <!-- Diagnostic Test Dispatch Form -->
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem; margin-top: 1.5rem;">
+            <div style="font-weight: 700; color: #0f172a; font-size: 0.95rem; margin-bottom: 0.35rem;">
+              🧪 Instant SMTP Diagnostic Probe Test
+            </div>
+            <p style="font-size: 0.85rem; color: #64748b; margin-bottom: 1rem;">
+              Send an immediate test message to verify TLS connection, credential authentication, and inbox delivery.
+            </p>
+            <form action="{{ url_for('admin_test_smtp') }}" method="POST" style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
+              <input type="email" name="recipient_email" class="form-control" style="max-width: 320px;" placeholder="Target test email" value="{{ smtp_config.username or current_user['email'] }}" required>
+              <button type="submit" class="btn btn-secondary" style="font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem;">
+                <span>🚀</span> Dispatch Test Probe
+              </button>
+            </form>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- 2. Targeted Email Communication & Broadcast Dispatcher -->
+      <div class="data-table-card" style="border-left: 5px solid #16a34a; margin-bottom: 2rem;">
+        <div class="data-table-header" style="border-bottom: 1px solid #bbf7d0; padding-bottom: 1rem; flex-wrap: wrap; gap: 0.75rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.75rem;">📢</span>
+            <div>
+              <h2 style="font-size: 1.35rem; color: #166534; margin-bottom: 0.2rem;">
+                Targeted Email Communication & Broadcast Studio
+              </h2>
+              <span style="font-size: 0.85rem; color: #14532d;">
+                Send official HTML emails to Farmers, Wholesale Buyers, or Both using pre-built communication templates.
+              </span>
+            </div>
+          </div>
+          <div>
+            <span style="background: #ecfdf5; color: #166534; border: 1px solid #a7f3d0; font-weight: 700; font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 999px;">
+              {{ total_farmers }} Farmers &bull; {{ total_buyers }} Buyers Available
+            </span>
+          </div>
+        </div>
+
+        <div style="padding: 1.5rem;">
+          
+          <!-- One-Click Template Loader Bar -->
+          <div style="margin-bottom: 1.5rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 1rem;">
+            <div style="font-size: 0.825rem; font-weight: 700; color: #166534; margin-bottom: 0.6rem;">
+              ⚡ Select Default Communication Template:
+            </div>
+            <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
+              <button type="button" class="btn btn-sm btn-outline-success email-template-btn" id="btnTmplWeather"
+                      data-target="farmer"
+                      data-subject="⛈️ [Weather Warning & Harvest Advisory] Heavy Rains Predicted in Tamil Nadu Districts">
+                ⛈️ Template 1: Weather & Crop Rescue (Farmers)
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-primary email-template-btn" id="btnTmplHarvest"
+                      data-target="buyer"
+                      data-subject="🛒 [Fresh Harvest Alert] New Direct Farm Batches Available in Your District">
+                🥕 Template 2: Fresh Direct Harvest (Buyers)
+              </button>
+              <button type="button" class="btn btn-sm btn-outline-dark email-template-btn" id="btnTmplMarket"
+                      data-target="both"
+                      data-subject="🌾 [FarmFresh Platform Update] Statewide Mandi Rates & Zero-Waste Trading Advisory">
+                🌾 Template 3: Market Advisory & Trends (Both)
+              </button>
+            </div>
+          </div>
+
+          <!-- Broadcast Email Dispatch Form -->
+          <form action="{{ url_for('admin_send_email_broadcast') }}" method="POST" id="emailBroadcastForm" onsubmit="return confirmBroadcastSend();">
+            
+            <!-- Target Audience Selector -->
+            <div style="margin-bottom: 1.25rem;">
+              <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.5rem; color: #0f172a;">
+                Target Audience *
+              </label>
+              <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; background: #f8fafc; padding: 0.85rem 1.1rem; border-radius: 8px; border: 1px solid #e2e8f0;">
+                <label style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; font-weight: 600; cursor: pointer;">
+                  <input type="radio" name="target_audience" value="farmer" id="audFarmer">
+                  <span>🌾 Farmers Only ({{ total_farmers }} recipients)</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; font-weight: 600; cursor: pointer;">
+                  <input type="radio" name="target_audience" value="buyer" id="audBuyer">
+                  <span>🛒 Buyers Only ({{ total_buyers }} recipients)</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; font-weight: 600; cursor: pointer;">
+                  <input type="radio" name="target_audience" value="both" id="audBoth" checked>
+                  <span>🌐 Both Farmers & Buyers ({{ total_users }} recipients)</span>
+                </label>
+                <label style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; font-weight: 600; cursor: pointer;">
+                  <input type="radio" name="target_audience" value="single" id="audSingle">
+                  <span>👤 Single Test Email</span>
+                </label>
+              </div>
+            </div>
+
+            <!-- Single Email Field (Hidden by default unless Single is picked) -->
+            <div id="singleEmailWrap" style="display: none; margin-bottom: 1.25rem;">
+              <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                Single Recipient Email Address
+              </label>
+              <input type="email" name="single_email" id="singleEmailInput" class="form-control" placeholder="e.g. test@gmail.com" value="{{ current_user['email'] }}">
+            </div>
+
+            <!-- Subject Line -->
+            <div style="margin-bottom: 1.25rem;">
+              <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                Email Subject Line *
+              </label>
+              <input type="text" name="subject" id="broadcastSubject" class="form-control" placeholder="e.g. 🌾 Important FarmFresh Advisory" required>
+            </div>
+
+            <!-- Message Body HTML Textarea -->
+            <div style="margin-bottom: 1.25rem;">
+              <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                Responsive HTML Message Body *
+              </label>
+              <textarea name="html_content" id="broadcastHtmlContent" rows="8" class="form-control" style="font-family: monospace; font-size: 0.85rem;" placeholder="Enter or edit HTML email content..." required></textarea>
+            </div>
+
+            <!-- Live HTML Email Preview Accordion -->
+            <div style="margin-bottom: 1.5rem; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+              <div style="background: #f1f5f9; padding: 0.6rem 1rem; font-size: 0.8rem; font-weight: 700; color: #475569; display: flex; justify-content: space-between; align-items: center;">
+                <span>👁️ Live Email Message Preview:</span>
+                <span style="font-size: 0.72rem; color: #64748b;">Updates in real time</span>
+              </div>
+              <div id="liveEmailPreview" style="padding: 1.5rem; background: #f8fafc; min-height: 120px; overflow-x: auto;">
+                <div style="color: #94a3b8; font-style: italic; text-align: center;">Click one of the templates above or type HTML content to see the live rendering here.</div>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg" style="font-weight: 800; display: inline-flex; align-items: center; gap: 0.5rem;">
+              <span>🚀</span> Dispatch Email Broadcast Now
+            </button>
+          </form>
+
+        </div>
+      </div>
+
+      <!-- Recent Email Activity Logs -->
+      <div class="data-table-card">
+        <div class="data-table-header">
+          <div>
+            <h2 style="font-size: 1.25rem;">Recent Email Activity Logs</h2>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Real-time tracking of sent verification emails, alerts, and simulator events</span>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="custom-table" style="font-size: 0.85rem;">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Status</th>
+                <th>Event</th>
+                <th>Recipient</th>
+                <th>Log Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if email_logs and email_logs|length > 0 %}
+                {% for log in email_logs %}
+                  <tr>
+                    <td style="font-size: 0.8rem; color: #64748b; white-space: nowrap;">{{ log['created_at'] }}</td>
+                    <td>
+                      {% if 'SENT' in log['action'] %}
+                        <span style="background: #dcfce7; color: #166534; padding: 0.2rem 0.5rem; border-radius: 999px; font-weight: 700; font-size: 0.75rem;">
+                          ✓ Delivered
+                        </span>
+                      {% elif 'SIMULATED' in log['action'] %}
+                        <span style="background: #e0f2fe; color: #0369a1; padding: 0.2rem 0.5rem; border-radius: 999px; font-weight: 700; font-size: 0.75rem;">
+                          ⚡ Simulated
+                        </span>
+                      {% else %}
+                        <span style="background: #fee2e2; color: #991b1b; padding: 0.2rem 0.5rem; border-radius: 999px; font-weight: 700; font-size: 0.75rem;">
+                          ⚠️ Failed
+                        </span>
+                      {% endif %}
+                    </td>
+                    <td style="font-weight: 700; color: #0f172a;">{{ log['action'] }}</td>
+                    <td style="color: #475569;">{{ log['user_email'] }}</td>
+                    <td style="color: #64748b; font-size: 0.8rem;">{{ log['details'] }}</td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="5" style="text-align: center; padding: 2rem; color: #64748b;">
+                    No email activities logged in this session yet.
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ======================================================================
+         TAB 9: AUDIT & ACTIVITY LOGS
+         ====================================================================== -->
+    <div class="admin-tab-pane" id="pane-logs">
+      
+      <div class="data-table-card">
+        <div class="data-table-header">
+          <div>
+            <h2 style="font-size: 1.35rem;">Platform Audit & Activity Log</h2>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Real-time tracking of platform transactions, listings, and updates</span>
+          </div>
+          <span class="badge" style="background: #e2e8f0; color: #334155; font-size: 0.8rem; font-weight: 700; padding: 0.35rem 0.75rem;">
+            {{ logs|length }} Audit Records
+          </span>
+        </div>
+
+        <div class="table-responsive">
+          <div class="table-scroll-hint"><span>👉 Swipe horizontally to view full table details</span></div>
+          <table class="custom-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>Action</th>
+                <th>Details</th>
+                <th>User</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for log in logs %}
+                <tr>
+                  <td style="font-size: 0.8rem; color: #64748b; white-space: nowrap;">
+                    {{ log['created_at'] }}
+                  </td>
+                  <td>
+                    <span style="font-weight: 700; font-size: 0.85rem; color: var(--primary-dark);">
+                      {{ log['action'] }}
+                    </span>
+                  </td>
+                  <td style="font-size: 0.85rem;">{{ log['details'] }}</td>
+                  <td style="font-size: 0.8rem; color: #64748b;">{{ log['user_email'] }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ======================================================================
+         TAB 10: SAMPLE PRODUCE DATA MANAGEMENT
+         ====================================================================== -->
+    <div class="admin-tab-pane" id="pane-sample-data">
+      
+      <div class="data-table-card" style="border-left: 5px solid #f59e0b; background: linear-gradient(to right, #ffffff, #fffdf5);">
+        <div class="data-table-header" style="border-bottom: 1px solid #fef3c7; padding-bottom: 1rem;">
+          <div style="display: flex; align-items: center; gap: 0.75rem;">
+            <span style="font-size: 1.75rem;">🧪</span>
+            <div>
+              <h2 style="font-size: 1.35rem; color: #92400e; margin-bottom: 0.2rem;">
+                Demonstration & Sample Produce Management
+              </h2>
+              <span style="font-size: 0.85rem; color: #78350f;">
+                Manage the 10 vegetable demonstration records displayed on the Browse Produce page for project evaluation.
+              </span>
+            </div>
+          </div>
+          <div>
+            {% if demo_listings_count > 0 %}
+              <span style="background: #fef3c7; color: #92400e; font-weight: 700; font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 999px; border: 1px solid #fde68a; display: inline-flex; align-items: center; gap: 0.4rem;">
+                <span style="width: 8px; height: 8px; background: #16a34a; border-radius: 50%; display: inline-block;"></span>
+                {{ demo_listings_count }} Demo Vegetables Active
+              </span>
+            {% else %}
+              <span style="background: #f1f5f9; color: #475569; font-weight: 700; font-size: 0.8rem; padding: 0.35rem 0.75rem; border-radius: 999px; border: 1px solid #cbd5e1; display: inline-flex; align-items: center; gap: 0.4rem;">
+                <span style="width: 8px; height: 8px; background: #94a3b8; border-radius: 50%; display: inline-block;"></span>
+                No Sample Data (Real Produce Only)
+              </span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div style="padding: 1.5rem;">
+          <p style="font-size: 0.9rem; color: #475569; line-height: 1.5; margin-bottom: 1.25rem;">
+            Sample listings are clearly tagged with <strong style="color: #92400e;">[SAMPLE]</strong> in Browse Produce so buyers and evaluators understand they are demonstration data. As an administrator, you can remove them before live deployment or reset them with current harvest dates anytime.
+          </p>
+
+          <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;">
+            <form action="{{ url_for('admin_reset_sample_data') }}" method="POST" style="margin: 0;" onsubmit="return confirm('Refresh all 10 demonstration vegetable listings with current harvest dates and realistic Tamil Nadu wholesale prices?');">
+              <button type="submit" class="btn btn-primary btn-sm" id="btn-reset-sample-data" style="display: inline-flex; align-items: center; gap: 0.4rem;">
+                <span>🔄</span> {% if demo_listings_count > 0 %}Refresh / Update Sample Data{% else %}Seed 10 Sample Vegetables{% endif %}
+              </button>
+            </form>
+
+            {% if demo_listings_count > 0 %}
+              <form action="{{ url_for('admin_remove_sample_data') }}" method="POST" style="margin: 0;" onsubmit="return confirm('Are you sure you want to completely remove all 10 demonstration vegetable listings from the marketplace?');">
+                <button type="submit" class="btn btn-danger btn-sm" id="btn-remove-sample-data" style="display: inline-flex; align-items: center; gap: 0.4rem;">
+                  <span>🗑️</span> Remove All Sample Data
+                </button>
+              </form>
+            {% endif %}
+
+            <a href="{{ url_for('browse_listings') }}" class="btn btn-outline-primary btn-sm" style="display: inline-flex; align-items: center; gap: 0.4rem;" target="_blank">
+              <span>👀</span> Preview on Browse Produce
+            </a>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
 </div>
+
+<!-- ==========================================================================
+     ADMIN PORTAL CLIENT INTERACTION JAVASCRIPT
+     ========================================================================== -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  
+  const navItems = document.querySelectorAll('.admin-nav-item');
+  const tabPanes = document.querySelectorAll('.admin-tab-pane');
+  const pageTitle = document.getElementById('adminCurrentTabTitle');
+  const sidebar = document.getElementById('adminSidebar');
+  const backdrop = document.getElementById('adminSidebarBackdrop');
+  const toggleBtn = document.getElementById('adminSidebarToggle');
+
+  const tabTitles = {
+    'overview': 'Agricultural Waste Prevention Control Center',
+    'broadcasts': 'Platform Announcement & Weather Alert Broadcasts',
+    'users': 'User Management & Email Verification Directory',
+    'listings': 'Manage & Moderate Marketplace Produce Listings',
+    'orders': 'Platform Orders & Procurement Enquiries',
+    'payments': 'Razorpay Payments & Gateway Escrow Audit',
+    'meetings': 'Direct In-Person Farm Meetings & Spot Sales',
+    'smtp': 'SMTP Email Service & Verification Diagnostics',
+    'logs': 'Real-Time Platform Audit & Activity Logs',
+    'sample-data': 'Demonstration & Sample Produce Management'
+  };
+
+  function activateTab(tabId) {
+    if (!tabId) tabId = 'overview';
+    
+    // Deactivate all
+    navItems.forEach(el => el.classList.remove('active'));
+    tabPanes.forEach(el => el.classList.remove('active'));
+
+    // Activate nav link
+    const targetNav = document.querySelector(`.admin-nav-item[data-tab="${tabId}"]`);
+    if (targetNav) {
+      targetNav.classList.add('active');
+    }
+
+    // Activate tab pane
+    const targetPane = document.getElementById(`pane-${tabId}`);
+    if (targetPane) {
+      targetPane.classList.add('active');
+    } else {
+      // fallback to overview
+      const fallbackPane = document.getElementById('pane-overview');
+      if (fallbackPane) fallbackPane.classList.add('active');
+    }
+
+    // Update title
+    if (pageTitle && tabTitles[tabId]) {
+      pageTitle.textContent = tabTitles[tabId];
+    }
+
+    // Close mobile drawer if open
+    if (sidebar && sidebar.classList.contains('show-mobile')) {
+      sidebar.classList.remove('show-mobile');
+      if (backdrop) backdrop.classList.remove('active');
+    }
+  }
+
+  // Handle nav tab clicks
+  navItems.forEach(item => {
+    item.addEventListener('click', function(e) {
+      e.preventDefault();
+      const tabId = this.getAttribute('data-tab');
+      if (tabId) {
+        history.replaceState(null, '', '#' + tabId);
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        const mainArea = document.querySelector('.admin-main-area');
+        if (mainArea) mainArea.scrollTop = 0;
+        activateTab(tabId);
+      }
+    });
+  });
+
+  // Handle jump buttons within panes
+  document.querySelectorAll('.admin-tab-jump-btn').forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const tabId = this.getAttribute('data-target-tab');
+      if (tabId) {
+        history.replaceState(null, '', '#' + tabId);
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        const mainArea = document.querySelector('.admin-main-area');
+        if (mainArea) mainArea.scrollTop = 0;
+        activateTab(tabId);
+      }
+    });
+  });
+
+  // Mobile sidebar drawer toggles
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', function() {
+      if (sidebar) sidebar.classList.toggle('show-mobile');
+      if (backdrop) backdrop.classList.toggle('active');
+    });
+  }
+
+  if (backdrop) {
+    backdrop.addEventListener('click', function() {
+      if (sidebar) sidebar.classList.remove('show-mobile');
+      backdrop.classList.remove('active');
+    });
+  }
+
+  // Listen to hash changes in URL (e.g. #broadcasts, #users)
+  window.addEventListener('hashchange', function() {
+    const hash = window.location.hash.replace('#', '');
+    if (hash) activateTab(hash);
+  });
+
+  // --------------------------------------------------------------------------
+  // SMTP Password Toggle Visibility
+  // --------------------------------------------------------------------------
+  const btnToggleSmtpPw = document.getElementById('btnToggleSmtpPassword');
+  const smtpPwField = document.getElementById('smtpPasswordField');
+  if (btnToggleSmtpPw && smtpPwField) {
+    btnToggleSmtpPw.addEventListener('click', function() {
+      if (smtpPwField.type === 'password') {
+        smtpPwField.type = 'text';
+        btnToggleSmtpPw.textContent = '🙈';
+      } else {
+        smtpPwField.type = 'password';
+        btnToggleSmtpPw.textContent = '👁️';
+      }
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // Targeted Email Templates & Live Preview Handlers
+  // --------------------------------------------------------------------------
+  const defaultTemplates = {"weather_farmer": {"subject": "\u26c8\ufe0f [Weather Warning & Harvest Advisory] Heavy Rains Predicted in Tamil Nadu Districts", "target": "farmer", "html": "<div style=\"font-family: 'Inter', -apple-system, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #fed7aa; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);\">\n  <div style=\"background: linear-gradient(135deg, #c2410c, #ea580c); padding: 24px; color: #ffffff; text-align: center;\">\n    <div style=\"font-size: 34px; margin-bottom: 6px;\">\u26c8\ufe0f</div>\n    <h2 style=\"margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;\">Urgent Weather & Crop Protection Advisory</h2>\n    <div style=\"font-size: 13px; opacity: 0.9; margin-top: 4px;\">Tamil Nadu State Agro-Advisory Bulletin</div>\n  </div>\n  <div style=\"padding: 26px 24px; color: #1e293b; font-size: 15px; line-height: 1.6;\">\n    <p style=\"margin-top: 0;\"><strong>Vanakkam Farmer Partner,</strong></p>\n    <p>Regional Meteorological Advisories forecast unseasonal heavy rainfall and gusty winds across agricultural districts in Tamil Nadu over the next 48 to 72 hours.</p>\n    \n    <div style=\"background: #fff7ed; border-left: 4px solid #ea580c; padding: 14px 18px; border-radius: 6px; margin: 20px 0;\">\n      <strong style=\"color: #9a3412;\">Recommended Immediate Farm Actions:</strong>\n      <ul style=\"margin: 8px 0 0; padding-left: 20px; color: #7c2d12;\">\n        <li>Harvest mature vegetable, tomato, shallot, and fruit crops immediately to prevent waterlogging.</li>\n        <li>Clear all farm drainage channels to prevent stagnant water in root zones.</li>\n        <li>Move harvested produce bags to elevated, tarpaulin-covered dry shelters.</li>\n        <li>Post urgent rescue lots on FarmFresh Rescue to connect with ready bulk buyers at fair rates.</li>\n      </ul>\n    </div>\n\n    <div style=\"text-align: center; margin: 28px 0;\">\n      <a href=\"http://127.0.0.1:5000/add-listing\" style=\"background: #ea580c; color: #ffffff !important; text-decoration: none; padding: 13px 30px; border-radius: 8px; font-weight: 700; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(234, 88, 12, 0.3);\">\n        \u2795 List Harvest for Urgent Rescue &rarr;\n      </a>\n    </div>\n\n    <p style=\"font-size: 13px; color: #64748b; margin-top: 24px; border-top: 1px solid #f1f5f9; padding-top: 16px;\">\n      FarmFresh Rescue Control Center &bull; Zero-Waste Agricultural Protection &bull; Tamil Nadu\n    </p>\n  </div>\n</div>"}, "harvest_buyer": {"subject": "\ud83d\uded2 [Fresh Harvest Alert] New Direct Farm Batches Available in Your District", "target": "buyer", "html": "<div style=\"font-family: 'Inter', -apple-system, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #bbf7d0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);\">\n  <div style=\"background: linear-gradient(135deg, #15803d, #16a34a); padding: 24px; color: #ffffff; text-align: center;\">\n    <div style=\"font-size: 34px; margin-bottom: 6px;\">\ud83e\udd55</div>\n    <h2 style=\"margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;\">Fresh Direct Harvest Batches Available</h2>\n    <div style=\"font-size: 13px; opacity: 0.9; margin-top: 4px;\">Zero-Intermediary Wholesale Agricultural Procurement</div>\n  </div>\n  <div style=\"padding: 26px 24px; color: #1e293b; font-size: 15px; line-height: 1.6;\">\n    <p style=\"margin-top: 0;\"><strong>Dear Wholesale Buyer / Hotelier / Retail Partner,</strong></p>\n    <p>Tamil Nadu farmers have listed premium, freshly harvested crop lots on <strong>FarmFresh Rescue</strong>. Procure directly at source rates with guaranteed freshness.</p>\n    \n    <div style=\"background: #f0fdf4; border-left: 4px solid #16a34a; padding: 14px 18px; border-radius: 6px; margin: 20px 0;\">\n      <strong style=\"color: #166534;\">Today's Priority Harvest Categories:</strong>\n      <ul style=\"margin: 8px 0 0; padding-left: 20px; color: #14532d;\">\n        <li><strong>Country & Hybrid Tomatoes:</strong> Direct farm lots in Dindigul, Salem, and Krishnagiri.</li>\n        <li><strong>Small Onions (Chinna Vengayam):</strong> High-grade dry shallots from Tiruppur and Perambalur.</li>\n        <li><strong>Green Chillies & Capsicum:</strong> Freshly plucked morning harvest at mandi-matching rates.</li>\n        <li><strong>Orchard Fresh Fruits:</strong> Bananas, guavas, and papayas ready for immediate dispatch.</li>\n      </ul>\n    </div>\n\n    <div style=\"text-align: center; margin: 28px 0;\">\n      <a href=\"http://127.0.0.1:5000/browse\" style=\"background: #16a34a; color: #ffffff !important; text-decoration: none; padding: 13px 30px; border-radius: 8px; font-weight: 700; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(22, 163, 74, 0.3);\">\n        \ud83d\udd0d Browse & Order Fresh Lots &rarr;\n      </a>\n    </div>\n\n    <p style=\"font-size: 13px; color: #64748b; margin-top: 24px; border-top: 1px solid #f1f5f9; padding-top: 16px;\">\n      FarmFresh Rescue Buyer Desk &bull; 100% Direct Farmer Trade &bull; Tamil Nadu\n    </p>\n  </div>\n</div>"}, "market_both": {"subject": "\ud83c\udf3e [FarmFresh Platform Update] Statewide Mandi Rates & Zero-Waste Trading Advisory", "target": "both", "html": "<div style=\"font-family: 'Inter', -apple-system, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #bfdbfe; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);\">\n  <div style=\"background: linear-gradient(135deg, #1e40af, #2563eb); padding: 24px; color: #ffffff; text-align: center;\">\n    <div style=\"font-size: 34px; margin-bottom: 6px;\">\ud83c\udf3e</div>\n    <h2 style=\"margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;\">Statewide Agricultural Market Advisory</h2>\n    <div style=\"font-size: 13px; opacity: 0.9; margin-top: 4px;\">Tamil Nadu Direct Farm Trade & Policy Briefing</div>\n  </div>\n  <div style=\"padding: 26px 24px; color: #1e293b; font-size: 15px; line-height: 1.6;\">\n    <p style=\"margin-top: 0;\"><strong>Dear FarmFresh Platform Member,</strong></p>\n    <p>Here is your regular briefing on agricultural market trends, direct trade protections, and zero-waste logistics across Tamil Nadu.</p>\n    \n    <div style=\"background: #eff6ff; border-left: 4px solid #2563eb; padding: 14px 18px; border-radius: 6px; margin: 20px 0;\">\n      <strong style=\"color: #1e40af;\">Key Platform Updates & Trading Highlights:</strong>\n      <ul style=\"margin: 8px 0 0; padding-left: 20px; color: #1e3a8a;\">\n        <li><strong>In-Person Farm Meetings:</strong> Buyers can schedule direct on-farm quality inspections before purchase.</li>\n        <li><strong>Escrow Settlement Security:</strong> All digital payments are held in escrow and settled swiftly upon delivery sign-off.</li>\n        <li><strong>Zero Waste Impact:</strong> Thousands of kg of fresh produce successfully rescued this season across 38 districts.</li>\n        <li><strong>Fair Mandi Price Benchmarks:</strong> AI Price Engine updated with live Koyambedu & regional regulated market indices.</li>\n      </ul>\n    </div>\n\n    <div style=\"text-align: center; margin: 28px 0;\">\n      <a href=\"http://127.0.0.1:5000/\" style=\"background: #2563eb; color: #ffffff !important; text-decoration: none; padding: 13px 30px; border-radius: 8px; font-weight: 700; font-size: 15px; display: inline-block; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);\">\n        \ud83d\ude80 Visit FarmFresh Rescue Platform &rarr;\n      </a>\n    </div>\n\n    <p style=\"font-size: 13px; color: #64748b; margin-top: 24px; border-top: 1px solid #f1f5f9; padding-top: 16px;\">\n      FarmFresh Rescue &bull; Tamil Nadu Direct Agricultural Initiative &bull; Vanakkam\n    </p>\n  </div>\n</div>"}};
+
+  const broadcastSubjInput = document.getElementById('broadcastSubject');
+  const broadcastHtmlArea = document.getElementById('broadcastHtmlContent');
+  const livePreview = document.getElementById('liveEmailPreview');
+  const singleWrap = document.getElementById('singleEmailWrap');
+
+  function updateLivePreview() {
+    if (livePreview && broadcastHtmlArea) {
+      const val = broadcastHtmlArea.value.trim();
+      if (val) {
+        livePreview.innerHTML = val;
+      } else {
+        livePreview.innerHTML = '<div style="color: #94a3b8; font-style: italic; text-align: center;">Click one of the templates above or type HTML content to see the live rendering here.</div>';
+      }
+    }
+  }
+
+  function applyTemplate(key) {
+    const tmpl = defaultTemplates[key];
+    if (!tmpl) return;
+    if (broadcastSubjInput) broadcastSubjInput.value = tmpl.subject;
+    if (broadcastHtmlArea) {
+      broadcastHtmlArea.value = tmpl.html;
+      updateLivePreview();
+    }
+    // Select matching audience radio
+    if (tmpl.target === 'farmer') {
+      const el = document.getElementById('audFarmer');
+      if (el) el.checked = true;
+    } else if (tmpl.target === 'buyer') {
+      const el = document.getElementById('audBuyer');
+      if (el) el.checked = true;
+    } else {
+      const el = document.getElementById('audBoth');
+      if (el) el.checked = true;
+    }
+    toggleSingleWrap();
+  }
+
+  const btnTmplW = document.getElementById('btnTmplWeather');
+  if (btnTmplW) btnTmplW.addEventListener('click', () => applyTemplate('weather_farmer'));
+
+  const btnTmplH = document.getElementById('btnTmplHarvest');
+  if (btnTmplH) btnTmplH.addEventListener('click', () => applyTemplate('harvest_buyer'));
+
+  const btnTmplM = document.getElementById('btnTmplMarket');
+  if (btnTmplM) btnTmplM.addEventListener('click', () => applyTemplate('market_both'));
+
+  if (broadcastHtmlArea) {
+    broadcastHtmlArea.addEventListener('input', updateLivePreview);
+  }
+
+  function toggleSingleWrap() {
+    const audSingle = document.getElementById('audSingle');
+    if (singleWrap && audSingle) {
+      singleWrap.style.display = audSingle.checked ? 'block' : 'none';
+    }
+  }
+
+  document.querySelectorAll('input[name="target_audience"]').forEach(r => {
+    r.addEventListener('change', toggleSingleWrap);
+  });
+
+  // Auto-load template 1 by default on first visit
+  if (broadcastHtmlArea && !broadcastHtmlArea.value.trim()) {
+    applyTemplate('weather_farmer');
+  }
+
+  window.confirmBroadcastSend = function() {
+    const selectedAud = document.querySelector('input[name="target_audience"]:checked');
+    const audVal = selectedAud ? selectedAud.value : 'all';
+    let label = 'all platform users';
+    if (audVal === 'farmer') label = 'all registered Farmers';
+    if (audVal === 'buyer') label = 'all registered Wholesale Buyers';
+    if (audVal === 'single') label = 'the specified test recipient';
+    return confirm('Confirm dispatch of email broadcast communication to ' + label + '?');
+  };
+
+  // Check URL hash on page load
+  const initialHash = window.location.hash.replace('#', '');
+  if (initialHash) {
+    activateTab(initialHash);
+  } else {
+    activateTab('overview');
+  }
+
+  // --------------------------------------------------------------------------
+  // Broadcast Preset Click Handlers
+  // --------------------------------------------------------------------------
+  document.querySelectorAll('.preset-broadcast-btn').forEach(btn => {
+    btn.addEventListener('click', function() {
+      document.getElementById('broadcast_title').value = this.getAttribute('data-title') || '';
+      document.getElementById('broadcast_category').value = this.getAttribute('data-category') || 'General';
+      document.getElementById('broadcast_severity').value = this.getAttribute('data-severity') || 'Info';
+      document.getElementById('broadcast_role').value = this.getAttribute('data-role') || 'all';
+      document.getElementById('broadcast_district').value = this.getAttribute('data-district') || 'All Tamil Nadu';
+      document.getElementById('broadcast_message').value = this.getAttribute('data-message') || '';
+      document.getElementById('broadcast_link').value = this.getAttribute('data-link') || '';
+      document.getElementById('broadcast_linktext').value = this.getAttribute('data-linktext') || '';
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // User Directory Search & Filters
+  // --------------------------------------------------------------------------
+  const searchInput = document.getElementById('userDirectorySearch');
+  const roleFilter = document.getElementById('userRoleFilter');
+  const verifFilter = document.getElementById('userVerifFilter');
+
+  function filterUsers() {
+    const q = (searchInput ? searchInput.value.toLowerCase().trim() : '');
+    const selectedRole = (roleFilter ? roleFilter.value.toLowerCase() : 'all');
+    const selectedVerif = (verifFilter ? verifFilter.value.toLowerCase() : 'all');
+
+    const rows = document.querySelectorAll('.user-row');
+    rows.forEach(row => {
+      const text = row.textContent.toLowerCase();
+      const role = row.getAttribute('data-role') || '';
+      const verified = row.getAttribute('data-verified') || '0';
+
+      const matchesQuery = !q || text.includes(q);
+      const matchesRole = (selectedRole === 'all' || role === selectedRole);
+      let matchesVerif = true;
+      if (selectedVerif === 'verified') matchesVerif = (verified === '1');
+      if (selectedVerif === 'unverified') matchesVerif = (verified === '0');
+
+      if (matchesQuery && matchesRole && matchesVerif) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  }
+
+  if (searchInput) searchInput.addEventListener('input', filterUsers);
+  if (roleFilter) roleFilter.addEventListener('change', filterUsers);
+  if (verifFilter) verifFilter.addEventListener('change', filterUsers);
+
+});
+</script>
 {% endblock %}

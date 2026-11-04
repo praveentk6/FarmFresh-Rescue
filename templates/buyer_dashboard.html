@@ -1,6 +1,108 @@
 {% extends "base.html" %}
 
-{% block title %}{{ _t('buyer_portal_title') }} - {{ _t('brand_name') }}{% endblock %}
+{% block title %}{{ _t('buyer_portal_title') }} - {{ _t('brand_name') }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const buyerTabBtns = document.querySelectorAll('.buyer-tab-btn');
+  const buyerPanes = document.querySelectorAll('.buyer-feature-pane');
+
+  function switchBuyerTab(targetTab, updateHash = true) {
+    if (!targetTab) targetTab = 'overview';
+
+    // 1. Update button active states
+    buyerTabBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-buyer-tab') === targetTab);
+    });
+
+    // 2. Show/hide feature panes cleanly in-place
+    if (targetTab === 'all') {
+      buyerPanes.forEach(pane => { pane.style.display = 'block'; });
+    } else {
+      buyerPanes.forEach(pane => {
+        const pTab = pane.getAttribute('data-buyer-pane');
+        pane.style.display = (pTab === targetTab) ? 'block' : 'none';
+      });
+    }
+
+    // 3. Keep scroll aligned at the feature tabs container without moving down
+    const tabsWrap = document.getElementById('buyerFeatureTabsWrap');
+    if (tabsWrap) {
+      const rect = tabsWrap.getBoundingClientRect();
+      if (rect.top < 0) {
+        tabsWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+
+    // 4. Update URL without causing anchor scroll
+    if (updateHash) {
+      const hashMap = {
+        'overview': 'overview',
+        'orders': 'buyerOrdersSection',
+        'meetings': 'meetingsSection',
+        'direct-purchases': 'directPurchasesSection',
+        'offers': 'offersSection',
+        'post-requirement': 'postRequirementSection',
+        'payments': 'buyerPaymentsSection',
+        'rescue': 'sharedRescueSection',
+        'all': 'all'
+      };
+      if (hashMap[targetTab]) {
+        history.replaceState(null, '', '#' + hashMap[targetTab]);
+      }
+    }
+  }
+
+  // Handle Tab Button Clicks
+  buyerTabBtns.forEach(btn => {
+    btn.addEventListener('click', function(e) {
+      e.preventDefault();
+      const target = this.getAttribute('data-buyer-tab');
+      switchBuyerTab(target, true);
+    });
+  });
+
+  // Intercept any internal anchor links pointing to sections
+  document.querySelectorAll('a[href*="#"]').forEach(link => {
+    link.addEventListener('click', function(e) {
+      const rawHref = this.getAttribute('href') || ''; const hash = rawHref.includes('#') ? ('#' + rawHref.split('#')[1]) : '';
+      const hashToTab = {
+        '#postRequirementSection': 'post-requirement',
+        '#buyerOrdersSection': 'orders',
+        '#meetingsSection': 'meetings',
+        '#directPurchasesSection': 'direct-purchases',
+        '#offersSection': 'offers',
+        '#sharedRescueSection': 'rescue',
+        '#buyerPaymentsSection': 'payments'
+      };
+      if (hashToTab[hash]) {
+        e.preventDefault();
+        switchBuyerTab(hashToTab[hash], true);
+      }
+    });
+  });
+
+  // Check URL hash on page load
+  const initialHash = window.location.hash;
+  const hashToTab = {
+    '#postRequirementSection': 'post-requirement',
+    '#buyerOrdersSection': 'orders',
+    '#meetingsSection': 'meetings',
+    '#directPurchasesSection': 'direct-purchases',
+    '#offersSection': 'offers',
+    '#sharedRescueSection': 'rescue',
+    '#buyerPaymentsSection': 'payments',
+    '#overview': 'overview',
+    '#all': 'all'
+  };
+  if (initialHash && hashToTab[initialHash]) {
+    switchBuyerTab(hashToTab[initialHash], false);
+  } else {
+    switchBuyerTab('overview', false);
+  }
+});
+</script>
+
+{% endblock %}
 
 {% block content %}
 <div class="container" style="padding-top: 2rem; padding-bottom: 4rem;">
@@ -25,31 +127,103 @@
       <a href="{{ url_for('browse_listings', urgency='urgent_only') }}" class="btn btn-secondary btn-lg">
         ⚡ {{ _t('urgent_rescue') }}
       </a>
-      <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-lg" style="border-color: #ef4444; color: #ef4444; font-weight: 700; display: inline-flex; align-items: center; gap: 0.4rem;" id="buyerDashboardLogoutBtn">
-        🚪 {{ _t('logout') }}
+    </div>
+  </div>
+
+  
+  <!-- Platform Announcements & Weather Alert Broadcasts -->
+  {% if active_broadcasts %}
+  <div class="platform-broadcasts-wrapper" style="margin-bottom: 2rem;">
+    {% for alert in active_broadcasts %}
+      <div class="alert-broadcast-card alert-broadcast-{{ alert.severity|lower }}" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.4rem; border-radius: 12px; margin-bottom: 0.85rem; border-left: 5px solid {% if alert.severity == 'Critical' %}#dc2626{% elif alert.severity == 'Warning' %}#ea580c{% elif alert.severity == 'Advisory' %}#d97706{% else %}#0284c7{% endif %}; background: {% if alert.severity == 'Critical' %}#fef2f2{% elif alert.severity == 'Warning' %}#fff7ed{% elif alert.severity == 'Advisory' %}#fffbeb{% else %}#f0f9ff{% endif %}; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+        <div style="display: flex; gap: 1rem; align-items: flex-start;">
+          <div style="font-size: 1.6rem; line-height: 1; flex-shrink: 0; margin-top: 2px;">
+            {% if alert.category == 'Weather Alert' %}⛈️{% elif alert.category == 'Scheme / Subsidy' %}🌾{% elif alert.category == 'Market Advisory' %}📈{% elif alert.category == 'Logistics' %}🚚{% else %}📢{% endif %}
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.35rem;">
+              <span class="badge" style="background: {% if alert.severity == 'Critical' %}#dc2626{% elif alert.severity == 'Warning' %}#ea580c{% elif alert.severity == 'Advisory' %}#d97706{% else %}#0284c7{% endif %}; color: #ffffff; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; padding: 0.2rem 0.6rem; border-radius: 6px;">
+                {{ alert.category }} &bull; {{ alert.severity }}
+              </span>
+              {% if alert.target_district and alert.target_district != 'All Tamil Nadu' %}
+              <span style="font-size: 0.75rem; background: #e2e8f0; color: #334155; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 600;">
+                📍 {{ alert.target_district }}
+              </span>
+              {% else %}
+              <span style="font-size: 0.75rem; background: #e2e8f0; color: #334155; padding: 0.15rem 0.5rem; border-radius: 4px; font-weight: 600;">
+                🌐 Statewide Alert
+              </span>
+              {% endif %}
+              <span style="font-size: 0.75rem; color: #64748b;">
+                {{ alert.created_at[:10] }}
+              </span>
+            </div>
+            <h4 style="margin: 0 0 0.35rem 0; font-size: 1.05rem; font-weight: 800; color: #0f172a;">{{ alert.title }}</h4>
+            <p style="margin: 0; font-size: 0.92rem; color: #334155; line-height: 1.5;">{{ alert.message }}</p>
+            {% if alert.action_link %}
+            <div style="margin-top: 0.6rem;">
+              <a href="{{ alert.action_link }}" class="btn btn-sm btn-outline" style="font-weight: 700; font-size: 0.82rem; padding: 0.3rem 0.75rem;">
+                {{ alert.action_text or 'View Details' }} &rarr;
+              </a>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <!-- Buyer Interactive In-Place Feature Tab Control Bar (Zero Downward Jumping) -->
+  <div class="buyer-feature-tabs-wrap" id="buyerFeatureTabsWrap">
+    <div class="buyer-feature-tabs" role="tablist">
+      <button type="button" class="buyer-tab-btn active" data-buyer-tab="overview">
+        <span class="tab-icon">📊</span>
+        <span>{{ 'Overview' if lang == 'en' else 'கண்ணோட்டம்' }}</span>
+      </button>
+      <button type="button" class="buyer-tab-btn" data-buyer-tab="orders">
+        <span class="tab-icon">📦</span>
+        <span>{{ _t('my_orders') }}</span>
+        <span class="tab-badge">{{ total_orders }}</span>
+      </button>
+      <button type="button" class="buyer-tab-btn" data-buyer-tab="meetings">
+        <span class="tab-icon">📅</span>
+        <span>{{ 'Direct Meetings' if lang == 'en' else 'நேரடி சந்திப்புகள்' }}</span>
+        <span class="tab-badge">{{ buyer_meetings|length }}</span>
+      </button>
+      <button type="button" class="buyer-tab-btn" data-buyer-tab="direct-purchases">
+        <span class="tab-icon">💵</span>
+        <span>{{ 'Direct Purchases' if lang == 'en' else 'நேரடி கொள்முதல்' }}</span>
+        <span class="tab-badge">{{ buyer_direct_sales|length }}</span>
+      </button>
+      <button type="button" class="buyer-tab-btn" data-buyer-tab="offers">
+        <span class="tab-icon">💬</span>
+        <span>{{ 'Received Offers' if lang == 'en' else 'சலுகைகள்' }}</span>
+        <span class="tab-badge">{{ received_offers|length }}</span>
+      </button>
+      <button type="button" class="buyer-tab-btn" data-buyer-tab="post-requirement">
+        <span class="tab-icon">📝</span>
+        <span>{{ 'Post Requirement' if lang == 'en' else 'தேவையை பதிவிடு' }}</span>
+      </button>
+      <button type="button" class="buyer-tab-btn" data-buyer-tab="payments">
+        <span class="tab-icon">💳</span>
+        <span>{{ 'Payments & Invoices' if lang == 'en' else 'விலைப்பட்டியல்கள்' }}</span>
+      </button>
+      <button type="button" class="buyer-tab-btn" data-buyer-tab="rescue">
+        <span class="tab-icon">🛒</span>
+        <span>{{ 'Shared Rescue' if lang == 'en' else 'பகிர்வு மீட்பு' }}</span>
+      </button>
+      <button type="button" class="buyer-tab-btn" data-buyer-tab="all">
+        <span class="tab-icon">👁️</span>
+        <span>{{ 'View All' if lang == 'en' else 'அனைத்தும்' }}</span>
+      </button>
+      <a href="{{ url_for('find_sellers') }}" class="btn btn-sm" style="background: #0284c7; color: white; font-weight: 700; border-radius: 10px; margin-left: auto; text-decoration: none; padding: 0.5rem 0.85rem; white-space: nowrap;">
+        ➕ Schedule Meeting
       </a>
     </div>
   </div>
 
-  <!-- Direct Meet & Sell Navigation Shortcuts -->
-  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; background: #ffffff; padding: 0.75rem 1rem; border-radius: 12px; border: 1px solid #e5e7eb; align-items: center;">
-    <a href="{{ url_for('browse_rescue_products') }}" class="btn btn-sm" style="background: #ecfdf5; color: #166534; font-weight: 700; border-radius: 20px;">
-      🛒 Shared Rescue Marketplace
-    </a>
-    <a href="{{ url_for('find_sellers') }}" class="btn btn-sm" style="background: #e0f2fe; color: #0369a1; font-weight: 700; border-radius: 20px;">
-      🤝 Find In-Person Sellers
-    </a>
-    <a href="#meetingsSection" class="btn btn-sm" style="background: #fef3c7; color: #92400e; font-weight: 700; border-radius: 20px;">
-      📅 My Direct Meetings ({{ buyer_meetings|length }})
-    </a>
-    <a href="#directPurchasesSection" class="btn btn-sm" style="background: #ede9fe; color: #6d28d9; font-weight: 700; border-radius: 20px;">
-      💵 Direct Purchases ({{ buyer_direct_sales|length }})
-    </a>
-    <a href="{{ url_for('find_sellers') }}" class="btn btn-sm" style="background: #16a34a; color: white; font-weight: 700; border-radius: 20px; margin-left: auto;">
-      ➕ Schedule Direct Meeting
-    </a>
-  </div>
-
+  <div class="buyer-feature-pane" data-buyer-pane="overview">
   <!-- Primary Calculated KPI Summary Cards for Buyer -->
   <div class="dashboard-grid-kpis" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 2rem;">
     <!-- 1. Total Orders -->
@@ -185,7 +359,10 @@
     </div>
   {% endif %}
 
+  </div><!-- end overview pane -->
+
   <!-- Section 3 & 4: Received Farmer Offers -->
+  <div class="buyer-feature-pane" data-buyer-pane="offers">
   <div class="data-table-card" id="offersSection" style="margin-bottom: 3rem; border-top: 4px solid #16a34a;">
     <div class="data-table-header">
       <div>
@@ -639,173 +816,244 @@
     {% endif %}
   </div>
 
-  <!-- Buyer Sent Orders Table -->
-  <div class="data-table-card" style="margin-bottom: 3rem;">
-    <div class="data-table-header">
-      <div>
-        <h2 style="font-size: 1.35rem; font-weight: 700;">{{ _t('buyer_my_enquiries') }}</h2>
-        <span style="font-size: 0.85rem; color: var(--text-muted);">{{ orders|length }} purchase requests sent to local farmers</span>
+  <!-- Buyer Sent Orders & Enquiries Hub -->
+  <div class="data-table-card orders-hub-card" id="buyerOrdersSection" style="margin-bottom: 3rem;">
+    <div class="orders-hub-header">
+      <div class="orders-hub-title-wrap">
+        <div class="orders-hub-badge">📋 {{ 'My Procurement Orders' if lang == 'en' else 'எனது கொள்முதல் கோரிக்கைகள்' }}</div>
+        <h2 class="orders-hub-title">{{ _t('buyer_my_enquiries') }}</h2>
+        <p class="orders-hub-subtitle">
+          {{ 'Track purchase requests, review farmer responses, confirm delivery schedules, and manage invoices.' if lang == 'en' else 'விவசாயிகளிடம் அனுப்பிய கொள்முதல் கோரிக்கைகளைக் கண்காணித்து, வரவுகளை உறுதிப்படுத்தவும்.' }}
+        </p>
       </div>
-      <a href="{{ url_for('browse_listings') }}" class="btn btn-outline-primary btn-sm">+ Find Fresh Produce</a>
+
+      <!-- Quick Search & Actions -->
+      <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+        <div class="orders-search-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="buyerOrderSearchInput" class="orders-search-input" placeholder="{{ 'Search crop or farmer...' if lang == 'en' else 'பயிர் அல்லது விவசாயி தேடு...' }}" onkeyup="filterBuyerOrdersList()">
+        </div>
+        <a href="{{ url_for('browse_listings') }}" class="btn btn-outline-primary btn-sm" style="height: 38px; display: inline-flex; align-items: center;">+ {{ 'Browse Marketplace' if lang == 'en' else 'சந்தை காண்க' }}</a>
+      </div>
     </div>
 
     {% if orders %}
-      <div class="table-responsive">
-        <div class="table-scroll-hint"><span>👉 Swipe horizontally to view full table details</span></div>
-        <table class="custom-table">
-          <thead>
-            <tr>
-              <th>Order #</th>
-              <th>Produce Item</th>
-              <th>Farmer Contact</th>
-              <th>Requested Qty & Offer</th>
-              <th>Delivery Preference</th>
-              <th>Status</th>
-              <th>Live Tracking</th>
-              <th style="text-align: right;">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for o in orders %}
-              <tr>
-                <td><strong>#{{ o['id'] }}</strong></td>
-                <td>
-                  <div style="display: flex; align-items: center; gap: 0.75rem;">
-                    {% if o['photo'] %}
-                      <img src="{{ url_for('static', filename='uploads/' ~ o['photo']) }}" alt="{{ o['crop_name'] }}" style="width: 44px; height: 44px; object-fit: cover; border-radius: 8px;">
-                    {% else %}
-                      <div style="width: 44px; height: 44px; background: #e2e8f0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.25rem;">
-                        🥦
-                      </div>
-                    {% endif %}
-                    <div>
-                      <a href="{{ url_for('listing_detail', listing_id=o['listing_id']) }}" style="font-weight: 700; color: #0f172a;">
-                        {{ o['crop_name'] }}
-                      </a>
-                      <div style="font-size: 0.75rem; color: #64748b;">
-                        Listing Rate: ₹{{ "%.0f"|format(o['price_per_unit']) }} / {{ o['unit'] }}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <div style="font-weight: 700;">{{ o['farmer_name'] }}</div>
-                  <div style="font-size: 0.775rem; color: #64748b;">
-                    📍 {{ o['village_town'] }}, {{ o['district'] }}<br>
-                    📞 {{ o['farmer_phone'] }}
-                  </div>
-                </td>
-                <td>
-                  {% if o['requested_quantity'] %}
-                    <div>Qty: <strong>{{ o['requested_quantity'] }}</strong> {{ o['unit'] }}</div>
-                  {% endif %}
-                  {% if o['offered_price'] %}
-                    <div style="color: #166534; font-weight: 700;">Offered: ₹{{ "%.0f"|format(o['offered_price']) }} / {{ o['unit'] }}</div>
-                  {% endif %}
-                  {% if o['total_price'] %}
-                    <div style="font-size: 0.8rem; color: #0f172a; font-weight: 700;">Total: ₹{{ "{:,.0f}".format(o['total_price']) }}</div>
-                  {% endif %}
-                </td>
-                <td style="max-width: 200px;">
-                  <span style="font-size: 0.75rem; background: #f1f5f9; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 600;">
-                    🚚 {{ o['delivery_preference'] or 'Direct Farm Pickup' }}
-                  </span>
-                  <div style="font-size: 0.825rem; color: #334155; margin-top: 0.25rem; line-height: 1.4;">
-                    {{ o['message'] }}
-                  </div>
-                  <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 0.25rem;">
-                    Sent: {{ o['created_at'].split()[0] if ' ' in o['created_at'] else o['created_at'] }}
-                  </div>
-                </td>
-                <td>
-                  {% if o['status'] == 'Pending' %}
-                    <span style="background: #fef3c7; color: #92400e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Pending</span>
-                  {% elif o['status'] == 'Accepted' %}
-                    <span style="background: #dcfce7; color: #166534; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Accepted</span>
-                  {% elif o['status'] in ['Packed', 'Ready for Collection'] %}
-                    <span style="background: #fef08a; color: #854d0e; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Packed / Ready</span>
-                  {% elif o['status'] == 'Shipped' %}
-                    <span style="background: #e0f2fe; color: #0369a1; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">In Transit</span>
-                  {% elif o['status'] in ['Completed', 'Delivered'] %}
-                    <span style="background: #dcfce7; color: #15803d; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Delivered</span>
-                  {% elif o['status'] == 'Cancelled' %}
-                    <span style="background: #fee2e2; color: #991b1b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">Cancelled</span>
-                  {% else %}
-                    <span style="background: #f1f5f9; color: #64748b; padding: 0.25rem 0.6rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 700;">{{ o['status'] }}</span>
-                  {% endif %}
-
-                  <div style="margin-top: 0.35rem;">
-                    {% if o['payment_status'] == 'Paid' %}
-                      <span style="background: #dcfce7; color: #166534; font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.2rem;">
-                        💳 Paid
-                      </span>
-                    {% elif o['payment_status'] == 'Pending COD' %}
-                      <span style="background: #e0f2fe; color: #0369a1; font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.2rem;">
-                        💵 COD Pending
-                      </span>
-                    {% else %}
-                      <span style="background: #fff7ed; color: #c2410c; font-size: 0.72rem; padding: 0.15rem 0.45rem; border-radius: 4px; font-weight: 700; display: inline-flex; align-items: center; gap: 0.2rem;">
-                        ⏳ Payment Due
-                      </span>
-                    {% endif %}
-                  </div>
-                </td>
-                <td>
-                  <a href="{{ url_for('track_order', order_id=o['id']) }}" class="btn btn-outline-primary btn-sm" style="white-space: nowrap;">
-                    🗺️ Track Route
-                  </a>
-                </td>
-                <td>
-                  <div style="display: flex; flex-direction: column; gap: 0.35rem; align-items: flex-end;">
-                    <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; justify-content: flex-end;">
-                      {% if o['payment_status'] == 'Paid' %}
-                        <a href="{{ url_for('view_invoice', order_id=o['id']) }}" class="btn btn-outline-primary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
-                          🧾 Invoice
-                        </a>
-                      {% elif o['status'] != 'Cancelled' %}
-                        <a href="{{ url_for('checkout_order', order_id=o['id']) }}" class="btn btn-success btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; background: #16a34a; border-color: #16a34a; color: white;">
-                          💳 Pay Now
-                        </a>
-                      {% endif %}
-
-                      <a href="{{ url_for('chat_conversation', recipient_id=o['farmer_id']) }}?order_id={{ o['id'] }}" class="btn btn-primary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">
-                        💬 Chat
-                      </a>
-
-                      <a href="tel:{{ o['farmer_phone'] }}" class="btn btn-secondary btn-sm" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
-                        📞 Call
-                      </a>
-                    </div>
-
-                    <!-- Cancel button for Pending orders -->
-                    {% if o['status'] == 'Pending' %}
-                      <form action="{{ url_for('cancel_order', order_id=o['id']) }}" method="POST" onsubmit="return confirm('Cancel this purchase request?');">
-                        <button type="submit" class="btn btn-danger btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.725rem;">
-                          ✕ {{ _t('btn_cancel_order') }}
-                        </button>
-                      </form>
-                    {% endif %}
-                  </div>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <!-- Filter Tabs -->
+      <div class="orders-filter-tabs" role="tablist">
+        <button type="button" class="order-filter-tab active" data-filter="all" onclick="setBuyerOrderFilter('all', this)">
+          <span>{{ 'All Requests' if lang == 'en' else 'அனைத்தும்' }}</span>
+          <span class="tab-count-pill">{{ orders|length }}</span>
+        </button>
+        <button type="button" class="order-filter-tab tab-pending" data-filter="pending" onclick="setBuyerOrderFilter('pending', this)">
+          <span>⏳ {{ 'Awaiting Response' if lang == 'en' else 'பதில் நிலுவையில்' }}</span>
+          <span class="tab-count-pill pill-amber" id="buyerCountPendingTab">0</span>
+        </button>
+        <button type="button" class="order-filter-tab tab-processing" data-filter="processing" onclick="setBuyerOrderFilter('processing', this)">
+          <span>🌾 {{ 'Confirmed / Preparing' if lang == 'en' else 'ஏற்கப்பட்டது' }}</span>
+          <span class="tab-count-pill" id="buyerCountProcessingTab">0</span>
+        </button>
+        <button type="button" class="order-filter-tab tab-transit" data-filter="transit" onclick="setBuyerOrderFilter('transit', this)">
+          <span>🚚 {{ 'In Transit' if lang == 'en' else 'வழியில்' }}</span>
+          <span class="tab-count-pill" id="buyerCountTransitTab">0</span>
+        </button>
+        <button type="button" class="order-filter-tab tab-completed" data-filter="completed" onclick="setBuyerOrderFilter('completed', this)">
+          <span>✅ {{ 'Completed' if lang == 'en' else 'முடிந்தது' }}</span>
+          <span class="tab-count-pill pill-green" id="buyerCountCompletedTab">0</span>
+        </button>
       </div>
+
+      <!-- Orders Card List -->
+      <div class="orders-card-list" id="buyerOrdersCardList">
+        {% for o in orders %}
+          {% set status_grp = 'pending' if o['status'] in ['Pending', 'Order Placed'] else ('processing' if o['status'] in ['Accepted', 'Confirmed', 'Packed', 'Ready for Collection', 'Ready for Pickup', 'Order Accepted'] else ('transit' if o['status'] in ['Shipped', 'In Transit', 'Out for Delivery'] else ('completed' if o['status'] in ['Delivered', 'Completed'] else 'other'))) %}
+
+          <div class="farmer-order-card" data-status-group="{{ status_grp }}" data-crop="{{ (o['crop_name'] or '')|lower }}" data-farmer="{{ (o['farmer_name'] or '')|lower }}" data-order-code="{{ (o['order_code'] or ('#' ~ o['id']))|lower }}">
+
+            <!-- Card Header -->
+            <div class="order-card-topbar">
+              <div class="order-code-badge-group">
+                <span class="order-code-pill">{{ o['order_code'] or ('#' ~ o['id']) }}</span>
+
+                {% if o['status'] in ['Pending', 'Order Placed'] %}
+                  <span class="order-status-badge badge-pending">⏳ {{ 'Awaiting Farmer Response' if lang == 'en' else 'விவசாயி முடிவு நிலுவை' }}</span>
+                {% elif o['status'] in ['Accepted', 'Confirmed', 'Order Accepted'] %}
+                  <span class="order-status-badge badge-accepted">✓ {{ 'Accepted by Farmer' if lang == 'en' else 'ஏற்றுக்கொள்ளப்பட்டது' }}</span>
+                {% elif o['status'] in ['Packed', 'Ready for Collection', 'Ready for Pickup'] %}
+                  <span class="order-status-badge badge-packed">📦 {{ 'Packed & Ready' if lang == 'en' else 'தயாராக உள்ளது' }}</span>
+                {% elif o['status'] in ['Shipped', 'In Transit', 'Out for Delivery'] %}
+                  <span class="order-status-badge badge-transit">🚚 {{ 'In Transit' if lang == 'en' else 'வழியில் உள்ளது' }}</span>
+                {% elif o['status'] in ['Delivered', 'Completed'] %}
+                  <span class="order-status-badge badge-completed">✅ {{ 'Delivered & Received' if lang == 'en' else 'பெறப்பட்டது' }}</span>
+                {% elif o['status'] in ['Rejected', 'Declined', 'Cancelled'] %}
+                  <span class="order-status-badge badge-cancelled">✕ {{ o['status'] }}</span>
+                {% else %}
+                  <span class="order-status-badge badge-neutral">{{ o['status'] }}</span>
+                {% endif %}
+
+                {% if o['payment_status'] in ['Paid', 'Payment Verified'] %}
+                  <span class="payment-status-badge badge-paid">✓ {{ 'Paid Online' if lang == 'en' else 'ஆன்லைன் செலுத்தியது' }}</span>
+                {% elif o['payment_status'] in ['Pending COD', 'COD Pending'] %}
+                  <span class="payment-status-badge badge-cod">💵 {{ 'Cash on Delivery' if lang == 'en' else 'நேரடி ரொக்கம்' }}</span>
+                {% else %}
+                  <span class="payment-status-badge" style="background:#fff7ed;color:#c2410c;border:1px solid #ffedd5;">💳 {{ 'Payment Due' if lang == 'en' else 'கட்டணம் செலுத்தவும்' }}</span>
+                {% endif %}
+              </div>
+
+              <div class="order-date-time">
+                <span>🗓️ {{ o['created_at'].split()[0] if ' ' in o['created_at'] else o['created_at'] }}</span>
+              </div>
+            </div>
+
+            <!-- Card Body Grid -->
+            <div class="order-card-body">
+              
+              <!-- Col 1: Produce & Total Value -->
+              <div class="order-col-produce">
+                <div class="produce-thumb-wrap">
+                  {% if o['photo'] %}
+                    <img src="{{ url_for('static', filename='uploads/' ~ o['photo']) }}" alt="{{ o['crop_name'] }}" class="order-produce-img" onerror="this.src='{{ url_for('static', filename='uploads/tomatoes.jpg') }}'">
+                  {% else %}
+                    <div class="order-produce-placeholder">🌱</div>
+                  {% endif %}
+                </div>
+                <div class="produce-info">
+                  <a href="{{ url_for('listing_detail', listing_id=o['listing_id']) }}" class="order-crop-name" title="{{ o['crop_name'] }}">
+                    {{ o['crop_name'] }}
+                  </a>
+                  <div class="order-quantity-line">
+                    <span class="qty-highlight">{% if o['requested_quantity'] %}{{ o['requested_quantity'] }} {{ o['unit'] or 'kg' }}{% else %}Enquiry / Bulk{% endif %}</span>
+                    {% if o['offered_price'] or o['price_per_unit'] %}
+                      <span class="unit-rate">(@ ₹{{ "%.0f"|format(o['offered_price'] or o['price_per_unit'] or 0) }}/{{ o['unit'] or 'kg' }})</span>
+                    {% endif %}
+                  </div>
+                  <div class="order-total-price">
+                    {% if o['total_price'] %}
+                      ₹{{ "{:,.0f}".format(o['total_price']) }}
+                    {% elif o['requested_quantity'] and (o['offered_price'] or o['price_per_unit']) %}
+                      ₹{{ "{:,.0f}".format(o['requested_quantity'] * (o['offered_price'] or o['price_per_unit'])) }}
+                    {% else %}
+                      <span style="font-size: 0.95rem; font-weight: 600; color: #64748b;">Custom Offer</span>
+                    {% endif %}
+                  </div>
+                  {% if o['freshness_grade'] or o['quality_grade'] %}
+                    <div class="harvest-status-pill">
+                      ✨ Grade: {{ o['freshness_grade'] or o['quality_grade'] }}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+
+              <!-- Col 2: Farmer & Delivery Details -->
+              <div class="order-col-buyer">
+                <div class="buyer-profile-wrap">
+                  <div class="buyer-name-line">
+                    <span class="buyer-icon">👨‍🌾</span>
+                    <strong class="buyer-name">{{ o['farmer_name'] }}</strong>
+                  </div>
+                  <div class="buyer-contact-line">
+                    <span>📍 {{ o['village_town'] }}, {{ o['district'] }}</span>
+                    <span class="contact-sep">•</span>
+                    <span>📞 {{ o['farmer_phone'] }}</span>
+                  </div>
+                </div>
+
+                <div class="delivery-pref-badge">
+                  🚚 {{ o['delivery_preference'] or 'Direct Farm Pickup' }}
+                </div>
+
+                {% if o['message'] %}
+                  <div class="buyer-msg-box" title="{{ o['message'] }}">
+                    <span class="msg-quote">“</span>{{ o['message'] }}<span class="msg-quote">”</span>
+                  </div>
+                {% endif %}
+
+                {% if o['handover_otp'] and o['status'] in ['Confirmed', 'Accepted', 'Packed', 'Ready for Pickup', 'In Transit', 'Ready for Collection'] %}
+                  <div class="handover-otp-box">
+                    <span class="otp-label">🔑 {{ 'Provide this OTP upon receipt:' if lang == 'en' else 'பெறும் போது இந்த OTP ஐ கூறவும்:' }}</span>
+                    <strong class="otp-code">{{ o['handover_otp'] }}</strong>
+                  </div>
+                {% endif %}
+              </div>
+
+              <!-- Col 3: Direct Action Controls -->
+              <div class="order-col-actions">
+                <div class="primary-action-group">
+                  {% if o['payment_status'] in ['Paid', 'Payment Verified'] %}
+                    <a href="{{ url_for('view_invoice', order_id=o['id']) }}" class="btn btn-action-receipt">
+                      🧾 {{ 'Digital Invoice' if lang == 'en' else 'விலைப்பட்டியல்' }}
+                    </a>
+                  {% elif o['status'] != 'Cancelled' and o['status'] != 'Rejected' %}
+                    <a href="{{ url_for('checkout_order', order_id=o['id']) }}" class="btn btn-action-accept" style="background:#16a34a;">
+                      💳 {{ 'Pay / Settle' if lang == 'en' else 'கட்டணம் செலுத்து' }}
+                    </a>
+                  {% endif %}
+
+                  {% if o['status'] in ['Packed', 'Shipped', 'In Transit', 'Ready for Collection'] %}
+                    <a href="{{ url_for('track_order', order_id=o['id']) }}" class="btn btn-action-route">
+                      🗺️ {{ 'Track Route' if lang == 'en' else 'வழியை காண்க' }}
+                    </a>
+                  {% endif %}
+
+                  <!-- Cancel button for Pending orders -->
+                  {% if o['status'] in ['Pending', 'Order Placed'] %}
+                    <form action="{{ url_for('cancel_order', order_id=o['id']) }}" method="POST" style="margin: 0; width: 100%;" onsubmit="return confirm('Cancel this purchase enquiry?');">
+                      <button type="submit" class="btn btn-action-decline">
+                        ✕ {{ _t('btn_cancel_order') }}
+                      </button>
+                    </form>
+                  {% endif %}
+                </div>
+
+                <!-- Compact Communication Quick-Pills -->
+                <div class="order-secondary-actions">
+                  <a href="{{ url_for('chat_conversation', recipient_id=o['farmer_id']) }}?order_id={{ o['id'] }}" class="btn-sec-action btn-sec-chat" title="Chat with Farmer">
+                    💬 Chat
+                  </a>
+                  <a href="tel:{{ o['farmer_phone'] }}" class="btn-sec-action btn-sec-call" title="Call Farmer">
+                    📞 Call
+                  </a>
+                  {% set clean_fphone = (o['farmer_phone'] or '').replace(' ', '').replace('-', '').replace('+91', '') %}
+                  <a href="https://wa.me/91{{ clean_fphone }}?text=Vanakkam%20{{ o['farmer_name'] }}%2C%20regarding%20my%20order%20%23{{ o['id'] }}%20for%20{{ o['crop_name'] }}%20on%20FarmFresh." 
+                     target="_blank" rel="noopener noreferrer" class="btn-sec-action btn-sec-wa" title="WhatsApp Farmer">
+                    🟢 WhatsApp
+                  </a>
+                  <a href="{{ url_for('track_order', order_id=o['id']) }}" class="btn-sec-action btn-sec-map" title="View Map / Route">
+                    🗺️ Route
+                  </a>
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+        {% endfor %}
+      </div>
+
+      <!-- Empty state when searching/filtering -->
+      <div id="buyerOrdersFilterEmpty" style="display: none; padding: 2.5rem 1.5rem; text-align: center; color: #64748b;">
+        <span style="font-size: 2rem; display: block; margin-bottom: 0.35rem;">🔍</span>
+        <div style="font-weight: 700; color: #0f172a; margin-bottom: 0.25rem;">{{ 'No matching orders found' if lang == 'en' else 'பொருந்தும் கோரிக்கைகள் இல்லை' }}</div>
+        <p style="font-size: 0.85rem; margin: 0;">{{ 'Try adjusting your search query or filter tab.' if lang == 'en' else 'தேடல் வார்த்தையை மாற்றி முயற்சிக்கவும்.' }}</p>
+      </div>
+
     {% else %}
       <div class="empty-state" style="padding: 3rem 1.5rem; text-align: center;">
-        <span class="empty-icon" style="font-size: 3rem; display: block; margin-bottom: 0.5rem;">🛒</span>
-        <h3 class="empty-title" style="font-size: 1.25rem; font-weight: 700;">You Haven't Sent Any Purchase Requests Yet</h3>
-        <p class="empty-text" style="color: var(--text-muted); margin-bottom: 1rem;">
-          Browse our real-time farm marketplace to discover fresh produce from local farmers in Tamil Nadu.
+        <span class="empty-icon" style="font-size: 2.5rem; display: block; margin-bottom: 0.5rem;">🌾</span>
+        <h3 class="empty-title" style="font-size: 1.15rem; font-weight: 700;">{{ 'No purchase requests sent yet' if lang == 'en' else 'கொள்முதல் கோரிக்கைகள் எதுவும் இல்லை' }}</h3>
+        <p class="empty-text" style="color: var(--text-muted); font-size: 0.9rem; max-width: 460px; margin: 0 auto 1.25rem;">
+          {{ 'Browse our real-time farm marketplace to discover fresh produce directly from local farmers in Tamil Nadu.' if lang == 'en' else 'தமிழ்நாட்டு விவசாயிகளிடமிருந்து புதிய காய்கறிகளை நேரடியாக வாங்க சந்தையைக் காண்க.' }}
         </p>
         <a href="{{ url_for('browse_listings') }}" class="btn btn-primary">{{ _t('browse_produce') }}</a>
       </div>
     {% endif %}
   </div>
 
+  </div><!-- end orders pane -->
+
   <!-- Buyer Payments & Invoices Section -->
-  <div class="data-table-card" style="margin-bottom: 3rem; border-top: 4px solid #16a34a;">
+  <div class="buyer-feature-pane" data-buyer-pane="payments">
+  <div class="data-table-card" id="buyerPaymentsSection" style="margin-bottom: 3rem; border-top: 4px solid #16a34a;">
     <div class="data-table-header">
       <div>
         <h2 style="font-size: 1.35rem; font-weight: 700; color: #0f172a;">
@@ -920,7 +1168,10 @@
     {% endif %}
   </div>
 
+  </div><!-- end payments pane -->
+
   <!-- Section: Post Buyer Procurement Requirement -->
+  <div class="buyer-feature-pane" data-buyer-pane="post-requirement">
   <div class="form-card" id="postRequirementSection" style="margin-bottom: 3rem; border: 1px solid #bbf7d0; background: #fcfdfc; padding: 2rem;">
     <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.25rem;">
       <div>
@@ -1224,4 +1475,82 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 });
 </script>
+
+<script>
+// Interactive Buyer Orders Hub Filter & Search Functions
+window.setBuyerOrderFilter = function(filterGroup, tabBtn) {
+  document.querySelectorAll('#buyerOrdersSection .order-filter-tab').forEach(t => t.classList.remove('active'));
+  if (tabBtn) tabBtn.classList.add('active');
+
+  const cards = document.querySelectorAll('#buyerOrdersCardList .farmer-order-card');
+  cards.forEach(card => {
+    const grp = card.getAttribute('data-status-group');
+    if (filterGroup === 'all' || grp === filterGroup) {
+      card.style.display = '';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+  checkBuyerEmptyOrdersState();
+};
+
+window.filterBuyerOrdersList = function() {
+  const q = (document.getElementById('buyerOrderSearchInput')?.value || '').toLowerCase().trim();
+  const activeTab = document.querySelector('#buyerOrdersSection .order-filter-tab.active');
+  const activeFilter = activeTab ? activeTab.getAttribute('data-filter') : 'all';
+
+  const cards = document.querySelectorAll('#buyerOrdersCardList .farmer-order-card');
+  cards.forEach(card => {
+    const grp = card.getAttribute('data-status-group');
+    const crop = card.getAttribute('data-crop') || '';
+    const farmer = card.getAttribute('data-farmer') || '';
+    const code = card.getAttribute('data-order-code') || '';
+
+    const matchesFilter = (activeFilter === 'all' || grp === activeFilter);
+    const matchesSearch = !q || crop.includes(q) || farmer.includes(q) || code.includes(q);
+
+    if (matchesFilter && matchesSearch) {
+      card.style.display = '';
+    } else {
+      card.style.display = 'none';
+    }
+  });
+  checkBuyerEmptyOrdersState();
+};
+
+window.updateBuyerOrderTabCounts = function() {
+  const cards = document.querySelectorAll('#buyerOrdersCardList .farmer-order-card');
+  let pending = 0, processing = 0, transit = 0, completed = 0;
+  cards.forEach(c => {
+    const g = c.getAttribute('data-status-group');
+    if (g === 'pending') pending++;
+    else if (g === 'processing') processing++;
+    else if (g === 'transit') transit++;
+    else if (g === 'completed') completed++;
+  });
+  const elP = document.getElementById('buyerCountPendingTab');
+  const elPr = document.getElementById('buyerCountProcessingTab');
+  const elT = document.getElementById('buyerCountTransitTab');
+  const elC = document.getElementById('buyerCountCompletedTab');
+  if (elP) elP.textContent = pending;
+  if (elPr) elPr.textContent = processing;
+  if (elT) elT.textContent = transit;
+  if (elC) elC.textContent = completed;
+};
+
+window.checkBuyerEmptyOrdersState = function() {
+  const cards = document.querySelectorAll('#buyerOrdersCardList .farmer-order-card');
+  let visible = 0;
+  cards.forEach(c => { if (c.style.display !== 'none') visible++; });
+  const emptyEl = document.getElementById('buyerOrdersFilterEmpty');
+  if (emptyEl) {
+    emptyEl.style.display = visible === 0 ? 'block' : 'none';
+  }
+};
+
+document.addEventListener('DOMContentLoaded', function() {
+  updateBuyerOrderTabCounts();
+});
+</script>
+
 {% endblock %}

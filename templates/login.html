@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Log In - FarmFresh Rescue{% endblock %}
+{% block title %}{{ 'உள்நுழைவு' if lang == 'ta' else 'Log In' }} - FarmFresh Rescue{% endblock %}
 
 {% block content %}
 <div class="auth-page-wrapper">
@@ -11,48 +11,67 @@
       <div class="auth-logo-badge">
         <span class="auth-leaf">🌾</span>
       </div>
-      <h1 class="auth-title">Welcome to FarmFresh</h1>
-      <p class="auth-subtitle">Tamil Nadu Agricultural Produce Direct Marketplace &bull; Zero Waste</p>
+      <h1 class="auth-title">{{ 'பார்ம்ஃப்ரெஷ்-க்கு நல்வரவு' if lang == 'ta' else 'Welcome to FarmFresh' }}</h1>
+      <p class="auth-subtitle">{{ 'தமிழ்நாடு விவசாய விளைபொருள் நேரடி சந்தை • பூஜ்ஜிய இழப்பு' if lang == 'ta' else 'Tamil Nadu Agricultural Produce Direct Marketplace • Zero Waste' }}</p>
     </div>
 
     <!-- Role Selection Tabs: Farmer, Buyer, Admin -->
     <div class="auth-role-tabs" role="tablist" aria-label="Role Login Options">
-      <button type="button" class="auth-tab {% if active_role == 'farmer' or not active_role %}active{% endif %}" id="tabFarmer" onclick="switchLoginRole('farmer')" role="tab" aria-selected="true" aria-controls="formFarmer">
+      <button type="button" class="auth-tab {% if active_role == 'farmer' or not active_role %}active{% endif %}" id="tabFarmer" onclick="switchLoginRole('farmer')" role="tab" aria-selected="true" aria-controls="paneFarmer">
         <span class="tab-icon">👨‍🌾</span>
-        <span class="tab-text">Farmer Login</span>
+        <span class="tab-text">{{ 'உழவர்' if lang == 'ta' else 'Farmer Login' }}</span>
       </button>
-      <button type="button" class="auth-tab {% if active_role == 'buyer' %}active{% endif %}" id="tabBuyer" onclick="switchLoginRole('buyer')" role="tab" aria-selected="false" aria-controls="formBuyer">
+      <button type="button" class="auth-tab {% if active_role == 'buyer' %}active{% endif %}" id="tabBuyer" onclick="switchLoginRole('buyer')" role="tab" aria-selected="false" aria-controls="paneBuyer">
         <span class="tab-icon">🛒</span>
-        <span class="tab-text">Buyer Login</span>
+        <span class="tab-text">{{ 'வாங்குபவர்' if lang == 'ta' else 'Buyer Login' }}</span>
       </button>
-      <button type="button" class="auth-tab {% if active_role == 'admin' %}active{% endif %}" id="tabAdmin" onclick="switchLoginRole('admin')" role="tab" aria-selected="false" aria-controls="formAdmin">
+      <button type="button" class="auth-tab {% if active_role == 'admin' %}active{% endif %}" id="tabAdmin" onclick="switchLoginRole('admin')" role="tab" aria-selected="false" aria-controls="paneAdmin">
         <span class="tab-icon">🛡️</span>
-        <span class="tab-text">Admin Login</span>
+        <span class="tab-text">{{ 'நிர்வாகி' if lang == 'ta' else 'Admin Login' }}</span>
       </button>
+    </div>
+
+    <!-- 1-Click Quick Demo Accounts Fill Bar -->
+    <div class="demo-accounts-strip">
+      <div class="demo-strip-header">
+        <span class="demo-strip-icon">⚡</span>
+        <span class="demo-strip-label">{{ '1-கிளிக் மாதிரி உள்நுழைவு:' if lang == 'ta' else '1-Click Demo Fill:' }}</span>
+      </div>
+      <div class="demo-strip-btns">
+        <button type="button" class="demo-quick-btn demo-quick-farmer" onclick="quickFillDemo('farmer', 'selvi.farms@gmail.com', 'farmer123')">
+          👨‍🌾 Selvi (Farmer)
+        </button>
+        <button type="button" class="demo-quick-btn demo-quick-buyer" onclick="quickFillDemo('buyer', 'saravana.hotel@gmail.com', 'buyer123')">
+          🛒 Saravana (Buyer)
+        </button>
+        <button type="button" class="demo-quick-btn demo-quick-admin" onclick="quickFillDemo('admin', 'Pp274142@gmail.com', 'praveen16')">
+          🛡️ Admin (Praveen)
+        </button>
+      </div>
     </div>
 
     <!-- 1. FARMER LOGIN FORM -->
     <div class="auth-role-pane {% if active_role == 'farmer' or not active_role %}active{% endif %}" id="paneFarmer">
       <div class="role-badge role-badge-farmer">
         <span>👨‍🌾</span>
-        <span>Farmer Portal &bull; Sell fresh surplus crops directly</span>
+        <span>{{ 'விவசாயி போர்டல் • விளைபொருட்களை நேரடியாக விற்பனை செய்யுங்கள்' if lang == 'ta' else 'Farmer Portal • Sell fresh surplus crops directly' }}</span>
       </div>
       <form action="{{ url_for('login_post') }}" method="POST" class="auth-form" id="formFarmer">
         <input type="hidden" name="role" value="farmer">
         <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
 
         <div class="form-group">
-          <label class="form-label" for="farmerEmail">Farmer Email Address <span class="required">*</span></label>
+          <label class="form-label" for="farmerEmail">{{ 'விவசாயி மின்னஞ்சல் முகவரி' if lang == 'ta' else 'Farmer Email Address' }} <span class="required">*</span></label>
           <div class="input-with-icon">
             <span class="input-icon">✉️</span>
-            <input type="email" name="email" id="farmerEmail" class="form-control auth-input" placeholder="farmer@example.com" required autofocus value="{{ email if active_role == 'farmer' else '' }}">
+            <input type="email" name="email" id="farmerEmail" class="form-control auth-input" placeholder="selvi.farms@gmail.com" required autofocus value="{{ email if active_role == 'farmer' else '' }}" autocomplete="email">
           </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="farmerPassword">Password <span class="required">*</span></label>
+          <label class="form-label" for="farmerPassword">{{ 'கடவுச்சொல்' if lang == 'ta' else 'Password' }} <span class="required">*</span></label>
           <div class="password-input-wrap">
-            <input type="password" name="password" id="farmerPassword" class="form-control auth-input" placeholder="••••••••" required>
+            <input type="password" name="password" id="farmerPassword" class="form-control auth-input" placeholder="••••••••" required autocomplete="current-password">
             <button type="button" class="btn-toggle-pw" onclick="togglePasswordVisibility('farmerPassword', this)" aria-label="Toggle password visibility">👁️</button>
           </div>
         </div>
@@ -60,17 +79,17 @@
         <div class="remember-forgot-row">
           <label class="checkbox-label">
             <input type="checkbox" name="remember_me" value="1">
-            <span>Remember Me</span>
+            <span>{{ 'என்னை நினைவில் கொள்' if lang == 'ta' else 'Remember Me' }}</span>
           </label>
-          <a href="{{ url_for('forgot_password', role='farmer') }}" class="forgot-link">Forgot Password?</a>
+          <a href="{{ url_for('forgot_password', role='farmer') }}" class="forgot-link">{{ 'கடவுச்சொல் மறந்துவிட்டதா?' if lang == 'ta' else 'Forgot Password?' }}</a>
         </div>
 
         <button type="submit" class="btn btn-primary btn-block btn-lg auth-submit-btn" id="btnFarmerLogin">
-          <span>Sign In as Farmer</span> &rarr;
+          <span>{{ 'விவசாயியாக உள்நுழையவும்' if lang == 'ta' else 'Sign In as Farmer' }}</span> &rarr;
         </button>
 
         <div class="auth-card-footer">
-          New Farmer? <a href="{{ url_for('register_farmer') }}" class="auth-link-highlight">+ Register Farmer Account</a>
+          {{ 'புதிய விவசாயியா?' if lang == 'ta' else 'New Farmer?' }} <a href="{{ url_for('register_farmer') }}" class="auth-link-highlight">+ {{ 'விவசாயியாக பதிவு செய்க' if lang == 'ta' else 'Register Farmer Account' }}</a>
         </div>
       </form>
     </div>
@@ -79,24 +98,24 @@
     <div class="auth-role-pane {% if active_role == 'buyer' %}active{% endif %}" id="paneBuyer">
       <div class="role-badge role-badge-buyer">
         <span>🛒</span>
-        <span>Buyer Portal &bull; Procure fresh harvests from local farmers</span>
+        <span>{{ 'வாங்குபவர் போர்டல் • உள்ளூர் விவசாயிகளிடமிருந்து புதிய அறுவடைகளை வாங்குங்கள்' if lang == 'ta' else 'Buyer Portal • Procure fresh harvests from local farmers' }}</span>
       </div>
       <form action="{{ url_for('login_post') }}" method="POST" class="auth-form" id="formBuyer">
         <input type="hidden" name="role" value="buyer">
         <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
 
         <div class="form-group">
-          <label class="form-label" for="buyerEmail">Buyer Email Address <span class="required">*</span></label>
+          <label class="form-label" for="buyerEmail">{{ 'வாங்குபவர் மின்னஞ்சல் முகவரி' if lang == 'ta' else 'Buyer Email Address' }} <span class="required">*</span></label>
           <div class="input-with-icon">
             <span class="input-icon">✉️</span>
-            <input type="email" name="email" id="buyerEmail" class="form-control auth-input" placeholder="buyer@example.com" required value="{{ email if active_role == 'buyer' else '' }}">
+            <input type="email" name="email" id="buyerEmail" class="form-control auth-input" placeholder="saravana.hotel@gmail.com" required value="{{ email if active_role == 'buyer' else '' }}" autocomplete="email">
           </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="buyerPassword">Password <span class="required">*</span></label>
+          <label class="form-label" for="buyerPassword">{{ 'கடவுச்சொல்' if lang == 'ta' else 'Password' }} <span class="required">*</span></label>
           <div class="password-input-wrap">
-            <input type="password" name="password" id="buyerPassword" class="form-control auth-input" placeholder="••••••••" required>
+            <input type="password" name="password" id="buyerPassword" class="form-control auth-input" placeholder="••••••••" required autocomplete="current-password">
             <button type="button" class="btn-toggle-pw" onclick="togglePasswordVisibility('buyerPassword', this)" aria-label="Toggle password visibility">👁️</button>
           </div>
         </div>
@@ -104,17 +123,17 @@
         <div class="remember-forgot-row">
           <label class="checkbox-label">
             <input type="checkbox" name="remember_me" value="1">
-            <span>Remember Me</span>
+            <span>{{ 'என்னை நினைவில் கொள்' if lang == 'ta' else 'Remember Me' }}</span>
           </label>
-          <a href="{{ url_for('forgot_password', role='buyer') }}" class="forgot-link">Forgot Password?</a>
+          <a href="{{ url_for('forgot_password', role='buyer') }}" class="forgot-link">{{ 'கடவுச்சொல் மறந்துவிட்டதா?' if lang == 'ta' else 'Forgot Password?' }}</a>
         </div>
 
         <button type="submit" class="btn btn-primary btn-block btn-lg auth-submit-btn" id="btnBuyerLogin" style="background: linear-gradient(135deg, #0284c7, #0369a1);">
-          <span>Sign In as Buyer</span> &rarr;
+          <span>{{ 'வாங்குபவராக உள்நுழையவும்' if lang == 'ta' else 'Sign In as Buyer' }}</span> &rarr;
         </button>
 
         <div class="auth-card-footer">
-          New Buyer? <a href="{{ url_for('register_buyer') }}" class="auth-link-highlight" style="color: #0284c7;">+ Register Buyer Account</a>
+          {{ 'புதிய வாங்குபவரா?' if lang == 'ta' else 'New Buyer?' }} <a href="{{ url_for('register_buyer') }}" class="auth-link-highlight" style="color: #0284c7;">+ {{ 'வாங்குபவராக பதிவு செய்க' if lang == 'ta' else 'Register Buyer Account' }}</a>
         </div>
       </form>
     </div>
@@ -123,11 +142,11 @@
     <div class="auth-role-pane {% if active_role == 'admin' %}active{% endif %}" id="paneAdmin">
       <div class="role-badge role-badge-admin">
         <span>🛡️</span>
-        <span>Administrator &bull; Platform Waste Oversight &amp; Audit</span>
+        <span>{{ 'நிர்வாகி போர்டல் • தளம் கண்காணிப்பு மற்றும் தணிக்கை' if lang == 'ta' else 'Administrator • Platform Waste Oversight & Audit' }}</span>
       </div>
       <div class="admin-notice-box">
         <span class="notice-icon">🔒</span>
-        <span class="notice-text">Restricted Platform Control Center. Only authorized administrator access permitted. Public admin registration is disabled.</span>
+        <span class="notice-text">{{ 'அங்கீகரிக்கப்பட்ட நிர்வாகி அணுகல் மட்டுமே அனுமதிக்கப்படுகிறது.' if lang == 'ta' else 'Restricted Platform Control Center. Only authorized administrator access permitted.' }}</span>
       </div>
 
       <form action="{{ url_for('login_post') }}" method="POST" class="auth-form" id="formAdmin">
@@ -135,27 +154,27 @@
         <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
 
         <div class="form-group">
-          <label class="form-label" for="adminEmail">Authorized Admin Email <span class="required">*</span></label>
+          <label class="form-label" for="adminEmail">{{ 'அங்கீகரிக்கப்பட்ட நிர்வாகி மின்னஞ்சல்' if lang == 'ta' else 'Authorized Admin Email' }} <span class="required">*</span></label>
           <div class="input-with-icon">
             <span class="input-icon">🛡️</span>
-            <input type="email" name="email" id="adminEmail" class="form-control auth-input" placeholder="admin@farmfresh.org" required value="{{ email if active_role == 'admin' else '' }}">
+            <input type="email" name="email" id="adminEmail" class="form-control auth-input" placeholder="Pp274142@gmail.com" required value="{{ email if active_role == 'admin' else '' }}" autocomplete="email">
           </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="adminPassword">Admin Master Password <span class="required">*</span></label>
+          <label class="form-label" for="adminPassword">{{ 'நிர்வாகி கடவுச்சொல்' if lang == 'ta' else 'Admin Master Password' }} <span class="required">*</span></label>
           <div class="password-input-wrap">
-            <input type="password" name="password" id="adminPassword" class="form-control auth-input" placeholder="••••••••" required>
+            <input type="password" name="password" id="adminPassword" class="form-control auth-input" placeholder="••••••••" required autocomplete="current-password">
             <button type="button" class="btn-toggle-pw" onclick="togglePasswordVisibility('adminPassword', this)" aria-label="Toggle password visibility">👁️</button>
           </div>
         </div>
 
         <button type="submit" class="btn btn-danger btn-block btn-lg auth-submit-btn" id="btnAdminLogin" style="background: linear-gradient(135deg, #b91c1c, #991b1b);">
-          <span>Access Admin Control Center</span> &rarr;
+          <span>{{ 'நிர்வாக கட்டுப்பாட்டு மையத்தை அணுகவும்' if lang == 'ta' else 'Access Admin Control Center' }}</span> &rarr;
         </button>
 
         <div class="auth-card-footer" style="color: #64748b; font-size: 0.8rem;">
-          Protected by bcrypt hashing &amp; signed JWT tokens. Unauthorized access attempts are monitored and logged.
+          {{ 'Bcrypt மற்றும் JWT குறியாக்கம் மூலம் பாதுகாக்கப்படுகிறது.' if lang == 'ta' else 'Protected by bcrypt hashing & signed JWT tokens. Authorized access only.' }}
         </div>
       </form>
     </div>
@@ -178,6 +197,26 @@ function switchLoginRole(role) {
   // Update URL hash without reload
   if (history.replaceState) {
     history.replaceState(null, null, '#' + role);
+  }
+}
+
+function quickFillDemo(role, email, password) {
+  switchLoginRole(role);
+  if (role === 'farmer') {
+    const e = document.getElementById('farmerEmail');
+    const p = document.getElementById('farmerPassword');
+    if (e) e.value = email;
+    if (p) p.value = password;
+  } else if (role === 'buyer') {
+    const e = document.getElementById('buyerEmail');
+    const p = document.getElementById('buyerPassword');
+    if (e) e.value = email;
+    if (p) p.value = password;
+  } else if (role === 'admin') {
+    const e = document.getElementById('adminEmail');
+    const p = document.getElementById('adminPassword');
+    if (e) e.value = email;
+    if (p) p.value = password;
   }
 }
 
