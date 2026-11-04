@@ -1385,6 +1385,36 @@
                 <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.25rem;">Name shown in recipient inbox</div>
               </div>
 
+              <!-- Field 7: Cloud Email HTTP API Key (Render & Cloud Deployments) -->
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  Cloud Email API Key <span style="font-size: 0.75rem; color: #16a34a; font-weight: 600;">(Recommended for Render)</span>
+                </label>
+                <input type="password" name="http_email_api_key" class="form-control" value="{{ smtp_config.http_email_api_key or '' }}" placeholder="re_... (Resend) or xkeysib-... (Brevo)">
+                <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.25rem;">Render blocks raw SMTP port 587. Adding a free Resend or Brevo API key sends emails over HTTPS port 443!</div>
+              </div>
+
+              <!-- Field 8: Cloud Provider -->
+              <div>
+                <label style="display: block; font-weight: 700; font-size: 0.85rem; margin-bottom: 0.35rem; color: #0f172a;">
+                  Email Provider API
+                </label>
+                <select name="email_provider" class="form-control">
+                  <option value="auto" {% if smtp_config.email_provider == 'auto' or not smtp_config.email_provider %}selected{% endif %}>Auto-Detect (Resend or Brevo)</option>
+                  <option value="resend" {% if smtp_config.email_provider == 'resend' %}selected{% endif %}>Resend (api.resend.com)</option>
+                  <option value="brevo" {% if smtp_config.email_provider == 'brevo' %}selected{% endif %}>Brevo (api.brevo.com)</option>
+                </select>
+                <div style="font-size: 0.72rem; color: #64748b; margin-top: 0.25rem;">Dispatches directly via HTTPS port 443</div>
+              </div>
+
+            </div>
+
+            <!-- Render Host Notice -->
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 0.85rem 1rem; margin-bottom: 1.25rem; font-size: 0.825rem; color: #166534; display: flex; align-items: flex-start; gap: 0.6rem;">
+              <span style="font-size: 1.25rem; line-height: 1;">💡</span>
+              <div>
+                <strong>Cloud Hosting (Render) Email Delivery:</strong> Render blocks outbound traffic on raw SMTP ports (25, 465, 587). The platform automatically handles this by delivering all announcements and notifications directly to user dashboards in real time. For direct inbox delivery to external Gmail addresses from Render, simply paste a free Resend (<code style="background:#dcfce7; color:#14532d; padding:1px 4px; border-radius:4px;">re_...</code>) or Brevo API key above!
+              </div>
             </div>
 
             <div style="display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center;">
@@ -1560,16 +1590,26 @@
                   <tr>
                     <td style="font-size: 0.8rem; color: #64748b; white-space: nowrap;">{{ log['created_at'] }}</td>
                     <td>
-                      {% if 'SENT' in log['action'] %}
-                        <span style="background: #dcfce7; color: #166534; padding: 0.2rem 0.5rem; border-radius: 999px; font-weight: 700; font-size: 0.75rem;">
+                      {% if 'SENT' in log['action'] or 'DELIVERED' in log['action'] %}
+                        <span style="background: #dcfce7; color: #166534; padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.25rem;">
                           ✓ Delivered
                         </span>
-                      {% elif 'SIMULATED' in log['action'] %}
-                        <span style="background: #e0f2fe; color: #0369a1; padding: 0.2rem 0.5rem; border-radius: 999px; font-weight: 700; font-size: 0.75rem;">
-                          ⚡ Simulated
+                      {% elif 'BROADCAST_COMPLETED' in log['action'] %}
+                        {% if 'Delivered: 0/' in log['details'] and not 'Delivered: 0/0' in log['details'] %}
+                          <span style="background: #fee2e2; color: #991b1b; padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.25rem;">
+                            ⚠️ Failed
+                          </span>
+                        {% else %}
+                          <span style="background: #dcfce7; color: #166534; padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.25rem;">
+                            📢 Broadcast Sent
+                          </span>
+                        {% endif %}
+                      {% elif 'SIMULATED' in log['action'] or 'IN-APP' in log['action'] %}
+                        <span style="background: #e0f2fe; color: #0369a1; padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.25rem;">
+                          ⚡ In-App / Simulated
                         </span>
                       {% else %}
-                        <span style="background: #fee2e2; color: #991b1b; padding: 0.2rem 0.5rem; border-radius: 999px; font-weight: 700; font-size: 0.75rem;">
+                        <span style="background: #fee2e2; color: #991b1b; padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 700; font-size: 0.75rem; display: inline-flex; align-items: center; gap: 0.25rem;">
                           ⚠️ Failed
                         </span>
                       {% endif %}

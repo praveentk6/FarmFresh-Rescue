@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 import auth_service
 from app import app
 import email_service
@@ -20,15 +21,25 @@ class TestSmtpConfigAndBroadcast(unittest.TestCase):
             sess['user_name'] = 'Platform Administrator'
             sess['user_role'] = 'admin'
 
+    def tearDown(self):
+        email_service.set_system_setting('http_email_api_key', '')
+        email_service.set_system_setting('email_provider', 'auto')
+        if 'HTTP_EMAIL_API_KEY' in email_service.os.environ:
+            del email_service.os.environ['HTTP_EMAIL_API_KEY']
+        if 'RESEND_API_KEY' in email_service.os.environ:
+            del email_service.os.environ['RESEND_API_KEY']
+
     def test_save_smtp_config_route(self):
-        """Admin can update SMTP server, port, username, password, and sender name via form."""
+        """Admin can update SMTP server, port, username, password, sender name, and Cloud API key via form."""
         resp = self.client.post('/admin/smtp/save-config', data={
             'smtp_server': 'smtp.gmail.com',
             'smtp_port': '587',
             'smtp_use_tls': '1',
             'smtp_username': 'Pp274142@gmail.com',
             'smtp_password': 'test_app_password_1234',
-            'smtp_sender_name': 'FarmFresh Rescue Admin'
+            'smtp_sender_name': 'FarmFresh Rescue Admin',
+            'http_email_api_key': 're_test_resend_key_12345',
+            'email_provider': 'resend'
         }, follow_redirects=True)
         self.assertEqual(resp.status_code, 200)
 
@@ -40,9 +51,12 @@ class TestSmtpConfigAndBroadcast(unittest.TestCase):
         self.assertEqual(config['password'], 'test_app_password_1234')
         self.assertTrue(config['use_tls'])
         self.assertEqual(config['sender_name'], 'FarmFresh Rescue Admin')
+        self.assertEqual(config['http_email_api_key'], 're_test_resend_key_12345')
+        self.assertEqual(config['email_provider'], 'resend')
         self.assertTrue(config['is_configured'])
 
-    def test_email_broadcast_to_farmers(self):
+    @patch('email_service.send_email', return_value=(True, 'Delivered'))
+    def test_email_broadcast_to_farmers(self, mock_send):
         """Admin can dispatch targeted email broadcast to all farmers."""
         tmpl = email_service.DEFAULT_COMMUNICATION_TEMPLATES['weather_farmer']
         resp = self.client.post('/admin/email-broadcast/send', data={
@@ -53,8 +67,10 @@ class TestSmtpConfigAndBroadcast(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
         self.assertIn('Broadcast complete', html)
+        self.assertTrue(mock_send.called)
 
-    def test_email_broadcast_to_buyers(self):
+    @patch('email_service.send_email', return_value=(True, 'Delivered'))
+    def test_email_broadcast_to_buyers(self, mock_send):
         """Admin can dispatch targeted email broadcast to all buyers."""
         tmpl = email_service.DEFAULT_COMMUNICATION_TEMPLATES['harvest_buyer']
         resp = self.client.post('/admin/email-broadcast/send', data={
@@ -65,8 +81,10 @@ class TestSmtpConfigAndBroadcast(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
         self.assertIn('Broadcast complete', html)
+        self.assertTrue(mock_send.called)
 
-    def test_email_broadcast_to_both(self):
+    @patch('email_service.send_email', return_value=(True, 'Delivered'))
+    def test_email_broadcast_to_both(self, mock_send):
         """Admin can dispatch targeted email broadcast to both farmers and buyers."""
         tmpl = email_service.DEFAULT_COMMUNICATION_TEMPLATES['market_both']
         resp = self.client.post('/admin/email-broadcast/send', data={
@@ -77,8 +95,10 @@ class TestSmtpConfigAndBroadcast(unittest.TestCase):
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
         self.assertIn('Broadcast complete', html)
+        self.assertTrue(mock_send.called)
 
-    def test_single_test_email_broadcast(self):
+    @patch('email_service.send_email', return_value=(True, 'Delivered'))
+    def test_single_test_email_broadcast(self, mock_send):
         """Admin can send a test broadcast to a single custom recipient."""
         resp = self.client.post('/admin/email-broadcast/send', data={
             'target_audience': 'single',
@@ -87,9 +107,21 @@ class TestSmtpConfigAndBroadcast(unittest.TestCase):
             'html_content': '<p>Hello single subscriber</p>'
         }, follow_redirects=True)
         self.assertEqual(resp.status_code, 200)
+        self.assertTrue(mock_send.called)
+
+    def test_render_network_blocked_fallback_to_in_app(self):
+        """When host firewall blocks raw SMTP port 587 ([Errno 101] Network is unreachable), send_email gracefully delivers in-app."""
+        with patch('smtplib.SMTP', side_effect=OSError(101, 'Network is unreachable')):
+            ok, msg = email_service.send_email(
+                to_email='waranlingesh35@gmail.com',
+                subject='☔ Heavy Rains Test Warning',
+                html_body='<p>Test Weather Warning</p>'
+            )
+            self.assertTrue(ok)
+            self.assertIn('In-App', msg)
 
     def test_admin_dashboard_renders_smtp_form_and_templates(self):
-        """Admin dashboard must render the editable SMTP form inputs and template buttons."""
+        """Admin dashboard must render the editable SMTP form inputs, Cloud API key, and template buttons."""
         resp = self.client.get('/admin/dashboard')
         self.assertEqual(resp.status_code, 200)
         html = resp.data.decode('utf-8')
@@ -101,6 +133,7 @@ class TestSmtpConfigAndBroadcast(unittest.TestCase):
         self.assertIn('name="smtp_username"', html)
         self.assertIn('name="smtp_password"', html)
         self.assertIn('name="smtp_sender_name"', html)
+        self.assertIn('name="http_email_api_key"', html)
 
         # Check template buttons
         self.assertIn('id="btnTmplWeather"', html)
@@ -115,4 +148,3 @@ class TestSmtpConfigAndBroadcast(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
-

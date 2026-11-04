@@ -4042,6 +4042,9 @@ def admin_save_smtp_config():
     password = request.form.get('smtp_password', '').strip()
     use_tls = request.form.get('smtp_use_tls', '1') in ('1', 'true', 'yes')
     sender_name = request.form.get('smtp_sender_name', 'FarmFresh Rescue Admin').strip()
+    http_email_api_key = request.form.get('http_email_api_key', '').strip()
+    email_provider = request.form.get('email_provider', 'auto').strip()
+    http_sender_email = request.form.get('http_sender_email', '').strip()
     
     try:
         port_num = int(port)
@@ -4054,7 +4057,10 @@ def admin_save_smtp_config():
         username=username,
         password=password if password != '' else None,
         use_tls=use_tls,
-        sender_name=sender_name
+        sender_name=sender_name,
+        http_email_api_key=http_email_api_key if http_email_api_key != '' else None,
+        email_provider=email_provider,
+        http_sender_email=http_sender_email
     )
     if ok:
         flash("✓ SMTP Configuration settings saved successfully!", "success")
