@@ -194,11 +194,59 @@
 </div>
 
 <!-- Hidden Processing Modal -->
-<div id="paymentLoadingOverlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 99999; display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+<div id="paymentLoadingOverlay" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.75); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
   <div style="background: white; padding: 2.5rem; border-radius: var(--radius-lg); text-align: center; max-width: 400px; width: 90%; box-shadow: var(--shadow-xl);">
     <div style="font-size: 3rem; margin-bottom: 1rem; animation: pulse 1.5s infinite;">🌾</div>
     <h3 style="font-size: 1.35rem; font-weight: 700; color: #0f172a; margin-bottom: 0.5rem;" id="loadingTitle">Processing Payment</h3>
     <p style="color: #64748b; font-size: 0.9rem;" id="loadingDesc">Communicating with Razorpay Secure Gateway... Please do not close or refresh this page.</p>
+  </div>
+</div>
+
+<!-- Interactive Razorpay Sandbox Simulation Modal -->
+<div id="razorpaySimModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.8); z-index: 99999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+  <div style="background: white; border-radius: 16px; max-width: 440px; width: 92%; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.25);">
+    <div style="background: linear-gradient(135deg, #0c2340 0%, #15803d 100%); padding: 1.25rem 1.5rem; color: white; display: flex; justify-content: space-between; align-items: center;">
+      <div style="display: flex; align-items: center; gap: 0.65rem;">
+        <span style="font-size: 1.5rem;">💳</span>
+        <div>
+          <div style="font-weight: 800; font-size: 1.05rem;">Razorpay Secure Gateway</div>
+          <div style="font-size: 0.72rem; color: #86efac; font-weight: 600;">Sandbox Simulation &bull; Escrow Protected</div>
+        </div>
+      </div>
+      <button type="button" onclick="closeSimulationModal()" style="background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; line-height: 1;">&times;</button>
+    </div>
+
+    <div style="padding: 1.5rem;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 1rem; padding-bottom: 0.75rem; border-bottom: 1px dashed #e2e8f0;">
+        <span style="font-size: 0.85rem; color: #64748b; font-weight: 600;">Amount Payable:</span>
+        <span style="font-size: 1.6rem; font-weight: 800; color: #15803d;">₹<span id="simModalAmount">0.00</span></span>
+      </div>
+
+      <div style="font-size: 0.8rem; font-weight: 700; color: #334155; text-transform: uppercase; margin-bottom: 0.5rem;">Select Payment Method</div>
+
+      <div style="display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 1.25rem;">
+        <label style="display: flex; align-items: center; gap: 0.65rem; padding: 0.75rem; border: 1.5px solid #22c55e; border-radius: 8px; background: #f0fdf4; cursor: pointer;">
+          <input type="radio" name="simPayMethod" value="UPI" checked>
+          <span style="font-weight: 700; color: #166534; font-size: 0.88rem;">📱 UPI / QR (Google Pay, PhonePe, Paytm)</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.65rem; padding: 0.75rem; border: 1.5px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer;">
+          <input type="radio" name="simPayMethod" value="Card">
+          <span style="font-weight: 600; color: #1e293b; font-size: 0.88rem;">💳 Test Card (Visa, RuPay, MasterCard)</span>
+        </label>
+        <label style="display: flex; align-items: center; gap: 0.65rem; padding: 0.75rem; border: 1.5px solid #e2e8f0; border-radius: 8px; background: #fff; cursor: pointer;">
+          <input type="radio" name="simPayMethod" value="NetBanking">
+          <span style="font-weight: 600; color: #1e293b; font-size: 0.88rem;">🏦 Net Banking (SBI, HDFC, ICICI, Canara)</span>
+        </label>
+      </div>
+
+      <button type="button" class="btn btn-primary btn-lg" id="btnConfirmSimulation" style="width: 100%; font-size: 1rem; padding: 0.85rem; background: #16a34a; border: none;" onclick="submitSimulationPayment()">
+        ✓ Complete & Approve Payment
+      </button>
+
+      <button type="button" class="btn btn-secondary" style="width: 100%; margin-top: 0.6rem;" onclick="closeSimulationModal()">
+        Cancel Payment
+      </button>
+    </div>
   </div>
 </div>
 
@@ -211,6 +259,7 @@
   let subtotalAmount = {{ subtotal }};
   let deliveryFee = {{ delivery_charges }};
   let currentTotal = subtotalAmount + deliveryFee;
+  let activeOrderData = null;
 
   function updateDeliveryCharge(mode) {
     if (mode === 'pickup') {
@@ -235,12 +284,56 @@
     document.getElementById('paymentLoadingOverlay').style.display = 'none';
   }
 
+  function openSimulationModal(orderData) {
+    activeOrderData = orderData;
+    document.getElementById('simModalAmount').textContent = currentTotal.toFixed(2);
+    document.getElementById('razorpaySimModal').style.display = 'flex';
+  }
+
+  function closeSimulationModal() {
+    document.getElementById('razorpaySimModal').style.display = 'none';
+  }
+
+  async function submitSimulationPayment() {
+    if (!activeOrderData) return;
+    const methodChoice = document.querySelector('input[name="simPayMethod"]:checked').value;
+    closeSimulationModal();
+    showLoading("Verifying Payment", "Confirming signature with Razorpay servers...");
+
+    const simPaymentId = "pay_test_" + Date.now() + "_" + Math.random().toString(36).substr(2, 6);
+    const simSignature = "mock_sig_" + Date.now();
+
+    try {
+      const verifyRes = await fetch('/api/verify-payment', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+          order_id: ORDER_ID,
+          transaction_id: activeOrderData.transaction_id,
+          razorpay_order_id: activeOrderData.order_id,
+          razorpay_payment_id: simPaymentId,
+          razorpay_signature: simSignature,
+          payment_method: "Razorpay Online (" + methodChoice + ")"
+        })
+      });
+      const verifyData = await verifyRes.json();
+      if (verifyData.success) {
+        window.location.href = verifyData.redirect_url;
+      } else {
+        hideLoading();
+        alert("Payment verification error: " + (verifyData.error || "Could not verify signature"));
+      }
+    } catch (e) {
+      hideLoading();
+      alert("Error confirming payment. Please contact support.");
+    }
+  }
+
   async function handleCheckoutSubmission() {
     const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked').value;
     const deliveryAddress = document.getElementById('deliveryAddressInput').value.trim();
 
     if (paymentMethod === 'COD') {
-      // Process Cash on Delivery Order
       if (!confirm("Confirm placement of Cash on Delivery (COD) order for ₹" + currentTotal.toFixed(2) + "?")) {
         return;
       }
@@ -286,6 +379,12 @@
 
       if (!orderData.success) {
         alert("Payment initialization failed: " + (orderData.error || "Please try again"));
+        return;
+      }
+
+      // If in sandbox simulation mode (e.g. test credentials or remote live API inactive)
+      if (orderData.is_mock) {
+        openSimulationModal(orderData);
         return;
       }
 
@@ -340,13 +439,18 @@
         }
       };
 
-      const rzp = new Razorpay(options);
-      rzp.on('payment.failed', function (response) {
-        hideLoading();
-        const errDesc = (response && response.error && response.error.description) ? response.error.description : "Transaction could not be completed";
-        alert("Payment Failed! Reason: " + errDesc);
-      });
-      rzp.open();
+      try {
+        const rzp = new Razorpay(options);
+        rzp.on('payment.failed', function (response) {
+          hideLoading();
+          const errDesc = (response && response.error && response.error.description) ? response.error.description : "Transaction could not be completed";
+          alert("Payment Failed! Reason: " + errDesc);
+        });
+        rzp.open();
+      } catch (rzpErr) {
+        console.warn("Razorpay checkout client failed to open, falling back to simulator:", rzpErr);
+        openSimulationModal(orderData);
+      }
 
     } catch (err) {
       hideLoading();

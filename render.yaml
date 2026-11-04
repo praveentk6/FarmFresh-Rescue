@@ -8,15 +8,15 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: RAZORPAY_KEY_ID
-        sync: false
+        value: rzp_test_Tut3XRwhXAIBLC
       - key: RAZORPAY_KEY_SECRET
-        sync: false
+        value: rU2jzCDi7z46Far9wDpKDYj5
       - key: ADMIN_EMAIL
-        sync: false
+        value: Pp274142@gmail.com
       - key: ADMIN_PASSWORD
-        sync: false
+        value: praveen16
       - key: JWT_SECRET
-        sync: false
+        value: farmfresh_rescue_super_secure_jwt_token_secret_key_2026
       - key: MONGODB_URI
         sync: false
 

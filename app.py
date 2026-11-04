@@ -50,7 +50,8 @@ from database import (
 import email_service
 from razorpay_gateway import (
     create_razorpay_order, verify_razorpay_signature,
-    verify_webhook_signature, RAZORPAY_KEY_ID
+    verify_webhook_signature, RAZORPAY_KEY_ID,
+    get_razorpay_key_id, get_razorpay_key_secret
 )
 import auth_service
 from qr_generator import generate_qr_bytes
@@ -3878,8 +3879,30 @@ def admin_dashboard():
         pending_payments_count=pending_payments_count,
         failed_payments_count=failed_payments_count,
         total_payment_volume=total_payment_volume,
-        refund_requests=refund_requests
+        refund_requests=refund_requests,
+        razorpay_key_id=get_razorpay_key_id(),
+        razorpay_key_secret=get_razorpay_key_secret()
     )
+
+@app.route('/admin/razorpay/save-config', methods=['POST'])
+@login_required
+@admin_required
+def admin_save_razorpay_config():
+    key_id = request.form.get('razorpay_key_id', '').strip()
+    key_secret = request.form.get('razorpay_key_secret', '').strip()
+
+    if not key_id or not key_secret:
+        flash("Both Razorpay Key ID and Key Secret are required.", "danger")
+        return redirect(url_for('admin_dashboard') + '#pane-payments')
+
+    from email_service import set_system_setting
+    set_system_setting('RAZORPAY_KEY_ID', key_id)
+    set_system_setting('RAZORPAY_KEY_SECRET', key_secret)
+    os.environ['RAZORPAY_KEY_ID'] = key_id
+    os.environ['RAZORPAY_KEY_SECRET'] = key_secret
+
+    flash("Razorpay API credentials updated successfully!", "success")
+    return redirect(url_for('admin_dashboard') + '#pane-payments')
 
 @app.route('/admin/toggle-user-status/<int:user_id>', methods=['POST'])
 @login_required
