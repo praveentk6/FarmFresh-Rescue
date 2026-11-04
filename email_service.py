@@ -35,6 +35,73 @@ def init_system_settings():
 
 init_system_settings()
 
+def init_sent_emails():
+    """Ensure sent_emails table exists for inspection of delivered templates."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS sent_emails (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                recipient_email TEXT,
+                recipient_name TEXT,
+                subject TEXT,
+                html_content TEXT,
+                text_content TEXT,
+                status TEXT,
+                mode TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        print(f"[init_sent_emails Error] {e}")
+
+init_sent_emails()
+
+def record_sent_email(recipient_email, recipient_name, subject, html_content, text_content=None, status='Delivered', mode='SMTP'):
+    """Record dispatched email for auditing and live in-app inspection."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        now_ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.execute("""
+            INSERT INTO sent_emails (recipient_email, recipient_name, subject, html_content, text_content, status, mode, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (recipient_email, recipient_name or '', subject, html_content, text_content or '', status, mode, now_ts))
+        email_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return email_id
+    except Exception as e:
+        print(f"[record_sent_email Error] {e}")
+        return None
+
+def get_sent_emails(limit=30):
+    """Fetch recent dispatched emails for admin inbox inspection."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, recipient_email, recipient_name, subject, status, mode, created_at FROM sent_emails ORDER BY id DESC LIMIT ?", (limit,))
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        return rows
+    except Exception:
+        return []
+
+def get_sent_email_detail(email_id):
+    """Retrieve full sent email details including HTML body for inspector preview."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM sent_emails WHERE id = ?", (email_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+    except Exception:
+        return None
+
 def get_system_setting(key, default=None):
     """Retrieve runtime system setting value from database."""
     try:
@@ -284,7 +351,7 @@ def save_smtp_config(server: str, port: int, username: str, password: str, use_t
     log_activity('SMTP_CONFIG_UPDATED', f"Updated SMTP settings: {username} via {server}:{port} (TLS={use_tls})")
     return True, "SMTP configuration settings saved and activated successfully!"
 
-def send_email(to_email: str, subject: str, html_body: str, text_body: str = None):
+def send_email(to_email: str, subject: str, html_body: str, text_body: str = None, recipient_name: str = None):
     """
     Deliver an email via Cloud HTTP API (Resend/Brevo) or standard SMTP,
     with automatic in-app dashboard fallback if cloud provider blocks raw outbound SMTP ports.
@@ -307,14 +374,27 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str = Non
                 provider=config.get('email_provider', 'auto')
             )
             if ok:
+                record_sent_email(to_email_clean, recipient_name, subject, html_body, text_body, 'Delivered', 'Cloud HTTPS API')
                 log_activity('EMAIL_SENT', f"Delivered email to {to_email_clean} via Cloud HTTPS API (Ref: {msg_ref}) | Subject: {subject}", to_email_clean)
                 return True, f"Email delivered to {to_email_clean} via Cloud HTTPS API (Ref: {msg_ref})."
         except Exception as http_err:
             print(f"[Cloud Email HTTP API Warning] {http_err}. Proceeding with SMTP/Fallback...")
 
-    # 2. Check if SMTP credentials exist
+    # 2. Check if host is Render or cloud container that blocks raw SMTP ports (25, 465, 587)
+    is_render_env = os.environ.get('RENDER') == 'true' or bool(os.environ.get('RENDER_SERVICE_ID')) or bool(os.environ.get('IS_RENDER'))
+    if is_render_env and not http_key:
+        # Fast path: Render firewall blocks raw SMTP ports 25, 465, 587.
+        # Avoid hanging on connection timeout; immediately deliver via in-app dashboard notification and record.
+        _deliver_in_app_notification(to_email_clean, subject, html_body or text_body or '')
+        record_sent_email(to_email_clean, recipient_name, subject, html_body, text_body, 'Delivered (In-App)', 'Render Firewall In-App Fallback')
+        note = "Delivered to user dashboard via In-App Notification (Render cloud blocks raw SMTP 587; add free Cloud API key for direct inbox delivery)."
+        log_activity('EMAIL_DELIVERED', f"✓ {note} Recipient: {to_email_clean} | Subject: {subject}", to_email_clean)
+        return True, f"✓ Delivered to {to_email_clean} via In-App Dashboard Notification ({note})"
+
+    # 3. Check if SMTP credentials exist
     if not config['is_configured']:
         _deliver_in_app_notification(to_email_clean, subject, html_body or text_body or '')
+        record_sent_email(to_email_clean, recipient_name, subject, html_body, text_body, 'Simulated', 'In-App / Simulator Mode')
         msg = f"[SMTP Simulator / In-App] To <{to_email_clean}>: '{subject}'. Notification stored in user dashboard."
         try:
             print(msg)
@@ -344,10 +424,10 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str = Non
         try:
             if is_ssl:
                 context = ssl.create_default_context()
-                server = smtplib.SMTP_SSL(config['server'], config['port'], context=context, timeout=8)
+                server = smtplib.SMTP_SSL(config['server'], config['port'], context=context, timeout=5)
                 server.ehlo()
             else:
-                server = smtplib.SMTP(config['server'], config['port'], timeout=8)
+                server = smtplib.SMTP(config['server'], config['port'], timeout=5)
                 server.ehlo()
                 if config['use_tls']:
                     server.starttls()
@@ -369,6 +449,7 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str = Non
                 try: server.close()
                 except: pass
 
+        record_sent_email(to_email_clean, recipient_name, subject, html_body, text_body, 'Delivered', f"SMTP ({config['server']})")
         log_activity('EMAIL_SENT', f"Delivered email to {to_email_clean} | Subject: {subject}", to_email_clean)
         return True, f"Email delivered to {to_email_clean} via {config['server']}."
     except Exception as e:
@@ -381,12 +462,14 @@ def send_email(to_email: str, subject: str, html_body: str, text_body: str = Non
         if is_network_blocked:
             # Automatic graceful fallback: Cloud host (Render) blocks raw SMTP ports 25/465/587.
             _deliver_in_app_notification(to_email_clean, subject, html_body or text_body or '')
+            record_sent_email(to_email_clean, recipient_name, subject, html_body, text_body, 'Delivered (In-App)', 'In-App Fallback (Firewall Block)')
             host_note = f"Host blocked raw SMTP port {config['port']} (Render Firewall). Auto-delivered via In-App Notification."
             log_activity('EMAIL_DELIVERED', f"✓ {host_note} To: {to_email_clean} | Subject: {subject}", to_email_clean)
             return True, f"✓ Delivered to {to_email_clean} via In-App Dashboard Notification ({host_note})"
 
         err_msg = f"SMTP Delivery Failed to {to_email_clean}: {str(e)}"
         print(f"[SMTP Error] {err_msg}")
+        record_sent_email(to_email_clean, recipient_name, subject, html_body, text_body, 'Failed', 'SMTP Authentication Error')
         log_activity('EMAIL_FAILED', err_msg, to_email_clean)
         return False, err_msg
 
@@ -611,10 +694,11 @@ def send_broadcast_communication(target_audience: str, subject: str, html_conten
     conn.close()
 
     if not recipients:
-        return False, "No active recipient users found for selected audience.", 0, 0
+        return False, "No active recipient users found for selected audience.", 0, 0, []
 
     success_count = 0
     fail_count = 0
+    dispatch_details = []
     
     for r in recipients:
         r_email = r.get('email', '').strip()
@@ -623,15 +707,27 @@ def send_broadcast_communication(target_audience: str, subject: str, html_conten
             continue
         
         personalized_html = html_content.replace('{user_name}', r_name)
-        ok, msg = send_email(r_email, subject, personalized_html, text_content)
+        ok, msg = send_email(r_email, subject, personalized_html, text_content, recipient_name=r_name)
         if ok:
             success_count += 1
+            dispatch_details.append({
+                'email': r_email,
+                'name': r_name,
+                'status': 'Delivered',
+                'message': msg
+            })
         else:
             fail_count += 1
+            dispatch_details.append({
+                'email': r_email,
+                'name': r_name,
+                'status': 'Failed',
+                'message': msg
+            })
 
     log_activity(
         'EMAIL_BROADCAST_COMPLETED',
         f"Audience: {target_audience} | Delivered: {success_count}/{len(recipients)} | Subject: {subject}",
         'admin'
     )
-    return True, f"Broadcast complete: {success_count} emails dispatched ({fail_count} failed) to {target_audience}.", success_count, fail_count
+    return True, f"Broadcast complete: {success_count} emails dispatched ({fail_count} failed) to {target_audience}.", success_count, fail_count, dispatch_details

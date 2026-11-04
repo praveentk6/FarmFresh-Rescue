@@ -3854,6 +3854,7 @@ def admin_dashboard():
         active_announcements_count=active_announcements_count,
         smtp_config=smtp_config,
         email_logs=email_logs,
+        sent_emails=email_service.get_sent_emails(30),
         default_templates=email_service.DEFAULT_COMMUNICATION_TEMPLATES,
         verified_users_count=verified_users_count,
         unverified_users_count=unverified_users_count,
@@ -4023,9 +4024,16 @@ def admin_send_verification(user_id):
 @admin_required
 def admin_test_smtp():
     recipient = request.form.get('recipient_email', '').strip()
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.form.get('is_ajax') == '1'
     if not recipient:
         recipient = g.user.get('email', 'admin@farmfresh.org')
     ok, send_msg = email_service.test_smtp_connection(recipient, base_url=request.host_url)
+    if is_ajax:
+        return jsonify({
+            'success': ok,
+            'message': send_msg,
+            'recipient': recipient
+        })
     if ok:
         flash(f"🧪 SMTP Diagnostic: {send_msg}", "success")
     else:
@@ -4076,24 +4084,53 @@ def admin_send_email_broadcast():
     subject = request.form.get('subject', '').strip()
     html_content = request.form.get('html_content', '').strip()
     single_email = request.form.get('single_email', '').strip()
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest' or request.form.get('is_ajax') == '1'
     
     if not subject or not html_content:
+        if is_ajax:
+            return jsonify({'success': False, 'message': 'Subject and email message content are required.'}), 400
         flash("Subject and email message content are required.", "danger")
         return redirect(url_for('admin_dashboard') + '#smtp')
         
-    ok, msg, sent_count, fail_count = email_service.send_broadcast_communication(
+    res = email_service.send_broadcast_communication(
         target_audience=audience,
         subject=subject,
         html_content=html_content,
         single_email=single_email,
         base_url=request.host_url
     )
+    ok = res[0]
+    msg = res[1]
+    sent_count = res[2]
+    fail_count = res[3]
+    dispatch_details = res[4] if len(res) > 4 else []
+
+    if is_ajax:
+        return jsonify({
+            'success': ok,
+            'message': msg,
+            'sent_count': sent_count,
+            'fail_count': fail_count,
+            'details': dispatch_details,
+            'subject': subject,
+            'audience': audience
+        })
+
     if ok:
         flash(f"📢 {msg}", "success")
     else:
         flash(f"⚠️ Broadcast dispatch failed: {msg}", "danger")
         
     return redirect(url_for('admin_dashboard') + '#smtp')
+
+@app.route('/admin/emails/preview/<int:email_id>')
+@login_required
+@admin_required
+def admin_preview_sent_email(email_id):
+    email_data = email_service.get_sent_email_detail(email_id)
+    if not email_data:
+        return jsonify({'success': False, 'message': 'Email record not found.'}), 404
+    return jsonify({'success': True, 'email': email_data})
 
 @app.route('/admin/announcements/create', methods=['POST'])
 @login_required

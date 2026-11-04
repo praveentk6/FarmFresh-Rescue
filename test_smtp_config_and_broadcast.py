@@ -145,6 +145,43 @@ class TestSmtpConfigAndBroadcast(unittest.TestCase):
         self.assertIn('id="broadcastSubject"', html)
         self.assertIn('id="broadcastHtmlContent"', html)
         self.assertIn('id="liveEmailPreview"', html)
+        self.assertIn('id="emailProgressModal"', html)
+        self.assertIn('id="emailProgressBar"', html)
+
+    @patch('email_service.send_email', return_value=(True, 'Delivered to test recipient'))
+    def test_ajax_broadcast_progress_response(self, mock_send):
+        """AJAX request to broadcast returns structured JSON progress data for the modal."""
+        resp = self.client.post('/admin/email-broadcast/send', data={
+            'target_audience': 'single',
+            'single_email': 'waranlingesh35@gmail.com',
+            'subject': 'Testing Progress Engine',
+            'html_content': '<p>Progress content</p>'
+        }, headers={'X-Requested-With': 'XMLHttpRequest'})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['sent_count'], 1)
+        self.assertEqual(len(data['details']), 1)
+        self.assertEqual(data['details'][0]['email'], 'waranlingesh35@gmail.com')
+
+    def test_email_inspection_preview_route(self):
+        """Admin can fetch full sent email record for the inspection modal."""
+        email_id = email_service.record_sent_email(
+            recipient_email='waranlingesh35@gmail.com',
+            recipient_name='Lingesh',
+            subject='Inspection Test Subject',
+            html_content='<h1>Test HTML Body</h1>',
+            status='Delivered',
+            mode='Cloud HTTPS API'
+        )
+        self.assertIsNotNone(email_id)
+
+        resp = self.client.get(f'/admin/emails/preview/{email_id}')
+        self.assertEqual(resp.status_code, 200)
+        data = resp.get_json()
+        self.assertTrue(data['success'])
+        self.assertEqual(data['email']['recipient_email'], 'waranlingesh35@gmail.com')
+        self.assertIn('Test HTML Body', data['email']['html_content'])
 
 if __name__ == '__main__':
     unittest.main()
