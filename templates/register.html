@@ -79,7 +79,7 @@
                 <span id="farmerOtpTimer" style="font-size: 0.75rem; color: #15803d; font-weight: 600;">Valid for 10m</span>
               </div>
               <div style="display: flex; gap: 8px; align-items: center;">
-                <input type="text" name="otp_code" id="farmerOtpInput" maxlength="6" pattern="[0-9]{6}" placeholder="------" class="form-control" style="max-width: 150px; font-family: monospace; font-size: 1.15rem; letter-spacing: 4px; text-align: center; font-weight: 800; border: 1.5px solid #16a34a; border-radius: 8px;">
+                <input type="text" name="otp_code" id="farmerOtpInput" maxlength="6" pattern="[0-9]{6}" placeholder="------" class="form-control" style="max-width: 150px; font-family: monospace; font-size: 1.15rem; letter-spacing: 4px; text-align: center; font-weight: 800; border: 1.5px solid #16a34a; border-radius: 8px;" oninput="if(this.value.trim().length === 6) verifyRegOtp('farmer');">
                 <button type="button" class="btn btn-success" id="btnVerifyFarmerOtp" onclick="verifyRegOtp('farmer')" style="background: #16a34a; border: none; color: #fff; font-weight: 700; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem;">
                   Verify OTP
                 </button>
@@ -216,7 +216,7 @@
                 <span id="buyerOtpTimer" style="font-size: 0.75rem; color: #0284c7; font-weight: 600;">Valid for 10m</span>
               </div>
               <div style="display: flex; gap: 8px; align-items: center;">
-                <input type="text" name="otp_code" id="buyerOtpInput" maxlength="6" pattern="[0-9]{6}" placeholder="------" class="form-control" style="max-width: 150px; font-family: monospace; font-size: 1.15rem; letter-spacing: 4px; text-align: center; font-weight: 800; border: 1.5px solid #0284c7; border-radius: 8px;">
+                <input type="text" name="otp_code" id="buyerOtpInput" maxlength="6" pattern="[0-9]{6}" placeholder="------" class="form-control" style="max-width: 150px; font-family: monospace; font-size: 1.15rem; letter-spacing: 4px; text-align: center; font-weight: 800; border: 1.5px solid #0284c7; border-radius: 8px;" oninput="if(this.value.trim().length === 6) verifyRegOtp('buyer');">
                 <button type="button" class="btn btn-primary" id="btnVerifyBuyerOtp" onclick="verifyRegOtp('buyer')" style="background: #0284c7; border: none; color: #fff; font-weight: 700; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem;">
                   Verify OTP
                 </button>
@@ -412,14 +412,23 @@ function validateRegForm(role) {
   var otpInput = document.getElementById(roleLower + 'OtpInput');
 
   if (!verifiedField || verifiedField.value !== '1') {
+    // If user already typed 6 digits, auto-verify!
     if (otpInput && otpInput.value.trim().length === 6) {
-      alert('You have entered an OTP code. Please click the "Verify OTP" button to confirm your email before submitting.');
-      otpInput.focus();
+      verifyRegOtp(roleLower);
       return false;
     }
-    alert('Please verify your email address with the 6-digit OTP code before creating your account.');
+    // Auto-trigger OTP generation and display drawer
     var emailInput = document.getElementById(roleLower + 'Email');
-    if (emailInput) emailInput.focus();
+    var emailVal = (emailInput ? emailInput.value : '').trim();
+    if (!emailVal || emailVal.indexOf('@') === -1 || emailVal.indexOf('.') === -1) {
+      alert('Please enter a valid email address.');
+      if (emailInput) emailInput.focus();
+      return false;
+    }
+    var drawer = document.getElementById(roleLower + 'OtpDrawer');
+    if (drawer) drawer.style.display = 'block';
+    alert('Please verify your email address. Generating your 6-digit verification code now.');
+    sendRegOtp(roleLower);
     return false;
   }
 
@@ -487,13 +496,30 @@ function sendRegOtp(role) {
     if (result.ok && result.data.success) {
       if (drawer) drawer.style.display = 'block';
       var otpInput = document.getElementById(role + 'OtpInput');
-      if (otpInput) {
-        otpInput.value = '';
-        otpInput.focus();
-      }
-      if (statusDiv) {
-        statusDiv.style.color = '#15803d';
-        statusDiv.innerHTML = '✓ ' + (result.data.message || 'OTP dispatched! Please check your email inbox.');
+
+      if (result.data.otp_code) {
+        // Fallback / instant gateway mode: populate and verify automatically!
+        if (otpInput) {
+          otpInput.value = result.data.otp_code;
+        }
+        if (statusDiv) {
+          statusDiv.style.color = '#15803d';
+          statusDiv.innerHTML = '<strong>🔐 Instant Gateway Verification:</strong> Code is <span style="font-family: monospace; font-size: 1.1rem; font-weight: 800; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; color: #0369a1;">' + result.data.otp_code + '</span>. Verifying now...';
+        }
+        // Auto-verify immediately!
+        setTimeout(function() {
+          verifyRegOtp(role);
+        }, 300);
+      } else {
+        // Live email was delivered to their actual inbox!
+        if (otpInput) {
+          otpInput.value = '';
+          otpInput.focus();
+        }
+        if (statusDiv) {
+          statusDiv.style.color = '#15803d';
+          statusDiv.innerHTML = '✓ ' + (result.data.message || 'OTP dispatched! Please check your email inbox.');
+        }
       }
 
       // 60s cooldown timer

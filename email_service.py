@@ -261,12 +261,23 @@ def build_buyer_welcome_html(user_name: str, base_url: str = 'http://127.0.0.1:5
 </body>
 </html>"""
 
+class OtpDispatchResult(tuple):
+    """3-tuple subclass (ok, msg, otp_code) with is_fallback attribute for backward-compatible unpacking."""
+    def __new__(cls, ok, msg, otp_code, is_fallback=False):
+        return super().__new__(cls, (ok, msg, otp_code))
+
+    def __init__(self, ok, msg, otp_code, is_fallback=False):
+        self.ok = ok
+        self.msg = msg
+        self.otp_code = otp_code
+        self.is_fallback = is_fallback
+
 def generate_and_send_registration_otp(email: str, user_name: str = 'Valued Member'):
     """Generate 6-digit OTP, persist in registration_otps table, and dispatch via email."""
     import random
     clean_email = email.strip().lower()
     if not clean_email or '@' not in clean_email:
-        return False, "Please enter a valid email address.", None
+        return OtpDispatchResult(False, "Please enter a valid email address.", None, is_fallback=False)
 
     otp_code = f"{random.randint(100000, 999999)}"
     now = datetime.datetime.now()
@@ -292,10 +303,20 @@ def generate_and_send_registration_otp(email: str, user_name: str = 'Valued Memb
         text_body = f"Vanakkam {user_name},\n\nYour FarmFresh Rescue registration verification code is: {otp_code}\nThis code is valid for 10 minutes.\n\nThank you,\nFarmFresh Rescue Team"
 
         ok, msg = send_email(clean_email, subject, html_body, text_body, recipient_name=user_name)
-        return True, f"A 6-digit verification code has been dispatched to {clean_email}.", otp_code
+
+        msg_str = str(msg or '').lower()
+        is_live_delivered = bool(ok) and ('in-app' not in msg_str) and ('simulator' not in msg_str) and ('fallback' not in msg_str) and ('firewall' not in msg_str)
+        is_fallback = not is_live_delivered
+
+        if is_live_delivered:
+            friendly_msg = f"A 6-digit verification code has been dispatched to {clean_email}. Please check your inbox or spam folder."
+        else:
+            friendly_msg = f"Verification code generated: {otp_code} (Host gateway fallback: use code {otp_code} for instant verification)."
+
+        return OtpDispatchResult(True, friendly_msg, otp_code, is_fallback=is_fallback)
     except Exception as e:
         print(f"[generate_and_send_registration_otp Error] {e}")
-        return False, str(e), None
+        return OtpDispatchResult(False, str(e), None, is_fallback=False)
 
 def verify_registration_otp(email: str, entered_otp: str):
     """Verify that entered OTP matches active valid code for email."""

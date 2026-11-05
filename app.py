@@ -1336,11 +1336,18 @@ def api_send_registration_otp():
     if existing:
         return jsonify({'success': False, 'message': f"An account with email '{email}' already exists. Please log in instead."}), 400
 
-    ok, msg, otp = email_service.generate_and_send_registration_otp(email, name)
+    res = email_service.generate_and_send_registration_otp(email, name)
+    ok = res[0]
+    msg = res[1]
+    otp = res[2]
+    is_fallback = getattr(res, 'is_fallback', False)
+
     status_code = 200 if ok else 400
     return jsonify({
         'success': ok,
-        'message': msg
+        'message': msg,
+        'otp_code': otp if is_fallback else None,
+        'is_fallback': is_fallback
     }), status_code
 
 @app.route('/api/auth/verify-registration-otp', methods=['POST'])

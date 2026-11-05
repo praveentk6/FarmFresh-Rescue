@@ -20,6 +20,7 @@ class TestRegistrationOtpAndWelcome(unittest.TestCase):
         cls.client = app.test_client()
 
     def setUp(self):
+        self.client = app.test_client()
         email_service.init_registration_otps()
         email_service.init_sent_emails()
 
@@ -176,6 +177,49 @@ class TestRegistrationOtpAndWelcome(unittest.TestCase):
         # Check that welcome email was triggered
         welcome_calls = [c for c in mock_send.call_args_list if "Vanakkam & Welcome" in c[0][1]]
         self.assertTrue(len(welcome_calls) > 0, "Welcome email was not dispatched during registration")
+
+    @patch('email_service.send_email', return_value=(True, 'Delivered'))
+    def test_09_buyer_end_to_end_registration_with_otp(self, mock_send):
+        """End-to-end buyer registration triggers buyer welcome email and sets email_verified=1."""
+        ts = int(datetime.datetime.now().timestamp())
+        new_buyer_email = f"live_reg_buyer_{ts}@farmfresh-sample.org"
+
+        # 1. Send OTP
+        res = email_service.generate_and_send_registration_otp(new_buyer_email, "Saravana Hotel")
+        self.assertTrue(res[0])
+        otp_code = res[2]
+
+        # 2. Verify OTP via API
+        verify_resp = self.client.post('/api/auth/verify-registration-otp', json={
+            'email': new_buyer_email,
+            'otp_code': otp_code
+        })
+        self.assertEqual(verify_resp.status_code, 200)
+
+        # 3. Submit buyer registration form
+        resp = self.client.post('/register_post', data={
+            'role': 'buyer',
+            'name': 'Saravana Hotel Procurement',
+            'email': new_buyer_email,
+            'phone': '9840123456',
+            'location': 'T. Nagar, Chennai',
+            'password': 'Password123!',
+            'confirm_password': 'Password123!',
+            'terms': '1',
+            'email_otp_verified': '1'
+        }, follow_redirects=True)
+
+        self.assertEqual(resp.status_code, 200)
+
+        # Verify buyer in database has email_verified == 1 and role == 'buyer'
+        user = auth_service.get_user_by_email(new_buyer_email)
+        self.assertIsNotNone(user, "Buyer was not created in database")
+        self.assertEqual(user['role'], 'buyer')
+        self.assertEqual(user['email_verified'], 1)
+
+        # Check buyer welcome email was dispatched
+        welcome_calls = [c for c in mock_send.call_args_list if "Welcome to FarmFresh Rescue Wholesale Hub" in c[0][1]]
+        self.assertTrue(len(welcome_calls) > 0, "Buyer welcome email was not dispatched during registration")
 
 if __name__ == '__main__':
     unittest.main()
