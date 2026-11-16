@@ -45,7 +45,15 @@ from database import (
     get_all_broadcast_announcements, toggle_broadcast_announcement_status,
     delete_broadcast_announcement, generate_user_email_verification_token,
     verify_user_email_by_token, admin_toggle_user_verification,
-    get_recent_email_activity_logs
+    get_recent_email_activity_logs,
+    check_meeting_conflict, request_meeting_reschedule, respond_meeting_reschedule,
+    get_reschedule_requests_for_user, get_meeting_reschedule_history,
+    submit_seller_verification, get_seller_verification_by_farmer_id,
+    get_all_seller_verifications, admin_review_seller_verification,
+    get_verification_stats,
+    submit_buyer_review, get_farmer_reviews, get_farmer_rating_summary,
+    get_completed_transactions_for_review, get_buyer_reviews_submitted,
+    get_all_buyer_reviews, delete_buyer_review
 )
 import email_service
 from razorpay_gateway import (
@@ -73,6 +81,27 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 MAX_FILE_SIZE = 3 * 1024 * 1024  # 3MB
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
+
+# Verification documents upload folder
+VERIFICATIONS_UPLOAD_FOLDER = os.path.join(app.root_path, 'static', 'uploads', 'verifications')
+os.makedirs(VERIFICATIONS_UPLOAD_FOLDER, exist_ok=True)
+VERIFICATION_ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'pdf'}
+
+def allowed_verification_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in VERIFICATION_ALLOWED_EXTENSIONS
+
+def save_verification_file(file_obj):
+    if not file_obj or not file_obj.filename:
+        return None
+    from werkzeug.utils import secure_filename
+    original = secure_filename(file_obj.filename)
+    if not allowed_verification_file(original):
+        return None
+    ext = original.rsplit('.', 1)[1].lower()
+    unique_name = f"verify_{uuid.uuid4().hex[:12]}.{ext}"
+    dest_path = os.path.join(VERIFICATIONS_UPLOAD_FOLDER, unique_name)
+    file_obj.save(dest_path)
+    return f"uploads/verifications/{unique_name}"
 
 # Ensure database tables, seed data, and single authorized admin exist
 try:
@@ -3694,6 +3723,10 @@ def farmer_dashboard():
         farmer_rescue_products=get_farmer_rescue_products(farmer_id),
         farmer_meetings=get_farmer_meetings(farmer_id),
         farmer_direct_sales=get_direct_sales_for_user(farmer_id, 'farmer'),
+        farmer_verification=get_seller_verification_by_farmer_id(farmer_id),
+        farmer_reviews=get_farmer_reviews(farmer_id),
+        farmer_rating_summary=get_farmer_rating_summary(farmer_id),
+        farmer_reschedule_requests=get_reschedule_requests_for_user(farmer_id, 'farmer'),
         active_broadcasts=get_active_broadcast_announcements(role='farmer', district=g.user.get('district') or g.user.get('location'))
     )
 
@@ -3819,6 +3852,9 @@ def buyer_dashboard():
         shared_rescue_products=get_shared_rescue_products()[:8],
         buyer_meetings=get_buyer_meetings(g.user['id']),
         buyer_direct_sales=get_direct_sales_for_user(g.user['id'], 'buyer'),
+        buyer_reschedule_requests=get_reschedule_requests_for_user(g.user['id'], 'buyer'),
+        reviewable_items=get_completed_transactions_for_review(g.user['id']),
+        buyer_submitted_reviews=get_buyer_reviews_submitted(g.user['id']),
         active_broadcasts=get_active_broadcast_announcements(role='buyer', district=g.user.get('district') or g.user.get('location'))
     )
 
@@ -3970,6 +4006,9 @@ def admin_dashboard():
         failed_payments_count=failed_payments_count,
         total_payment_volume=total_payment_volume,
         refund_requests=refund_requests,
+        seller_verifications=get_all_seller_verifications(),
+        verification_stats=get_verification_stats(),
+        buyer_reviews=get_all_buyer_reviews(),
         razorpay_key_id=get_razorpay_key_id(),
         razorpay_key_secret=get_razorpay_key_secret()
     )
@@ -5576,6 +5615,303 @@ def api_direct_messages(other_user_id):
 
     messages = get_direct_chat_messages(g.user['id'], other_user_id, meeting_id=meeting_id)
     return jsonify({'success': True, 'messages': messages})
+
+# ==========================================
+# Meeting Rescheduling Routes
+# ==========================================
+
+@app.route('/meetings/<int:meeting_id>/reschedule', methods=['POST'])
+@app.route('/api/meetings/<int:meeting_id>/reschedule', methods=['POST'])
+@login_required
+def route_request_meeting_reschedule(meeting_id):
+    """Buyer or Farmer submits a reschedule request for a meeting."""
+    data = request.get_json(silent=True) or request.form
+    proposed_date = (data.get('proposed_date') or data.get('reschedule_date') or '').strip()
+    proposed_time = (data.get('proposed_time') or data.get('reschedule_time') or '').strip()
+    reason = (data.get('reason') or data.get('reschedule_reason') or '').strip()
+    proposed_location = (data.get('proposed_location') or data.get('reschedule_location') or '').strip()
+
+    if not proposed_date or not proposed_time:
+        msg = "Both proposed date and time are required to reschedule a meeting."
+        if request.is_json:
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(msg, "warning")
+        return redirect(url_for('view_direct_meeting', meeting_id=meeting_id))
+
+    ok, msg, req_id = request_meeting_reschedule(
+        meeting_id=meeting_id,
+        requester_id=g.user['id'],
+        requester_role=g.user['role'],
+        proposed_date=proposed_date,
+        proposed_time=proposed_time,
+        reason=reason,
+        proposed_location=proposed_location or None
+    )
+
+    if request.is_json:
+        return jsonify({'success': ok, 'message': msg, 'request_id': req_id}), (200 if ok else 400)
+
+    if ok:
+        flash(f"📅 {msg}", "success")
+    else:
+        flash(f"⚠️ {msg}", "danger")
+    return redirect(url_for('view_direct_meeting', meeting_id=meeting_id))
+
+@app.route('/meetings/reschedule/<int:reschedule_id>/respond', methods=['POST'])
+@app.route('/api/meetings/reschedule/<int:reschedule_id>/respond', methods=['POST'])
+@login_required
+def route_respond_meeting_reschedule(reschedule_id):
+    """Counterparty accepts or rejects a reschedule request."""
+    data = request.get_json(silent=True) or request.form
+    action = (data.get('action') or '').strip().lower()
+    notes = (data.get('notes') or data.get('response_notes') or '').strip()
+
+    if action not in ('accept', 'reject'):
+        msg = "Action must be 'accept' or 'reject'."
+        if request.is_json:
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(msg, "warning")
+        return redirect(url_for('list_direct_meetings'))
+
+    ok, msg = respond_meeting_reschedule(
+        reschedule_id=reschedule_id,
+        responder_id=g.user['id'],
+        responder_role=g.user['role'],
+        action=action,
+        response_notes=notes
+    )
+
+    if request.is_json:
+        return jsonify({'success': ok, 'message': msg}), (200 if ok else 400)
+
+    if ok:
+        flash(f"✓ {msg}", "success")
+    else:
+        flash(f"⚠️ {msg}", "danger")
+    
+    redirect_to = request.form.get('redirect_to')
+    if redirect_to:
+        return redirect(redirect_to)
+    return redirect(url_for('list_direct_meetings'))
+
+@app.route('/buyer/reschedule-requests')
+@login_required
+@buyer_required
+def buyer_reschedule_requests_view():
+    """List all reschedule requests for buyer."""
+    requests = get_reschedule_requests_for_user(g.user['id'], 'buyer')
+    return render_template('buyer_reschedules.html', reschedule_requests=requests)
+
+@app.route('/farmer/reschedule-requests')
+@login_required
+@farmer_required
+def farmer_reschedule_requests_view():
+    """List all reschedule requests for farmer."""
+    requests = get_reschedule_requests_for_user(g.user['id'], 'farmer')
+    return render_template('farmer_reschedules.html', reschedule_requests=requests)
+
+# ==========================================
+# Seller Verification Routes
+# ==========================================
+
+@app.route('/farmer/verification', methods=['GET'])
+@login_required
+@farmer_required
+def farmer_verification_view():
+    """Farmer views verification status and documents."""
+    verification = get_seller_verification_by_farmer_id(g.user['id'])
+    return render_template('farmer_verification.html', verification=verification)
+
+@app.route('/farmer/verification/submit', methods=['POST'])
+@login_required
+@farmer_required
+def farmer_verification_submit():
+    """Farmer submits identity/business verification details and uploads document."""
+    seller_name = request.form.get('seller_name', '').strip() or g.user['name']
+    mobile_number = request.form.get('mobile_number', '').strip() or g.user.get('phone', '')
+    farm_name = request.form.get('farm_name', '').strip()
+    farm_address = request.form.get('farm_address', '').strip() or g.user.get('location', '')
+    farm_location = request.form.get('farm_location', '').strip() or farm_address
+    district = request.form.get('district', '').strip() or g.user.get('district', 'Coimbatore')
+    document_type = request.form.get('document_type', '').strip()
+    document_number = request.form.get('document_number', '').strip()
+
+    if not document_type:
+        flash("Please select a document type for verification.", "warning")
+        return redirect(url_for('farmer_dashboard') + '#verification')
+
+    if 'document_file' not in request.files or not request.files['document_file'].filename:
+        flash("Please upload a valid identity or business verification document (PDF, PNG, JPG).", "warning")
+        return redirect(url_for('farmer_dashboard') + '#verification')
+
+    doc_file = request.files['document_file']
+    saved_doc_path = save_verification_file(doc_file)
+    if not saved_doc_path:
+        flash("Invalid file format. Allowed formats: PDF, PNG, JPG, JPEG.", "danger")
+        return redirect(url_for('farmer_dashboard') + '#verification')
+
+    add_doc_path = None
+    if 'additional_document_file' in request.files and request.files['additional_document_file'].filename:
+        add_doc_path = save_verification_file(request.files['additional_document_file'])
+
+    ok, msg, v_id = submit_seller_verification(
+        farmer_id=g.user['id'],
+        seller_name=seller_name,
+        mobile_number=mobile_number,
+        farm_name=farm_name,
+        farm_address=farm_address,
+        farm_location=farm_location,
+        district=district,
+        document_type=document_type,
+        document_number=document_number,
+        document_file=saved_doc_path,
+        additional_document_file=add_doc_path
+    )
+
+    if ok:
+        flash("✓ Verification documents submitted successfully! Admin review in progress.", "success")
+        log_activity("Seller Verification Submitted", f"Farmer {seller_name} (#{g.user['id']}) submitted verification documents.")
+    else:
+        flash(f"Failed to submit verification: {msg}", "danger")
+
+    return redirect(url_for('farmer_dashboard') + '#verification')
+
+@app.route('/admin/seller-verifications/<int:verification_id>/review', methods=['POST'])
+@login_required
+@admin_required
+def admin_review_verification_route(verification_id):
+    """Admin approves or rejects seller verification."""
+    data = request.get_json(silent=True) or request.form
+    action = (data.get('action') or '').strip().lower()
+    rejection_reason = (data.get('rejection_reason') or '').strip()
+    notes = (data.get('admin_notes') or '').strip()
+
+    if action not in ('approve', 'reject'):
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Action must be approve or reject'}), 400
+        flash("Action must be approve or reject.", "warning")
+        return redirect(url_for('admin_dashboard') + '#verifications')
+
+    if action == 'reject' and not rejection_reason:
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Rejection reason is required.'}), 400
+        flash("Rejection reason is required when rejecting verification.", "danger")
+        return redirect(url_for('admin_dashboard') + '#verifications')
+
+    ok, msg = admin_review_seller_verification(
+        verification_id=verification_id,
+        admin_id=g.user['id'],
+        action=action,
+        rejection_reason=rejection_reason,
+        notes=notes
+    )
+
+    if request.is_json:
+        return jsonify({'success': ok, 'message': msg}), (200 if ok else 400)
+
+    if ok:
+        flash(f"✓ {msg}", "success")
+        log_activity("Seller Verification Decision", f"Admin {action}ed verification #{verification_id}")
+    else:
+        flash(f"⚠️ {msg}", "danger")
+
+    return redirect(url_for('admin_dashboard') + '#verifications')
+
+# ==========================================
+# Buyer Reviews and Rating System Routes
+# ==========================================
+
+@app.route('/api/reviews/submit', methods=['POST'])
+@app.route('/buyer/reviews/submit', methods=['POST'])
+@login_required
+@buyer_required
+def submit_review_route():
+    """Buyer submits rating and review for a completed direct meeting or sale."""
+    data = request.get_json(silent=True) or request.form
+    farmer_id = data.get('farmer_id', type=int)
+    meeting_id = data.get('meeting_id', type=int)
+    transaction_id = data.get('transaction_id', type=int)
+    product_id = data.get('product_id', type=int)
+    rating = data.get('rating', type=float) or 5.0
+    comment = (data.get('comment') or '').strip()
+    quality_rating = data.get('quality_rating', type=float) or rating
+    freshness_rating = data.get('freshness_rating', type=float) or rating
+    communication_rating = data.get('communication_rating', type=float) or rating
+    price_rating = data.get('price_rating', type=float) or rating
+    overall_rating = data.get('overall_rating', type=float) or rating
+
+    if not farmer_id:
+        if meeting_id:
+            m = get_meeting_by_id(meeting_id)
+            if m:
+                farmer_id = m['farmer_id']
+        elif transaction_id:
+            s = get_direct_sale_by_id(transaction_id)
+            if s:
+                farmer_id = s['farmer_id']
+
+    if not farmer_id:
+        msg = "Farmer ID or valid meeting/transaction reference is required."
+        if request.is_json:
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(msg, "warning")
+        return redirect(url_for('buyer_dashboard') + '#reviews')
+
+    ok, msg, r_id = submit_buyer_review(
+        buyer_id=g.user['id'],
+        farmer_id=farmer_id,
+        rating=rating,
+        comment=comment,
+        quality_rating=quality_rating,
+        freshness_rating=freshness_rating,
+        communication_rating=communication_rating,
+        price_rating=price_rating,
+        overall_rating=overall_rating,
+        meeting_id=meeting_id,
+        transaction_id=transaction_id,
+        product_id=product_id
+    )
+
+    if request.is_json:
+        return jsonify({'success': ok, 'message': msg, 'review_id': r_id}), (200 if ok else 400)
+
+    if ok:
+        flash(f"⭐ {msg}", "success")
+    else:
+        flash(f"⚠️ {msg}", "danger")
+    return redirect(url_for('buyer_dashboard') + '#reviews')
+
+@app.route('/buyer/reviews')
+@login_required
+@buyer_required
+def buyer_reviews_view():
+    """Buyer views submitted reviews and completed transactions waiting for review."""
+    reviewable = get_completed_transactions_for_review(g.user['id'])
+    my_reviews = get_buyer_reviews_submitted(g.user['id'])
+    return render_template('buyer_reviews.html', reviewable_items=reviewable, my_reviews=my_reviews)
+
+@app.route('/farmer/reviews')
+@login_required
+@farmer_required
+def farmer_reviews_view():
+    """Farmer views all received buyer reviews and detailed rating metrics."""
+    reviews = get_farmer_reviews(g.user['id'])
+    summary = get_farmer_rating_summary(g.user['id'])
+    return render_template('farmer_reviews.html', reviews=reviews, rating_summary=summary)
+
+@app.route('/admin/reviews/<int:review_id>/delete', methods=['POST'])
+@login_required
+@admin_required
+def admin_delete_review_route(review_id):
+    """Admin moderates/removes an inappropriate review."""
+    ok, msg = delete_buyer_review(review_id)
+    if request.is_json:
+        return jsonify({'success': ok, 'message': msg}), (200 if ok else 400)
+    if ok:
+        flash(f"✓ {msg}", "info")
+    else:
+        flash(f"⚠️ {msg}", "danger")
+    return redirect(url_for('admin_dashboard') + '#reviews')
 
 # ==========================================
 # Error Handlers

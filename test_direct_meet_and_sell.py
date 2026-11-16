@@ -1,6 +1,7 @@
 import unittest
 import json
 import os
+import datetime
 from app import app
 from database import (
     get_db, init_db, create_rescue_product, get_shared_rescue_products,
@@ -90,7 +91,7 @@ class DirectMeetAndSellTestCase(unittest.TestCase):
             'rescue_price': '25',
             'quality_grade': 'Grade A',
             'harvest_date': '2026-11-03',
-            'expiry_date': '2026-11-10',
+            'expiry_date': (datetime.datetime.now() + datetime.timedelta(days=10)).strftime('%Y-%m-%d'),
             'farm_location': 'Pollachi Farmgate',
             'district': 'Coimbatore',
             'pin_code': '642001',

@@ -319,6 +319,20 @@ def init_db():
         cursor.execute("ALTER TABLE users ADD COLUMN longitude REAL")
     if 'district' not in user_cols:
         cursor.execute("ALTER TABLE users ADD COLUMN district TEXT")
+    if 'email_verified' not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0")
+    if 'verification_token' not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN verification_token TEXT")
+    if 'verified_at' not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN verified_at TIMESTAMP")
+    if 'verification_status' not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN verification_status TEXT DEFAULT 'Not Verified'")
+    if 'is_verified_seller' not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN is_verified_seller INTEGER DEFAULT 0")
+    if 'seller_rating' not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN seller_rating REAL DEFAULT 0.0")
+    if 'total_reviews' not in user_cols:
+        cursor.execute("ALTER TABLE users ADD COLUMN total_reviews INTEGER DEFAULT 0")
 
     # 2. listings migrations
     cursor.execute("PRAGMA table_info(listings)")
@@ -676,6 +690,86 @@ def init_db():
         FOREIGN KEY (meeting_id) REFERENCES direct_meetings(id) ON DELETE SET NULL,
         FOREIGN KEY (farmer_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    ''')
+
+    # Meeting Reschedule Requests Table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS meeting_reschedule_requests (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        meeting_id INTEGER NOT NULL,
+        requested_by TEXT NOT NULL,
+        requester_id INTEGER NOT NULL,
+        buyer_id INTEGER NOT NULL,
+        farmer_id INTEGER NOT NULL,
+        original_date DATE NOT NULL,
+        original_time TEXT NOT NULL,
+        proposed_date DATE NOT NULL,
+        proposed_time TEXT NOT NULL,
+        proposed_location TEXT,
+        reason TEXT,
+        status TEXT DEFAULT 'Pending' CHECK(status IN ('Pending', 'Accepted', 'Rejected', 'Cancelled')),
+        response_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        responded_at TIMESTAMP,
+        FOREIGN KEY (meeting_id) REFERENCES direct_meetings(id) ON DELETE CASCADE,
+        FOREIGN KEY (requester_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (farmer_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+    ''')
+
+    # Seller Verifications Table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS seller_verifications (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        farmer_id INTEGER NOT NULL,
+        seller_name TEXT NOT NULL,
+        mobile_number TEXT NOT NULL,
+        farm_name TEXT,
+        farm_address TEXT NOT NULL,
+        farm_location TEXT,
+        district TEXT,
+        document_type TEXT NOT NULL,
+        document_number TEXT,
+        document_file TEXT NOT NULL,
+        additional_document_file TEXT,
+        status TEXT DEFAULT 'Verification Pending' CHECK(status IN ('Not Verified', 'Verification Pending', 'Verified', 'Rejected')),
+        admin_notes TEXT,
+        rejection_reason TEXT,
+        submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reviewed_at TIMESTAMP,
+        reviewed_by INTEGER,
+        FOREIGN KEY (farmer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
+    )
+    ''')
+
+    # Buyer Reviews and Rating System Table
+    cursor.execute('''
+    CREATE TABLE IF NOT EXISTS buyer_reviews (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        buyer_id INTEGER NOT NULL,
+        farmer_id INTEGER NOT NULL,
+        transaction_id INTEGER,
+        meeting_id INTEGER,
+        product_id INTEGER,
+        buyer_name TEXT NOT NULL,
+        farmer_name TEXT,
+        product_name TEXT,
+        rating REAL NOT NULL CHECK(rating >= 1 AND rating <= 5),
+        quality_rating REAL DEFAULT 5,
+        freshness_rating REAL DEFAULT 5,
+        communication_rating REAL DEFAULT 5,
+        price_rating REAL DEFAULT 5,
+        overall_rating REAL DEFAULT 5,
+        comment TEXT,
+        is_verified_purchase INTEGER DEFAULT 1,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (farmer_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (transaction_id) REFERENCES direct_sales(id) ON DELETE SET NULL,
+        FOREIGN KEY (meeting_id) REFERENCES direct_meetings(id) ON DELETE SET NULL
     )
     ''')
 
@@ -2984,9 +3078,13 @@ def get_shared_rescue_products(filters=None, sort_by='recent'):
         conn.commit()
 
         query = """
-            SELECT rp.*, u.email as farmer_email, u.location as farmer_default_location
+            SELECT rp.*, u.email as farmer_email, u.location as farmer_default_location,
+                   COALESCE(u.is_verified_seller, 0) as is_verified_seller,
+                   COALESCE(u.verification_status, 'Not Verified') as verification_status,
+                   COALESCE(u.seller_rating, 0.0) as seller_rating,
+                   COALESCE(u.total_reviews, 0) as total_reviews
             FROM rescue_products rp
-            JOIN users u ON rp.farmer_id = u.id
+            LEFT JOIN users u ON rp.farmer_id = u.id
             WHERE rp.status IN ('Available', 'Partially Reserved')
               AND rp.quantity > 0
               AND (rp.expiry_date IS NULL OR date(rp.expiry_date) >= date('now'))
@@ -3068,9 +3166,13 @@ def get_rescue_product_by_id(product_id):
         cursor = conn.cursor()
         cursor.execute("""
             SELECT rp.*, u.email as farmer_email, u.phone as farmer_user_phone,
-                   u.location as farmer_base_location, u.created_at as farmer_joined_at
+                   u.location as farmer_base_location, u.created_at as farmer_joined_at,
+                   COALESCE(u.is_verified_seller, 0) as is_verified_seller,
+                   COALESCE(u.verification_status, 'Not Verified') as verification_status,
+                   COALESCE(u.seller_rating, 0.0) as seller_rating,
+                   COALESCE(u.total_reviews, 0) as total_reviews
             FROM rescue_products rp
-            JOIN users u ON rp.farmer_id = u.id
+            LEFT JOIN users u ON rp.farmer_id = u.id
             WHERE rp.id = ?
         """, (product_id,))
         row = cursor.fetchone()
@@ -3349,6 +3451,11 @@ def get_meeting_by_id(meeting_id):
         sale = cursor.fetchone()
         meeting['sale'] = dict(sale) if sale else None
 
+        # Reschedule history
+        cursor.execute("SELECT * FROM meeting_reschedule_requests WHERE meeting_id = ? ORDER BY id DESC", (meeting_id,))
+        meeting['reschedule_history'] = [dict(r) for r in cursor.fetchall()]
+        meeting['latest_reschedule'] = meeting['reschedule_history'][0] if meeting['reschedule_history'] else None
+
         conn.close()
         return meeting
     except Exception as e:
@@ -3356,14 +3463,25 @@ def get_meeting_by_id(meeting_id):
         return None
 
 def get_buyer_meetings(buyer_id, status_filter=None):
-    """Retrieve all meetings for a buyer, optionally filtered by status."""
+    """Retrieve all meetings for a buyer, optionally filtered by status, with seller verification and reschedule info."""
     try:
         conn = get_db()
         cursor = conn.cursor()
         query = """
-            SELECT dm.*, rp.photo as product_photo, rp.rescue_price
+            SELECT dm.*, rp.photo as product_photo, rp.rescue_price,
+                   COALESCE(f.is_verified_seller, 0) as is_verified_seller,
+                   COALESCE(f.verification_status, 'Not Verified') as verification_status,
+                   COALESCE(f.seller_rating, 0.0) as seller_rating,
+                   COALESCE(f.total_reviews, 0) as total_reviews,
+                   (SELECT r.id FROM meeting_reschedule_requests r WHERE r.meeting_id = dm.id ORDER BY r.id DESC LIMIT 1) as latest_reschedule_id,
+                   (SELECT r.status FROM meeting_reschedule_requests r WHERE r.meeting_id = dm.id ORDER BY r.id DESC LIMIT 1) as latest_reschedule_status,
+                   (SELECT r.proposed_date FROM meeting_reschedule_requests r WHERE r.meeting_id = dm.id ORDER BY r.id DESC LIMIT 1) as proposed_reschedule_date,
+                   (SELECT r.proposed_time FROM meeting_reschedule_requests r WHERE r.meeting_id = dm.id ORDER BY r.id DESC LIMIT 1) as proposed_reschedule_time,
+                   (SELECT r.reason FROM meeting_reschedule_requests r WHERE r.meeting_id = dm.id ORDER BY r.id DESC LIMIT 1) as proposed_reschedule_reason,
+                   (SELECT r.requested_by FROM meeting_reschedule_requests r WHERE r.meeting_id = dm.id ORDER BY r.id DESC LIMIT 1) as reschedule_requested_by
             FROM direct_meetings dm
             LEFT JOIN rescue_products rp ON dm.rescue_product_id = rp.id
+            JOIN users f ON dm.farmer_id = f.id
             WHERE dm.buyer_id = ?
         """
         params = [buyer_id]
@@ -3376,16 +3494,23 @@ def get_buyer_meetings(buyer_id, status_filter=None):
         rows = cursor.fetchall()
         conn.close()
         return [dict(r) for r in rows]
-    except Exception:
+    except Exception as e:
+        print(f"Error in get_buyer_meetings: {e}")
         return []
 
 def get_farmer_meetings(farmer_id, status_filter=None):
-    """Retrieve all meetings for a farmer, optionally filtered by status."""
+    """Retrieve all meetings for a farmer, optionally filtered by status, with reschedule proposals."""
     try:
         conn = get_db()
         cursor = conn.cursor()
         query = """
-            SELECT dm.*, rp.photo as product_photo, rp.rescue_price
+            SELECT dm.*, rp.photo as product_photo, rp.rescue_price,
+                   (SELECT r.id FROM meeting_reschedule_requests r WHERE r.meeting_id = dm.id ORDER BY r.id DESC LIMIT 1) as latest_reschedule_id,
+                   (SELECT r.status FROM meeting_reschedule_requests r WHERE r.meeting_id = dm.id ORDER BY r.id DESC LIMIT 1) as latest_reschedule_status,
+                   (SELECT r.proposed_date FROM meeting_reschedule_requests r WHERE r.meeting_id = dm.id ORDER BY r.id DESC LIMIT 1) as proposed_reschedule_date,
+                   (SELECT r.proposed_time FROM meeting_reschedule_requests r WHERE r.meeting_id = dm.id ORDER BY r.id DESC LIMIT 1) as proposed_reschedule_time,
+                   (SELECT r.reason FROM meeting_reschedule_requests r WHERE r.meeting_id = dm.id ORDER BY r.id DESC LIMIT 1) as proposed_reschedule_reason,
+                   (SELECT r.requested_by FROM meeting_reschedule_requests r WHERE r.meeting_id = dm.id ORDER BY r.id DESC LIMIT 1) as reschedule_requested_by
             FROM direct_meetings dm
             LEFT JOIN rescue_products rp ON dm.rescue_product_id = rp.id
             WHERE dm.farmer_id = ?
@@ -3400,7 +3525,8 @@ def get_farmer_meetings(farmer_id, status_filter=None):
         rows = cursor.fetchall()
         conn.close()
         return [dict(r) for r in rows]
-    except Exception:
+    except Exception as e:
+        print(f"Error in get_farmer_meetings: {e}")
         return []
 
 def respond_direct_meeting(meeting_id, user_id, action, reschedule_data=None, notes=None):
@@ -3427,8 +3553,9 @@ def respond_direct_meeting(meeting_id, user_id, action, reschedule_data=None, no
             return False, "Unauthorized: you are not a party in this meeting"
 
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        action_lower = str(action or '').strip().lower()
 
-        if action == 'accept':
+        if action_lower in ('accept', 'confirmed'):
             cursor.execute("""
                 UPDATE direct_meetings
                 SET status = 'Confirmed',
@@ -3450,7 +3577,7 @@ def respond_direct_meeting(meeting_id, user_id, action, reschedule_data=None, no
             )
             return True, "Meeting confirmed successfully!"
 
-        elif action == 'reject':
+        elif action_lower in ('reject', 'rejected'):
             cursor.execute("""
                 UPDATE direct_meetings
                 SET status = 'Rejected',
@@ -4249,3 +4376,787 @@ def get_recent_email_activity_logs(limit=25):
     except Exception as e:
         print(f"[get_recent_email_activity_logs Error] {e}")
         return []
+
+# ----------------------------------------------------------------------------
+# BUYER-FARMER MEETING RESCHEDULING SYSTEM
+# ----------------------------------------------------------------------------
+
+def check_meeting_conflict(farmer_id, date_str, time_str, exclude_meeting_id=None):
+    """
+    Check if a farmer already has a confirmed meeting on the given date and time.
+    Returns (has_conflict, conflicting_meeting_dict or None)
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        query = """
+            SELECT * FROM direct_meetings
+            WHERE farmer_id = ?
+              AND proposed_date = ?
+              AND proposed_time = ?
+              AND status IN ('Confirmed', 'Accepted')
+        """
+        params = [farmer_id, date_str, time_str]
+        if exclude_meeting_id:
+            query += " AND id != ?"
+            params.append(exclude_meeting_id)
+        cursor.execute(query, params)
+        conflict = cursor.fetchone()
+        conn.close()
+        if conflict:
+            return True, dict(conflict)
+        return False, None
+    except Exception as e:
+        print(f"Error checking meeting conflict: {e}")
+        return False, None
+
+def request_meeting_reschedule(meeting_id, requester_id, requester_role, proposed_date, proposed_time, reason, proposed_location=None):
+    """
+    Submit a formal meeting rescheduling request.
+    Can be requested by Buyer or Farmer.
+    Validates against existing confirmed conflicts.
+    Notifies the counterpart.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM direct_meetings WHERE id = ?", (meeting_id,))
+        m = cursor.fetchone()
+        if not m:
+            conn.close()
+            return False, "Meeting not found", None
+
+        is_farmer = (m['farmer_id'] == requester_id)
+        is_buyer = (m['buyer_id'] == requester_id)
+        if not (is_farmer or is_buyer):
+            conn.close()
+            return False, "Unauthorized: You are not a party in this meeting", None
+
+        if m['status'] in ('Completed', 'Cancelled', 'Rejected'):
+            conn.close()
+            return False, f"Cannot reschedule a meeting that is {m['status'].lower()}", None
+
+        # Check conflicting schedules for the farmer on the proposed date & time
+        conflict, conflict_mtg = check_meeting_conflict(m['farmer_id'], proposed_date, proposed_time, exclude_meeting_id=meeting_id)
+        if conflict:
+            conn.close()
+            return False, f"Conflicting schedule: The farmer already has a confirmed meeting #{conflict_mtg['meeting_code']} on {proposed_date} at {proposed_time}. Please pick another time slot.", None
+
+        actor_role = 'farmer' if is_farmer else 'buyer'
+        target_user_id = m['buyer_id'] if is_farmer else m['farmer_id']
+        requester_name = m['farmer_name'] if is_farmer else m['buyer_name']
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # Insert into meeting_reschedule_requests
+        cursor.execute("""
+            INSERT INTO meeting_reschedule_requests (
+                meeting_id, requested_by, requester_id, buyer_id, farmer_id,
+                original_date, original_time, proposed_date, proposed_time,
+                proposed_location, reason, status, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Pending', ?)
+        """, (
+            meeting_id, actor_role, requester_id, m['buyer_id'], m['farmer_id'],
+            m['proposed_date'], m['proposed_time'], proposed_date, proposed_time,
+            proposed_location or m['meeting_location'], reason, now_str
+        ))
+        reschedule_id = cursor.lastrowid
+
+        # Update direct_meetings status to Rescheduled
+        cursor.execute("""
+            UPDATE direct_meetings
+            SET status = 'Rescheduled',
+                rescheduled_date = ?,
+                rescheduled_time = ?,
+                rescheduled_location = ?,
+                rescheduled_by = ?,
+                updated_at = ?
+            WHERE id = ?
+        """, (
+            proposed_date, proposed_time,
+            proposed_location or m['meeting_location'],
+            'Farmer' if is_farmer else 'Buyer',
+            now_str, meeting_id
+        ))
+        conn.commit()
+        conn.close()
+
+        # In-app notification
+        create_notification(
+            target_user_id,
+            f"Reschedule Request: Meeting #{m['meeting_code']} 📅",
+            f"{requester_name} proposed rescheduling from {m['proposed_date']} {m['proposed_time']} to {proposed_date} {proposed_time}. Reason: {reason or 'Not specified'}.",
+            notif_type='order',
+            link=f"/meeting/{meeting_id}"
+        )
+
+        return True, "Reschedule request submitted successfully. Waiting for counterpart confirmation.", reschedule_id
+    except Exception as e:
+        return False, str(e), None
+
+def respond_meeting_reschedule(reschedule_id, responder_id, responder_role, action, response_notes=None):
+    """
+    Counterpart responds to a rescheduling request:
+    action: 'accept' or 'reject'
+    If accepted: Updates the meeting date & time to the proposed slot and sets status to 'Confirmed'.
+    If rejected: Reverts meeting status to 'Confirmed' with the original date/time, maintaining request history.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT r.*, dm.meeting_code, dm.product_name, dm.farmer_name, dm.buyer_name, dm.meeting_location
+            FROM meeting_reschedule_requests r
+            JOIN direct_meetings dm ON r.meeting_id = dm.id
+            WHERE r.id = ?
+        """, (reschedule_id,))
+        req = cursor.fetchone()
+        if not req:
+            conn.close()
+            return False, "Reschedule request not found"
+
+        req_dict = dict(req)
+        # Check authorization: Responder must be the counterpart
+        if req_dict['requested_by'] == 'buyer':
+            if responder_id != req_dict['farmer_id'] and responder_role != 'admin':
+                conn.close()
+                return False, "Unauthorized: Only the farmer can respond to this reschedule request"
+        else:
+            if responder_id != req_dict['buyer_id'] and responder_role != 'admin':
+                conn.close()
+                return False, "Unauthorized: Only the buyer can respond to this reschedule request"
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        action_clean = str(action or '').strip().lower()
+
+        if action_clean in ('accept', 'accepted'):
+            # Check for conflicting schedules for the farmer at this confirmed slot
+            conflict, conflict_mtg = check_meeting_conflict(req_dict['farmer_id'], req_dict['proposed_date'], req_dict['proposed_time'], exclude_meeting_id=req_dict['meeting_id'])
+            if conflict:
+                conn.close()
+                return False, f"Schedule conflict detected: Confirmed meeting #{conflict_mtg['meeting_code']} already exists at that slot."
+
+            # Update request
+            cursor.execute("""
+                UPDATE meeting_reschedule_requests
+                SET status = 'Accepted', response_notes = ?, responded_at = ?
+                WHERE id = ?
+            """, (response_notes, now_str, reschedule_id))
+
+            # Update direct_meetings with the new confirmed schedule
+            cursor.execute("""
+                UPDATE direct_meetings
+                SET proposed_date = ?,
+                    proposed_time = ?,
+                    meeting_location = COALESCE(?, meeting_location),
+                    status = 'Confirmed',
+                    updated_at = ?
+                WHERE id = ?
+            """, (req_dict['proposed_date'], req_dict['proposed_time'], req_dict['proposed_location'], now_str, req_dict['meeting_id']))
+            conn.commit()
+            conn.close()
+
+            # Notify requester
+            notify_user_id = req_dict['requester_id']
+            actor_name = req_dict['farmer_name'] if req_dict['requested_by'] == 'buyer' else req_dict['buyer_name']
+            create_notification(
+                notify_user_id,
+                f"Reschedule Accepted! #{req_dict['meeting_code']} ✅",
+                f"{actor_name} accepted your reschedule proposal. Confirmed date: {req_dict['proposed_date']} at {req_dict['proposed_time']}.",
+                notif_type='order',
+                link=f"/meeting/{req_dict['meeting_id']}"
+            )
+            return True, "Reschedule request accepted. Meeting schedule updated and confirmed!"
+
+        elif action_clean in ('reject', 'rejected'):
+            cursor.execute("""
+                UPDATE meeting_reschedule_requests
+                SET status = 'Rejected', response_notes = ?, responded_at = ?
+                WHERE id = ?
+            """, (response_notes or 'Declined by counterpart', now_str, reschedule_id))
+
+            # Revert meeting status back to Confirmed with original date
+            cursor.execute("""
+                UPDATE direct_meetings
+                SET status = 'Confirmed', updated_at = ?
+                WHERE id = ?
+            """, (now_str, req_dict['meeting_id']))
+            conn.commit()
+            conn.close()
+
+            # Notify requester
+            notify_user_id = req_dict['requester_id']
+            actor_name = req_dict['farmer_name'] if req_dict['requested_by'] == 'buyer' else req_dict['buyer_name']
+            create_notification(
+                notify_user_id,
+                f"Reschedule Declined #{req_dict['meeting_code']}",
+                f"{actor_name} declined the proposed reschedule. Meeting remains scheduled on {req_dict['original_date']} at {req_dict['original_time']}. Note: {response_notes or 'None'}.",
+                notif_type='info',
+                link=f"/meeting/{req_dict['meeting_id']}"
+            )
+            return True, "Reschedule request rejected. Original meeting schedule maintained."
+        else:
+            conn.close()
+            return False, f"Unknown action: {action}"
+    except Exception as e:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False, str(e)
+
+def get_reschedule_requests_for_user(user_id, role, status_filter='all'):
+    """
+    Retrieve reschedule requests relevant to the user (farmer or buyer).
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        query = """
+            SELECT r.*, dm.meeting_code, dm.product_name, dm.meeting_location,
+                   dm.buyer_name, dm.buyer_phone, dm.farmer_name, dm.farmer_phone
+            FROM meeting_reschedule_requests r
+            JOIN direct_meetings dm ON r.meeting_id = dm.id
+            WHERE (r.buyer_id = ? OR r.farmer_id = ?)
+        """
+        params = [user_id, user_id]
+        if status_filter and status_filter != 'all':
+            query += " AND r.status = ?"
+            params.append(status_filter)
+        query += " ORDER BY r.id DESC"
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"Error fetching reschedule requests: {e}")
+        return []
+
+def get_meeting_reschedule_history(meeting_id):
+    """Retrieve full history of reschedule requests for a specific meeting."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM meeting_reschedule_requests
+            WHERE meeting_id = ?
+            ORDER BY id DESC
+        """, (meeting_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"Error fetching meeting reschedule history: {e}")
+        return []
+
+# ----------------------------------------------------------------------------
+# SELLER VERIFICATION SYSTEM
+# ----------------------------------------------------------------------------
+
+def submit_seller_verification(farmer_id, seller_name, mobile_number, farm_name, farm_address,
+                               farm_location, district, document_type, document_number,
+                               document_file, additional_document_file=None):
+    """
+    Farmer submits verification details and documents for administrative approval.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        cursor.execute("""
+            INSERT INTO seller_verifications (
+                farmer_id, seller_name, mobile_number, farm_name, farm_address,
+                farm_location, district, document_type, document_number,
+                document_file, additional_document_file, status, submitted_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Verification Pending', ?)
+        """, (
+            farmer_id, seller_name, mobile_number, farm_name, farm_address,
+            farm_location, district, document_type, document_number,
+            document_file, additional_document_file, now_str
+        ))
+        v_id = cursor.lastrowid
+
+        # Update farmer's profile status in users table
+        cursor.execute("""
+            UPDATE users
+            SET verification_status = 'Verification Pending'
+            WHERE id = ?
+        """, (farmer_id,))
+        conn.commit()
+
+        # Notify admins
+        cursor.execute("SELECT id FROM users WHERE role = 'admin'")
+        admins = cursor.fetchall()
+        for a in admins:
+            create_notification(
+                a['id'],
+                f"New Seller Verification: {seller_name} 📋",
+                f"Farmer {seller_name} ({district or 'Tamil Nadu'}) submitted documents for verification.",
+                notif_type='info',
+                link="/admin"
+            )
+
+        conn.close()
+        return True, "Verification submitted successfully and is under admin review.", v_id
+    except Exception as e:
+        return False, str(e), None
+
+def get_seller_verification_by_farmer_id(farmer_id):
+    """Fetch the latest verification request for a farmer."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT sv.*, u.name as user_name, u.email as user_email
+            FROM seller_verifications sv
+            JOIN users u ON sv.farmer_id = u.id
+            WHERE sv.farmer_id = ?
+            ORDER BY sv.id DESC LIMIT 1
+        """, (farmer_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+    except Exception as e:
+        print(f"Error fetching seller verification: {e}")
+        return None
+
+def get_all_seller_verifications(status_filter='all'):
+    """Fetch all seller verification requests for admin management."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        query = """
+            SELECT sv.*, u.name as user_name, u.email as user_email, u.phone as user_phone,
+                   u.is_verified_seller, u.seller_rating, u.total_reviews
+            FROM seller_verifications sv
+            JOIN users u ON sv.farmer_id = u.id
+        """
+        params = []
+        if status_filter and status_filter != 'all':
+            query += " WHERE sv.status = ?"
+            params.append(status_filter)
+        query += " ORDER BY sv.id DESC"
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"Error fetching all verifications: {e}")
+        return []
+
+def admin_review_seller_verification(verification_id, admin_id, action, rejection_reason=None, notes=None):
+    """
+    Admin approves or rejects seller verification.
+    Approve: Sets verification_status='Verified', is_verified_seller=1, awards green badge.
+    Reject: Sets verification_status='Rejected', is_verified_seller=0, requires rejection_reason.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM seller_verifications WHERE id = ?", (verification_id,))
+        v = cursor.fetchone()
+        if not v:
+            conn.close()
+            return False, "Verification request not found"
+
+        v_dict = dict(v)
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        action_lower = str(action or '').strip().lower()
+
+        # Validate admin_id exists to prevent foreign key errors
+        reviewer_id = admin_id
+        if reviewer_id:
+            cursor.execute("SELECT id FROM users WHERE id = ?", (reviewer_id,))
+            if not cursor.fetchone():
+                reviewer_id = None
+
+        if action_lower in ('approve', 'verified'):
+            cursor.execute("""
+                UPDATE seller_verifications
+                SET status = 'Verified', admin_notes = ?, rejection_reason = NULL,
+                    reviewed_at = ?, reviewed_by = ?
+                WHERE id = ?
+            """, (notes, now_str, reviewer_id, verification_id))
+
+            cursor.execute("""
+                UPDATE users
+                SET verification_status = 'Verified', is_verified_seller = 1
+                WHERE id = ?
+            """, (v_dict['farmer_id'],))
+            conn.commit()
+            conn.close()
+
+            # Notify the farmer
+            create_notification(
+                v_dict['farmer_id'],
+                "Seller Verification Approved! 🏅",
+                "Congratulations! Your seller profile and documents have been verified. You now display the green Verified Seller badge across all listings.",
+                notif_type='order',
+                link="/farmer"
+            )
+            return True, "Seller verified successfully! Green badge enabled."
+
+        elif action_lower in ('reject', 'rejected'):
+            if not rejection_reason or not rejection_reason.strip():
+                conn.close()
+                return False, "Rejection reason is required when rejecting verification"
+
+            cursor.execute("""
+                UPDATE seller_verifications
+                SET status = 'Rejected', rejection_reason = ?, admin_notes = ?,
+                    reviewed_at = ?, reviewed_by = ?
+                WHERE id = ?
+            """, (rejection_reason.strip(), notes, now_str, reviewer_id, verification_id))
+
+            cursor.execute("""
+                UPDATE users
+                SET verification_status = 'Rejected', is_verified_seller = 0
+                WHERE id = ?
+            """, (v_dict['farmer_id'],))
+            conn.commit()
+            conn.close()
+
+            # Notify the farmer
+            create_notification(
+                v_dict['farmer_id'],
+                "Seller Verification Update ⚠️",
+                f"Your seller verification request was rejected. Reason: {rejection_reason.strip()}. Please re-upload valid documents.",
+                notif_type='info',
+                link="/farmer"
+            )
+            return True, "Verification request rejected."
+        else:
+            conn.close()
+            return False, f"Unknown action: {action}"
+    except Exception as e:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False, str(e)
+
+def get_verification_stats():
+    """Summary counts for admin verification dashboard."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM seller_verifications")
+        total = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM seller_verifications WHERE status = 'Verified'")
+        verified = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM seller_verifications WHERE status = 'Verification Pending'")
+        pending = cursor.fetchone()[0]
+        cursor.execute("SELECT COUNT(*) FROM seller_verifications WHERE status = 'Rejected'")
+        rejected = cursor.fetchone()[0]
+        conn.close()
+        return {
+            'total': total,
+            'verified': verified,
+            'pending': pending,
+            'rejected': rejected
+        }
+    except Exception as e:
+        print(f"Error fetching verification stats: {e}")
+        return {'total': 0, 'verified': 0, 'pending': 0, 'rejected': 0}
+
+# ----------------------------------------------------------------------------
+# BUYER REVIEW AND RATING SYSTEM
+# ----------------------------------------------------------------------------
+
+def submit_buyer_review(buyer_id, farmer_id, rating, comment, quality_rating=5.0,
+                        freshness_rating=5.0, communication_rating=5.0, price_rating=5.0,
+                        overall_rating=None, meeting_id=None, transaction_id=None, product_id=None):
+    """
+    Buyer submits a review with 1-5 star ratings and detailed category scores.
+    Enforces 1 review per completed transaction / meeting.
+    Recalculates seller average rating and total reviews.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        # Buyer info
+        cursor.execute("SELECT name FROM users WHERE id = ?", (buyer_id,))
+        b_row = cursor.fetchone()
+        if not b_row:
+            conn.close()
+            return False, "Buyer account not found", None
+        buyer_name = b_row['name']
+
+        # Farmer info
+        cursor.execute("SELECT name FROM users WHERE id = ?", (farmer_id,))
+        f_row = cursor.fetchone()
+        if not f_row:
+            conn.close()
+            return False, "Seller account not found", None
+        farmer_name = f_row['name']
+
+        # Product name resolution
+        prod_name = None
+        if meeting_id:
+            cursor.execute("SELECT product_name FROM direct_meetings WHERE id = ?", (meeting_id,))
+            m_row = cursor.fetchone()
+            if m_row:
+                prod_name = m_row['product_name']
+        elif transaction_id:
+            cursor.execute("SELECT product_name FROM direct_sales WHERE id = ?", (transaction_id,))
+            s_row = cursor.fetchone()
+            if s_row:
+                prod_name = s_row['product_name']
+
+        # Enforce 1 review per meeting or per transaction
+        if meeting_id:
+            cursor.execute("SELECT id FROM buyer_reviews WHERE buyer_id = ? AND meeting_id = ?", (buyer_id, meeting_id))
+            if cursor.fetchone():
+                conn.close()
+                return False, "You have already reviewed this meeting", None
+        if transaction_id:
+            cursor.execute("SELECT id FROM buyer_reviews WHERE buyer_id = ? AND transaction_id = ?", (buyer_id, transaction_id))
+            if cursor.fetchone():
+                conn.close()
+                return False, "You have already reviewed this purchase transaction", None
+
+        # Validate rating range
+        r = float(rating)
+        if r < 1 or r > 5:
+            conn.close()
+            return False, "Rating must be between 1 and 5 stars", None
+
+        q_r = max(1.0, min(5.0, float(quality_rating or 5.0)))
+        f_r = max(1.0, min(5.0, float(freshness_rating or 5.0)))
+        c_r = max(1.0, min(5.0, float(communication_rating or 5.0)))
+        p_r = max(1.0, min(5.0, float(price_rating or 5.0)))
+        o_r = max(1.0, min(5.0, float(overall_rating or r)))
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        cursor.execute("""
+            INSERT INTO buyer_reviews (
+                buyer_id, farmer_id, transaction_id, meeting_id, product_id,
+                buyer_name, farmer_name, product_name, rating,
+                quality_rating, freshness_rating, communication_rating, price_rating, overall_rating,
+                comment, is_verified_purchase, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+        """, (
+            buyer_id, farmer_id, transaction_id, meeting_id, product_id,
+            buyer_name, farmer_name, prod_name, r,
+            q_r, f_r, c_r, p_r, o_r,
+            comment or '', now_str
+        ))
+        review_id = cursor.lastrowid
+
+        # Recalculate seller rating and total reviews
+        cursor.execute("""
+            SELECT COUNT(*), AVG(rating) FROM buyer_reviews WHERE farmer_id = ?
+        """, (farmer_id,))
+        count_row = cursor.fetchone()
+        tot_reviews = count_row[0] or 0
+        avg_rating = round(float(count_row[1] or 0.0), 2)
+
+        cursor.execute("""
+            UPDATE users
+            SET seller_rating = ?, total_reviews = ?
+            WHERE id = ?
+        """, (avg_rating, tot_reviews, farmer_id))
+        conn.commit()
+        conn.close()
+
+        # In-app notification to the farmer
+        create_notification(
+            farmer_id,
+            f"New Buyer Review: {r} Stars ⭐",
+            f"{buyer_name} left a {r}★ review: \"{(comment or '')[:60]}...\"",
+            notif_type='order',
+            link="/farmer"
+        )
+
+        return True, "Review submitted successfully!", review_id
+    except Exception as e:
+        return False, str(e), None
+
+def get_farmer_reviews(farmer_id, limit=50):
+    """Retrieve all buyer reviews for a farmer."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM buyer_reviews
+            WHERE farmer_id = ?
+            ORDER BY id DESC LIMIT ?
+        """, (farmer_id, limit))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"Error fetching farmer reviews: {e}")
+        return []
+
+def get_farmer_rating_summary(farmer_id):
+    """
+    Calculate full rating statistics: average, total count, 1-5 breakdown, category averages.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT COUNT(*), AVG(rating),
+                   AVG(quality_rating), AVG(freshness_rating),
+                   AVG(communication_rating), AVG(price_rating), AVG(overall_rating)
+            FROM buyer_reviews
+            WHERE farmer_id = ?
+        """, (farmer_id,))
+        agg = cursor.fetchone()
+        total = agg[0] or 0
+        avg_rating = round(float(agg[1] or 0.0), 1)
+
+        cat_avgs = {
+            'quality': round(float(agg[2] or 5.0), 1),
+            'freshness': round(float(agg[3] or 5.0), 1),
+            'communication': round(float(agg[4] or 5.0), 1),
+            'price': round(float(agg[5] or 5.0), 1),
+            'overall': round(float(agg[6] or 5.0), 1)
+        }
+
+        # Breakdown by star rating 1 to 5
+        breakdown = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0}
+        cursor.execute("""
+            SELECT CAST(ROUND(rating) AS INTEGER) as star, COUNT(*)
+            FROM buyer_reviews
+            WHERE farmer_id = ?
+            GROUP BY star
+        """, (farmer_id,))
+        for row in cursor.fetchall():
+            s = int(row[0])
+            if s in breakdown:
+                breakdown[s] = row[1]
+
+        # Calculate percentages
+        percentages = {}
+        for s in range(1, 6):
+            percentages[s] = round((breakdown[s] / total * 100), 1) if total > 0 else 0
+
+        conn.close()
+        return {
+            'average_rating': avg_rating,
+            'total_reviews': total,
+            'breakdown': breakdown,
+            'percentages': percentages,
+            'categories': cat_avgs
+        }
+    except Exception as e:
+        print(f"Error calculating rating summary: {e}")
+        return {
+            'average_rating': 0.0,
+            'total_reviews': 0,
+            'breakdown': {5: 0, 4: 0, 3: 0, 2: 0, 1: 0},
+            'percentages': {5: 0, 4: 0, 3: 0, 2: 0, 1: 0},
+            'categories': {'quality': 0, 'freshness': 0, 'communication': 0, 'price': 0, 'overall': 0}
+        }
+
+def get_completed_transactions_for_review(buyer_id):
+    """
+    Find completed meetings and completed sales for a buyer that have NOT yet been reviewed.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        
+        # 1. Completed direct sales not reviewed
+        cursor.execute("""
+            SELECT s.id as transaction_id, s.meeting_id, s.farmer_id, s.product_name,
+                   s.final_quantity, s.agreed_price_per_kg, s.total_amount, s.created_at,
+                   u.name as farmer_name, u.location as farmer_location
+            FROM direct_sales s
+            JOIN users u ON s.farmer_id = u.id
+            WHERE s.buyer_id = ?
+              AND s.status = 'Completed'
+              AND s.id NOT IN (SELECT transaction_id FROM buyer_reviews WHERE buyer_id = ? AND transaction_id IS NOT NULL)
+            ORDER BY s.id DESC
+        """, (buyer_id, buyer_id))
+        sales = [dict(r) for r in cursor.fetchall()]
+
+        # 2. Completed meetings not reviewed
+        cursor.execute("""
+            SELECT m.id as meeting_id, NULL as transaction_id, m.farmer_id, m.product_name,
+                   m.required_quantity as final_quantity, m.meeting_location, m.proposed_date,
+                   u.name as farmer_name, u.location as farmer_location
+            FROM direct_meetings m
+            JOIN users u ON m.farmer_id = u.id
+            WHERE m.buyer_id = ?
+              AND m.status = 'Completed'
+              AND m.id NOT IN (SELECT meeting_id FROM buyer_reviews WHERE buyer_id = ? AND meeting_id IS NOT NULL)
+            ORDER BY m.id DESC
+        """, (buyer_id, buyer_id))
+        meetings = [dict(r) for r in cursor.fetchall()]
+
+        conn.close()
+        return {'sales': sales, 'meetings': meetings}
+    except Exception as e:
+        print(f"Error fetching completed transactions for review: {e}")
+        return {'sales': [], 'meetings': []}
+
+def get_buyer_reviews_submitted(buyer_id, limit=50):
+    """Retrieve all reviews submitted by this buyer."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT r.*, u.name as farmer_name, u.location as farmer_location
+            FROM buyer_reviews r
+            JOIN users u ON r.farmer_id = u.id
+            WHERE r.buyer_id = ?
+            ORDER BY r.id DESC LIMIT ?
+        """, (buyer_id, limit))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"Error fetching buyer reviews: {e}")
+        return []
+
+def get_all_buyer_reviews(limit=100):
+    """Retrieve all reviews across the platform for admin monitoring."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT r.*, b.name as buyer_name, b.email as buyer_email,
+                   f.name as farmer_name, f.email as farmer_email
+            FROM buyer_reviews r
+            JOIN users b ON r.buyer_id = b.id
+            JOIN users f ON r.farmer_id = f.id
+            ORDER BY r.id DESC LIMIT ?
+        """, (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"Error fetching all reviews: {e}")
+        return []
+
+def delete_buyer_review(review_id):
+    """Admin function to delete an inappropriate review and recalculate rating."""
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT farmer_id FROM buyer_reviews WHERE id = ?", (review_id,))
+        row = cursor.fetchone()
+        if not row:
+            conn.close()
+            return False, "Review not found"
+        farmer_id = row['farmer_id']
+
+        cursor.execute("DELETE FROM buyer_reviews WHERE id = ?", (review_id,))
+        
+        # Recalculate farmer rating
+        cursor.execute("SELECT COUNT(*), AVG(rating) FROM buyer_reviews WHERE farmer_id = ?", (farmer_id,))
+        agg = cursor.fetchone()
+        tot = agg[0] or 0
+        avg = round(float(agg[1] or 0.0), 2)
+
+        cursor.execute("UPDATE users SET seller_rating = ?, total_reviews = ? WHERE id = ?", (avg, tot, farmer_id))
+        conn.commit()
+        conn.close()
+        return True, "Review removed and seller rating recalculated"
+    except Exception as e:
+        return False, str(e)

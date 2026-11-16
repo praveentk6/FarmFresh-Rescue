@@ -121,7 +121,12 @@ def get_user_by_email(email: str):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT id, name, email, password_hash, role, phone, location, pin_code, user_type, is_active, created_at, email_verified, verification_token, verified_at, district
+        SELECT id, name, email, password_hash, role, phone, location, pin_code, user_type, is_active, created_at,
+               email_verified, verification_token, verified_at, district,
+               COALESCE(verification_status, 'Not Verified') as verification_status,
+               COALESCE(is_verified_seller, 0) as is_verified_seller,
+               COALESCE(seller_rating, 0.0) as seller_rating,
+               COALESCE(total_reviews, 0) as total_reviews
         FROM users WHERE LOWER(email) = ?
     """, (email_clean,))
     row = cursor.fetchone()
@@ -163,7 +168,12 @@ def get_user_by_id(user_id: int):
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT id, name, email, password_hash, role, phone, location, pin_code, user_type, is_active, created_at, email_verified, verification_token, verified_at, district
+        SELECT id, name, email, password_hash, role, phone, location, pin_code, user_type, is_active, created_at,
+               email_verified, verification_token, verified_at, district,
+               COALESCE(verification_status, 'Not Verified') as verification_status,
+               COALESCE(is_verified_seller, 0) as is_verified_seller,
+               COALESCE(seller_rating, 0.0) as seller_rating,
+               COALESCE(total_reviews, 0) as total_reviews
         FROM users WHERE id = ?
     """, (user_id,))
     row = cursor.fetchone()

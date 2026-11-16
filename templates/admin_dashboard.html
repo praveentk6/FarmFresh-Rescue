@@ -189,6 +189,24 @@
         <span class="admin-nav-badge">{{ meetings|length if meetings else 0 }}</span>
       </a>
 
+      <a href="#verifications" class="admin-nav-item" data-tab="verifications">
+        <div class="admin-nav-left">
+          <span class="admin-nav-icon">🏅</span>
+          <span>Seller Verification</span>
+        </div>
+        <span class="admin-nav-badge {% if verification_stats and verification_stats.pending > 0 %}badge-alert{% endif %}">
+          {{ verification_stats.pending if verification_stats else 0 }}
+        </span>
+      </a>
+
+      <a href="#reviews" class="admin-nav-item" data-tab="reviews">
+        <div class="admin-nav-left">
+          <span class="admin-nav-icon">⭐</span>
+          <span>Reviews Management</span>
+        </div>
+        <span class="admin-nav-badge">{{ buyer_reviews|length if buyer_reviews else 0 }}</span>
+      </a>
+
       <a href="#smtp" class="admin-nav-item" data-tab="smtp">
         <div class="admin-nav-left">
           <span class="admin-nav-icon">📧</span>
@@ -1280,8 +1298,268 @@
     </div>
 
     <!-- ======================================================================
-         TAB 8: SMTP CONFIGURATION & TARGETED EMAIL BROADCASTS
+         TAB: SELLER VERIFICATION MANAGEMENT
          ====================================================================== -->
+    <div class="admin-tab-pane" id="pane-verifications">
+      
+      <!-- Verification Metric Summary Cards -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
+        <div class="metric-card" style="border-left: 4px solid #0284c7; background: #ffffff; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0;">
+          <div style="color: #64748b; font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">Total Submissions</div>
+          <div style="font-size: 2rem; font-weight: 800; color: #0284c7; margin-top: 0.35rem;">
+            {{ verification_stats.total if verification_stats else 0 }}
+          </div>
+          <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">All-time seller verification requests</div>
+        </div>
+
+        <div class="metric-card" style="border-left: 4px solid #16a34a; background: #ffffff; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0;">
+          <div style="color: #64748b; font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">Verified Sellers</div>
+          <div style="font-size: 2rem; font-weight: 800; color: #16a34a; margin-top: 0.35rem;">
+            {{ verification_stats.verified if verification_stats else 0 }}
+          </div>
+          <div style="font-size: 0.8rem; color: #16a34a; margin-top: 0.25rem;">Active green badges awarded</div>
+        </div>
+
+        <div class="metric-card" style="border-left: 4px solid #f59e0b; background: #ffffff; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0;">
+          <div style="color: #64748b; font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">Pending Review</div>
+          <div style="font-size: 2rem; font-weight: 800; color: #f59e0b; margin-top: 0.35rem;">
+            {{ verification_stats.pending if verification_stats else 0 }}
+          </div>
+          <div style="font-size: 0.8rem; color: #b45309; margin-top: 0.25rem;">Requires administrator action</div>
+        </div>
+
+        <div class="metric-card" style="border-left: 4px solid #dc2626; background: #ffffff; padding: 1.25rem; border-radius: 12px; border: 1px solid #e2e8f0;">
+          <div style="color: #64748b; font-size: 0.85rem; font-weight: 700; text-transform: uppercase;">Rejected / Deficient</div>
+          <div style="font-size: 2rem; font-weight: 800; color: #dc2626; margin-top: 0.35rem;">
+            {{ verification_stats.rejected if verification_stats else 0 }}
+          </div>
+          <div style="font-size: 0.8rem; color: #64748b; margin-top: 0.25rem;">Documents failed validation</div>
+        </div>
+      </div>
+
+      <!-- Seller Verification Table Card -->
+      <div class="data-table-card" style="border-left: 5px solid #0284c7;">
+        <div class="data-table-header" style="flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 style="font-size: 1.35rem; color: #0f172a; display: flex; align-items: center; gap: 0.5rem;">
+              <span>🏅</span> Seller Verification Requests & Document Audit
+            </h2>
+            <span style="font-size: 0.875rem; color: #64748b;">
+              Review uploaded farmer identity, land patta, and business credentials before awarding the Verified Seller badge
+            </span>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Farmer Details</th>
+                <th>Farm & Location</th>
+                <th>Document Details</th>
+                <th>Uploaded Files</th>
+                <th>Status</th>
+                <th>Submitted</th>
+                <th>Admin Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if seller_verifications %}
+                {% for v in seller_verifications %}
+                  <tr>
+                    <td>
+                      <div style="font-weight: 700; color: #1e293b;">{{ v.seller_name }}</div>
+                      <div style="font-size: 0.8rem; color: #64748b;">📞 {{ v.mobile_number or v.user_phone }}</div>
+                      <div style="font-size: 0.8rem; color: #64748b;">✉️ {{ v.user_email }}</div>
+                    </td>
+                    <td>
+                      <div style="font-weight: 600; color: #334155;">{{ v.farm_name or 'Farm Location' }}</div>
+                      <div style="font-size: 0.8rem; color: #64748b;">{{ v.farm_address }}</div>
+                      <span style="background: #f1f5f9; color: #475569; font-size: 0.75rem; font-weight: 700; padding: 0.15rem 0.5rem; border-radius: 4px;">
+                        📍 {{ v.district or 'Tamil Nadu' }}
+                      </span>
+                    </td>
+                    <td>
+                      <div style="font-weight: 700; color: #0284c7;">{{ v.document_type }}</div>
+                      {% if v.document_number %}
+                        <div style="font-family: monospace; font-size: 0.8rem; color: #475569;">No: {{ v.document_number }}</div>
+                      {% endif %}
+                    </td>
+                    <td>
+                      <div style="display: flex; flex-direction: column; gap: 0.35rem;">
+                        {% if v.document_file %}
+                          <a href="{{ url_for('static', filename=v.document_file) }}" target="_blank" class="btn btn-outline-primary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; display: inline-flex; align-items: center; gap: 0.35rem; width: fit-content;">
+                            <span>📄</span> View Document
+                          </a>
+                        {% endif %}
+                        {% if v.additional_document_file %}
+                          <a href="{{ url_for('static', filename=v.additional_document_file) }}" target="_blank" class="btn btn-outline-secondary btn-sm" style="font-size: 0.75rem; padding: 0.2rem 0.5rem; display: inline-flex; align-items: center; gap: 0.35rem; width: fit-content;">
+                            <span>📎</span> Extra Doc
+                          </a>
+                        {% endif %}
+                      </div>
+                    </td>
+                    <td>
+                      {% if v.status == 'Verified' %}
+                        <span style="background: #dcfce7; color: #15803d; font-size: 0.78rem; font-weight: 800; padding: 0.3rem 0.7rem; border-radius: 20px; display: inline-flex; align-items: center; gap: 0.3rem;">
+                          <span>✓</span> Verified Seller
+                        </span>
+                      {% elif v.status == 'Verification Pending' %}
+                        <span style="background: #fef3c7; color: #b45309; font-size: 0.78rem; font-weight: 800; padding: 0.3rem 0.7rem; border-radius: 20px; display: inline-flex; align-items: center; gap: 0.3rem;">
+                          <span>⏳</span> Pending Review
+                        </span>
+                      {% elif v.status == 'Rejected' %}
+                        <span style="background: #fee2e2; color: #b91c1c; font-size: 0.78rem; font-weight: 800; padding: 0.3rem 0.7rem; border-radius: 20px; display: inline-flex; align-items: center; gap: 0.3rem;" title="{{ v.rejection_reason }}">
+                          <span>❌</span> Rejected
+                        </span>
+                        {% if v.rejection_reason %}
+                          <div style="font-size: 0.75rem; color: #dc2626; margin-top: 0.25rem; max-width: 180px;">
+                            {{ v.rejection_reason }}
+                          </div>
+                        {% endif %}
+                      {% else %}
+                        <span style="background: #f1f5f9; color: #475569; font-size: 0.78rem; font-weight: 800; padding: 0.3rem 0.7rem; border-radius: 20px;">
+                          {{ v.status }}
+                        </span>
+                      {% endif %}
+                    </td>
+                    <td style="font-size: 0.825rem; color: #64748b;">
+                      {{ v.submitted_at[:10] if v.submitted_at else 'Recent' }}
+                    </td>
+                    <td>
+                      {% if v.status == 'Verification Pending' or v.status == 'Rejected' %}
+                        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+                          <form action="{{ url_for('admin_review_verification_route', verification_id=v.id) }}" method="POST" style="margin: 0;">
+                            <input type="hidden" name="action" value="approve">
+                            <button type="submit" class="btn btn-sm" style="background: #16a34a; color: white; font-weight: 700; border-radius: 6px; padding: 0.35rem 0.75rem;" onclick="return confirm('Approve verification for {{ v.seller_name }}? This will grant the green Verified Seller badge.');">
+                              ✓ Approve
+                            </button>
+                          </form>
+
+                          <button type="button" class="btn btn-sm" style="background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; font-weight: 700; border-radius: 6px; padding: 0.35rem 0.75rem;" onclick="openRejectionPrompt({{ v.id }}, '{{ v.seller_name }}');">
+                            ✕ Reject
+                          </button>
+                        </div>
+                      {% else %}
+                        <span style="font-size: 0.8rem; color: #16a34a; font-weight: 700;">✓ Badge Active</span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="7" style="text-align: center; padding: 3rem 1rem; color: #64748b;">
+                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🏅</div>
+                    <div style="font-weight: 700; font-size: 1.1rem; color: #1e293b;">No Seller Verification Requests</div>
+                    <div style="font-size: 0.875rem;">When farmers submit identity and farm documents, they will appear here for review.</div>
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ======================================================================
+         TAB: BUYER REVIEWS & RATINGS MANAGEMENT
+         ====================================================================== -->
+    <div class="admin-tab-pane" id="pane-reviews">
+      <div class="data-table-card" style="border-left: 5px solid #f59e0b;">
+        <div class="data-table-header" style="flex-wrap: wrap; gap: 1rem;">
+          <div>
+            <h2 style="font-size: 1.35rem; color: #0f172a; display: flex; align-items: center; gap: 0.5rem;">
+              <span>⭐</span> Buyer Reviews & Seller Rating Moderation
+            </h2>
+            <span style="font-size: 0.875rem; color: #64748b;">
+              Audit verified reviews submitted after completed meetings and direct purchases
+            </span>
+          </div>
+          <div>
+            <span style="background: #fef3c7; color: #b45309; font-weight: 800; font-size: 0.85rem; padding: 0.4rem 0.85rem; border-radius: 20px;">
+              {{ buyer_reviews|length if buyer_reviews else 0 }} Total Reviews
+            </span>
+          </div>
+        </div>
+
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Rating</th>
+                <th>Category Scores</th>
+                <th>Buyer</th>
+                <th>Seller</th>
+                <th>Product</th>
+                <th>Comment</th>
+                <th>Date</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% if buyer_reviews %}
+                {% for r in buyer_reviews %}
+                  <tr>
+                    <td>
+                      <div style="display: flex; align-items: center; gap: 0.25rem;">
+                        <span style="color: #f59e0b; font-size: 1.1rem;">★</span>
+                        <span style="font-weight: 800; font-size: 1.05rem; color: #1e293b;">{{ r.rating }}</span>
+                        <span style="font-size: 0.8rem; color: #64748b;">/ 5</span>
+                      </div>
+                      <span style="background: #dcfce7; color: #15803d; font-size: 0.7rem; font-weight: 800; padding: 0.15rem 0.4rem; border-radius: 4px;">
+                        ✓ Verified Purchase
+                      </span>
+                    </td>
+                    <td>
+                      <div style="font-size: 0.78rem; color: #475569; display: flex; flex-direction: column; gap: 0.15rem;">
+                        <div>Quality: <strong>{{ r.quality_rating }}★</strong></div>
+                        <div>Freshness: <strong>{{ r.freshness_rating }}★</strong></div>
+                        <div>Communication: <strong>{{ r.communication_rating }}★</strong></div>
+                        <div>Price: <strong>{{ r.price_rating }}★</strong></div>
+                      </div>
+                    </td>
+                    <td>
+                      <div style="font-weight: 700; color: #1e293b;">{{ r.buyer_name }}</div>
+                      <div style="font-size: 0.78rem; color: #64748b;">{{ r.buyer_email }}</div>
+                    </td>
+                    <td>
+                      <div style="font-weight: 700; color: #1e293b;">{{ r.farmer_name }}</div>
+                      <div style="font-size: 0.78rem; color: #64748b;">{{ r.farmer_email }}</div>
+                    </td>
+                    <td>
+                      <span style="font-weight: 600; color: #0284c7;">{{ r.product_name or 'Direct Purchase' }}</span>
+                    </td>
+                    <td>
+                      <div style="max-width: 250px; font-size: 0.85rem; color: #334155; word-wrap: break-word;">
+                        "{{ r.comment }}"
+                      </div>
+                    </td>
+                    <td style="font-size: 0.825rem; color: #64748b; white-space: nowrap;">
+                      {{ r.created_at[:10] if r.created_at else 'Recent' }}
+                    </td>
+                    <td>
+                      <form action="{{ url_for('admin_delete_review_route', review_id=r.id) }}" method="POST" style="margin: 0;">
+                        <button type="submit" class="btn btn-sm" style="background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; font-weight: 700; padding: 0.3rem 0.65rem; border-radius: 6px;" onclick="return confirm('Delete this review? Seller rating will be recalculated automatically.');">
+                          🗑️ Delete
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                {% endfor %}
+              {% else %}
+                <tr>
+                  <td colspan="8" style="text-align: center; padding: 3rem 1rem; color: #64748b;">
+                    <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">⭐</div>
+                    <div style="font-weight: 700; font-size: 1.1rem; color: #1e293b;">No Buyer Reviews Recorded Yet</div>
+                    <div style="font-size: 0.875rem;">Reviews submitted by buyers after completed meetings and orders will be cataloged here.</div>
+                  </td>
+                </tr>
+              {% endif %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
     <div class="admin-tab-pane" id="pane-smtp">
       
       <!-- 1. Interactive SMTP Configuration Card -->
@@ -1915,6 +2193,8 @@ document.addEventListener('DOMContentLoaded', function() {
     'orders': 'Platform Orders & Procurement Enquiries',
     'payments': 'Razorpay Payments & Gateway Escrow Audit',
     'meetings': 'Direct In-Person Farm Meetings & Spot Sales',
+    'verifications': 'Seller Verification & Farm Document Inspection Hub',
+    'reviews': 'Buyer Reviews, Star Ratings & Trust Moderation',
     'smtp': 'SMTP Email Service & Verification Diagnostics',
     'logs': 'Real-Time Platform Audit & Activity Logs',
     'sample-data': 'Demonstration & Sample Produce Management'
@@ -2487,6 +2767,32 @@ document.addEventListener('DOMContentLoaded', function() {
   if (searchInput) searchInput.addEventListener('input', filterUsers);
   if (roleFilter) roleFilter.addEventListener('change', filterUsers);
   if (verifFilter) verifFilter.addEventListener('change', filterUsers);
+
+  // --------------------------------------------------------------------------
+  // Seller Verification Rejection Prompt Helper
+  // --------------------------------------------------------------------------
+  window.openRejectionPrompt = function(verificationId, sellerName) {
+    const reason = prompt(`Enter rejection reason for ${sellerName} (mandatory):`, 'Incomplete document or illegible verification scan.');
+    if (!reason || !reason.trim()) {
+      alert('Rejection was cancelled: A reason is required.');
+      return;
+    }
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = `/admin/seller-verifications/${verificationId}/review`;
+    const actionInput = document.createElement('input');
+    actionInput.type = 'hidden';
+    actionInput.name = 'action';
+    actionInput.value = 'reject';
+    const reasonInput = document.createElement('input');
+    reasonInput.type = 'hidden';
+    reasonInput.name = 'rejection_reason';
+    reasonInput.value = reason.trim();
+    form.appendChild(actionInput);
+    form.appendChild(reasonInput);
+    document.body.appendChild(form);
+    form.submit();
+  };
 
 });
 </script>
