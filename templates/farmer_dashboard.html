@@ -11,7 +11,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 1. Update active tab button
     farmerTabBtns.forEach(btn => {
-      btn.classList.toggle('active', btn.getAttribute('data-farmer-tab') === targetTab);
+      const isActive = btn.getAttribute('data-farmer-tab') === targetTab;
+      btn.classList.toggle('active', isActive);
+      if (isActive && window.innerWidth <= 768) {
+        btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
     });
 
     // 2. Show/hide feature panes cleanly in-place
@@ -108,6 +112,16 @@ document.addEventListener('DOMContentLoaded', function() {
     switchFarmerTab(hashToTab[initialHash], false);
   } else {
     switchFarmerTab('overview', false);
+  }
+
+  // Smooth mouse wheel horizontal scroll support if overflowing on compact views
+  const tabsContainer = document.querySelector('.farmer-feature-tabs');
+  if (tabsContainer) {
+    tabsContainer.addEventListener('wheel', (e) => {
+      if (tabsContainer.scrollWidth > tabsContainer.clientWidth && Math.abs(e.deltaX) < Math.abs(e.deltaY)) {
+        tabsContainer.scrollLeft += e.deltaY;
+      }
+    }, { passive: true });
   }
 });
 </script>
@@ -252,7 +266,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <span class="tab-icon">👁️</span>
         <span>{{ 'View All' if lang == 'en' else 'அனைத்தும்' }}</span>
       </button>
-      <a href="{{ url_for('add_rescue_product') }}" class="btn btn-sm" style="background: #16a34a; color: white; font-weight: 700; border-radius: 10px; margin-left: auto; text-decoration: none; padding: 0.5rem 0.85rem; white-space: nowrap;">
+      <a href="{{ url_for('add_rescue_product') }}" class="btn btn-sm" style="background: #16a34a; color: white; font-weight: 700; border-radius: 10px; text-decoration: none; padding: 0.5rem 0.85rem; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.35rem;">
         ➕ Add Rescue Product
       </a>
     </div>

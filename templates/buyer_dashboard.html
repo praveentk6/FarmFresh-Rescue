@@ -11,7 +11,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // 1. Update button active states
     buyerTabBtns.forEach(btn => {
-      btn.classList.toggle('active', btn.getAttribute('data-buyer-tab') === targetTab);
+      const isActive = btn.getAttribute('data-buyer-tab') === targetTab;
+      btn.classList.toggle('active', isActive);
+      if (isActive && window.innerWidth <= 768) {
+        btn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
     });
 
     // 2. Show/hide feature panes cleanly in-place
@@ -71,7 +75,9 @@ document.addEventListener('DOMContentLoaded', function() {
         '#postRequirementSection': 'post-requirement',
         '#buyerOrdersSection': 'orders',
         '#meetingsSection': 'meetings',
+        '#reschedulesSection': 'reschedules',
         '#directPurchasesSection': 'direct-purchases',
+        '#reviewsSection': 'reviews',
         '#offersSection': 'offers',
         '#sharedRescueSection': 'rescue',
         '#buyerPaymentsSection': 'payments'
@@ -89,7 +95,9 @@ document.addEventListener('DOMContentLoaded', function() {
     '#postRequirementSection': 'post-requirement',
     '#buyerOrdersSection': 'orders',
     '#meetingsSection': 'meetings',
+    '#reschedulesSection': 'reschedules',
     '#directPurchasesSection': 'direct-purchases',
+    '#reviewsSection': 'reviews',
     '#offersSection': 'offers',
     '#sharedRescueSection': 'rescue',
     '#buyerPaymentsSection': 'payments',
@@ -100,6 +108,16 @@ document.addEventListener('DOMContentLoaded', function() {
     switchBuyerTab(hashToTab[initialHash], false);
   } else {
     switchBuyerTab('overview', false);
+  }
+
+  // Smooth mouse wheel horizontal scroll support if overflowing on compact views
+  const tabsContainer = document.querySelector('.buyer-feature-tabs');
+  if (tabsContainer) {
+    tabsContainer.addEventListener('wheel', (e) => {
+      if (tabsContainer.scrollWidth > tabsContainer.clientWidth && Math.abs(e.deltaX) < Math.abs(e.deltaY)) {
+        tabsContainer.scrollLeft += e.deltaY;
+      }
+    }, { passive: true });
   }
 });
 </script>
@@ -234,7 +252,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <span class="tab-icon">👁️</span>
         <span>{{ 'View All' if lang == 'en' else 'அனைத்தும்' }}</span>
       </button>
-      <a href="{{ url_for('find_sellers') }}" class="btn btn-sm" style="background: #0284c7; color: white; font-weight: 700; border-radius: 10px; margin-left: auto; text-decoration: none; padding: 0.5rem 0.85rem; white-space: nowrap;">
+      <a href="{{ url_for('find_sellers') }}" class="btn btn-sm" style="background: #0284c7; color: white; font-weight: 700; border-radius: 10px; text-decoration: none; padding: 0.5rem 0.85rem; white-space: nowrap; display: inline-flex; align-items: center; gap: 0.35rem;">
         ➕ Schedule Meeting
       </a>
     </div>
@@ -617,8 +635,10 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     </div>
   {% endif %}
+  </div><!-- end offers pane -->
 
   <!-- 1. SHARED RESCUE PRODUCE HIGHLIGHTS -->
+  <div class="buyer-feature-pane" data-buyer-pane="rescue">
   <div class="data-table-card" id="sharedRescueSection" style="margin-bottom: 3rem; border-top: 4px solid #16a34a;">
     <div class="data-table-header">
       <div>
@@ -675,6 +695,7 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     {% endif %}
   </div>
+  </div><!-- end rescue pane -->
 
   <!-- 2. MY DIRECT MEETINGS & FARMGATE VISITS -->
   <div class="buyer-feature-pane" data-buyer-pane="meetings">
@@ -1548,6 +1569,7 @@ document.addEventListener('DOMContentLoaded', function() {
       </div>
     {% endif %}
   </div>
+  </div><!-- end post-requirement pane -->
 
   <!-- MODAL: REJECT OFFER -->
   <div id="rejectOfferModal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px);">
@@ -1990,6 +2012,5 @@ window.closeBuyerReviewModal = function() {
     </form>
   </div>
 </div>
-</script>
 
 {% endblock %}

@@ -5683,33 +5683,56 @@ textarea.form-control {
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
-  padding: 0.5rem 0.65rem;
+  padding: 0.65rem 0.75rem;
   margin-bottom: 2rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
   position: sticky;
   top: 1rem;
   z-index: 40;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+.farmer-feature-tabs-wrap::-webkit-scrollbar,
+.buyer-feature-tabs-wrap::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .farmer-feature-tabs,
 .buyer-feature-tabs {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
-  overflow-x: auto;
-  scrollbar-width: thin;
-  padding-bottom: 0.2rem;
+  gap: 0.5rem;
+  flex-wrap: wrap; /* Wraps cleanly on desktop: eliminates ugly horizontal scrollbars and shows all tabs! */
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 
 .farmer-feature-tabs::-webkit-scrollbar,
 .buyer-feature-tabs::-webkit-scrollbar {
-  height: 4px;
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
-.farmer-feature-tabs::-webkit-scrollbar-thumb,
-.buyer-feature-tabs::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
+@media (max-width: 768px) {
+  .farmer-feature-tabs,
+  .buyer-feature-tabs {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 0.25rem;
+    scrollbar-width: none !important;
+    -ms-overflow-style: none !important;
+  }
+  .farmer-feature-tabs::-webkit-scrollbar,
+  .buyer-feature-tabs::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
 }
 
 .farmer-tab-btn,
@@ -5717,7 +5740,7 @@ textarea.form-control {
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  padding: 0.55rem 0.95rem;
+  padding: 0.5rem 0.85rem;
   border-radius: 10px;
   font-size: 0.85rem;
   font-weight: 600;
@@ -5726,9 +5749,10 @@ textarea.form-control {
   border: 1px solid #e2e8f0;
   cursor: pointer;
   white-space: nowrap;
-  transition: all 0.18s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   user-select: none;
   text-decoration: none;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .farmer-tab-btn:hover,
@@ -5736,6 +5760,7 @@ textarea.form-control {
   background: #f1f5f9;
   color: #0f172a;
   border-color: #cbd5e1;
+  transform: translateY(-1px);
 }
 
 /* Active Farmer Tab: Green Accent */
@@ -5743,7 +5768,7 @@ textarea.form-control {
   background: #16a34a !important;
   color: #ffffff !important;
   border-color: #16a34a !important;
-  box-shadow: 0 2px 6px rgba(22, 163, 74, 0.25);
+  box-shadow: 0 3px 8px rgba(22, 163, 74, 0.3) !important;
   font-weight: 700;
 }
 
@@ -5752,19 +5777,22 @@ textarea.form-control {
   background: #0284c7 !important;
   color: #ffffff !important;
   border-color: #0284c7 !important;
-  box-shadow: 0 2px 6px rgba(2, 132, 199, 0.25);
+  box-shadow: 0 3px 8px rgba(2, 132, 199, 0.3) !important;
   font-weight: 700;
 }
 
 .tab-badge {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 700;
   background: #e2e8f0;
-  color: #475569;
+  color: #334155;
   line-height: 1.1;
+  transition: all 0.2s ease;
 }
 
 .farmer-tab-btn.active .tab-badge,
