@@ -461,5 +461,82 @@ class TestRescheduleVerificationReviews(unittest.TestCase):
         res2 = client.get(f"/meeting/{meeting_id}")
         self.assertEqual(res2.status_code, 200)
 
+    def test_09_buyer_reviews_and_ratings_ui(self):
+        """Test product reviews, summary calculation, photo persistence, and page UI rendering."""
+        # 1. Submit a buyer review with produce photo
+        ok, msg, rev_id = database.submit_buyer_review(
+            buyer_id=self.buyer_id,
+            farmer_id=self.farmer_id,
+            rating=5,
+            comment="Outstanding fresh harvest directly from farmgate! High quality produce.",
+            meeting_id=None,
+            transaction_id=None,
+            product_id=self.listing_id,
+            quality_rating=5.0,
+            freshness_rating=5.0,
+            communication_rating=4.5,
+            price_rating=5.0,
+            review_photo="tomatoes.jpg"
+        )
+        self.assertTrue(ok, msg)
+        self.assertIsNotNone(rev_id)
+
+        # 2. Verify get_product_reviews
+        p_reviews = database.get_product_reviews(product_id=self.listing_id, crop_name="Ponni Rice Harvest", farmer_id=self.farmer_id)
+        self.assertTrue(len(p_reviews) >= 1)
+        rev = next(r for r in p_reviews if r['id'] == rev_id)
+        self.assertEqual(rev['rating'], 5.0)
+        self.assertEqual(rev['review_photo'], "tomatoes.jpg")
+        self.assertEqual(rev['buyer_id'], self.buyer_id)
+
+        # 3. Verify get_product_rating_summary
+        summary = database.get_product_rating_summary(product_id=self.listing_id, crop_name="Ponni Rice Harvest", farmer_id=self.farmer_id)
+        self.assertGreaterEqual(summary['total_reviews'], 1)
+        self.assertGreaterEqual(summary['average_rating'], 4.0)
+        self.assertIn(5, summary['star_counts'])
+        self.assertGreaterEqual(summary['star_counts'][5], 1)
+
+        # 4. Check UI rendering on Produce Listing Detail page
+        from app import app
+        app.config['TESTING'] = True
+        client = app.test_client()
+
+        res_listing = client.get(f"/listing/{self.listing_id}")
+        self.assertEqual(res_listing.status_code, 200)
+        self.assertIn(b"Customer Reviews", res_listing.data)
+        self.assertIn(b"Verified Buyer Feedback", res_listing.data)
+        self.assertIn(b"Produce Quality Breakdown", res_listing.data)
+        self.assertIn(b"Outstanding fresh harvest", res_listing.data)
+
+        # 5. Insert rescue product and check UI rendering on Rescue Product Detail page
+        conn = database.get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO rescue_products (
+                farmer_id, product_name, category, quantity, initial_quantity, unit,
+                original_price, rescue_price, discount_percent, quality_grade, harvest_date, expiry_date,
+                farm_location, district, pin_code, farmer_name, farmer_phone, photo, status
+            ) VALUES (
+                ?, 'Fresh Country Tomatoes', 'Vegetables', 100, 100, 'kg',
+                25.0, 18.0, 28.0, 'Grade A', date('now'), date('now', '+3 days'),
+                'Delta Agro Zone', 'Thanjavur', '613001', 'Farmer Test', '9876543210', 'tomatoes.jpg', 'Available'
+            )
+        """, (self.farmer_id,))
+        rescue_id = cur.lastrowid
+        conn.commit()
+        conn.close()
+
+        res_rescue = client.get(f"/rescue-product/{rescue_id}")
+        self.assertEqual(res_rescue.status_code, 200)
+        self.assertIn(b"Customer Reviews", res_rescue.data)
+        self.assertIn(b"Verified Buyer Feedback", res_rescue.data)
+        self.assertIn(b"Produce Quality Breakdown", res_rescue.data)
+
+        # 6. Check Seller Profile reviews rendering
+        res_seller = client.get(f"/seller/{self.farmer_id}")
+        self.assertEqual(res_seller.status_code, 200)
+        self.assertIn(b"Buyer Reviews", res_seller.data)
+        self.assertIn(b"Outstanding fresh harvest", res_seller.data)
+
 if __name__ == '__main__':
     unittest.main()

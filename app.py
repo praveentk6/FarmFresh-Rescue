@@ -53,7 +53,8 @@ from database import (
     get_verification_stats,
     submit_buyer_review, update_buyer_review, get_farmer_reviews, get_farmer_rating_summary,
     get_completed_transactions_for_review, get_buyer_reviews_submitted,
-    get_all_buyer_reviews, delete_buyer_review
+    get_all_buyer_reviews, delete_buyer_review,
+    get_product_reviews, get_product_rating_summary, is_buyer_eligible_for_product_review
 )
 import email_service
 from razorpay_gateway import (
@@ -815,6 +816,18 @@ def listing_detail(listing_id):
     available_stock = get_available_stock(listing_id)
     benchmark_price = get_crop_benchmark_price(listing['crop_name'], listing['district'])
 
+    # Customer Reviews & Ratings for this Produce / Farmer
+    product_reviews = get_product_reviews(product_id=listing_id, crop_name=listing['crop_name'], farmer_id=listing['farmer_id'])
+    rating_summary = get_product_rating_summary(product_id=listing_id, crop_name=listing['crop_name'], farmer_id=listing['farmer_id'])
+    is_eligible, already_reviewed, existing_review, review_context = False, False, None, {}
+    if g.user and g.user.get('role') == 'buyer':
+        is_eligible, already_reviewed, existing_review, review_context = is_buyer_eligible_for_product_review(
+            buyer_id=g.user['id'],
+            product_id=listing_id,
+            crop_name=listing['crop_name'],
+            farmer_id=listing['farmer_id']
+        )
+
     return render_template(
         'listing_detail.html',
         listing=listing,
@@ -829,7 +842,17 @@ def listing_detail(listing_id):
         buyer_distance_km=buyer_distance_km,
         is_favorited=is_favorited,
         available_stock=available_stock,
-        benchmark_price=benchmark_price
+        benchmark_price=benchmark_price,
+        reviews=product_reviews,
+        rating_summary=rating_summary,
+        is_eligible_to_review=is_eligible,
+        already_reviewed=already_reviewed,
+        existing_review=existing_review,
+        review_context=review_context,
+        product_title=listing['crop_name'],
+        product_farmer_id=listing['farmer_id'],
+        product_farmer_name=listing['farmer_name'],
+        product_thumb=listing['photo']
     )
 
 # ==========================================
@@ -5069,6 +5092,7 @@ def browse_rescue_products():
     )
 
 @app.route('/rescue-product/<int:product_id>')
+@app.route('/rescue-product/<int:product_id>', endpoint='view_rescue_product')
 def rescue_product_detail(product_id):
     """Detailed view of a shared rescue product."""
     product = get_rescue_product_by_id(product_id)
@@ -5083,10 +5107,32 @@ def rescue_product_detail(product_id):
         f_lat, f_lng, _ = get_coordinates_for_location(product['farm_location'], product['district'])
         dist_info = calculate_haversine_distance(f_lat, f_lng, b_lat, b_lng)
 
+    # Customer Reviews & Ratings for this Rescue Produce / Farmer
+    product_reviews = get_product_reviews(product_id=product_id, crop_name=product['product_name'], farmer_id=product['farmer_id'])
+    rating_summary = get_product_rating_summary(product_id=product_id, crop_name=product['product_name'], farmer_id=product['farmer_id'])
+    is_eligible, already_reviewed, existing_review, review_context = False, False, None, {}
+    if g.user and g.user.get('role') == 'buyer':
+        is_eligible, already_reviewed, existing_review, review_context = is_buyer_eligible_for_product_review(
+            buyer_id=g.user['id'],
+            product_id=product_id,
+            crop_name=product['product_name'],
+            farmer_id=product['farmer_id']
+        )
+
     return render_template(
         'rescue_product_detail.html',
         product=product,
-        dist_info=dist_info
+        dist_info=dist_info,
+        reviews=product_reviews,
+        rating_summary=rating_summary,
+        is_eligible_to_review=is_eligible,
+        already_reviewed=already_reviewed,
+        existing_review=existing_review,
+        review_context=review_context,
+        product_title=product['product_name'],
+        product_farmer_id=product['farmer_id'],
+        product_farmer_name=product['farmer_name'],
+        product_thumb=product['photo']
     )
 
 @app.route('/farmer/rescue-product/add', methods=['GET', 'POST'])
@@ -5857,6 +5903,15 @@ def submit_review_route():
     price_rating = data.get('price_rating', type=float) or rating
     overall_rating = data.get('overall_rating', type=float) or rating
 
+    # Optional uploaded produce photo
+    review_photo = None
+    if 'review_photo' in request.files and request.files['review_photo'].filename:
+        review_photo = validate_and_save_image(request.files['review_photo'])
+
+    next_url = (request.form.get('next_url') or request.referrer or (url_for('buyer_dashboard') + '#reviews'))
+    if '#customerReviewsSection' not in next_url and ('/rescue-product/' in next_url or '/listing/' in next_url):
+        next_url += '#customerReviewsSection'
+
     # If review_id is provided, perform review edit/update
     if review_id:
         ok, msg, r_id = update_buyer_review(
@@ -5868,7 +5923,8 @@ def submit_review_route():
             freshness_rating=freshness_rating,
             communication_rating=communication_rating,
             price_rating=price_rating,
-            overall_rating=overall_rating
+            overall_rating=overall_rating,
+            review_photo=review_photo
         )
         if request.is_json:
             return jsonify({'success': ok, 'message': msg, 'review_id': r_id}), (200 if ok else 400)
@@ -5876,7 +5932,7 @@ def submit_review_route():
             flash(f"⭐ {msg}", "success")
         else:
             flash(f"⚠️ {msg}", "danger")
-        return redirect(url_for('buyer_dashboard') + '#reviews')
+        return redirect(next_url)
 
     if not farmer_id:
         if meeting_id:
@@ -5893,7 +5949,7 @@ def submit_review_route():
         if request.is_json:
             return jsonify({'success': False, 'message': msg}), 400
         flash(msg, "warning")
-        return redirect(url_for('buyer_dashboard') + '#reviews')
+        return redirect(next_url)
 
     ok, msg, r_id = submit_buyer_review(
         buyer_id=g.user['id'],
@@ -5907,7 +5963,8 @@ def submit_review_route():
         overall_rating=overall_rating,
         meeting_id=meeting_id,
         transaction_id=transaction_id,
-        product_id=product_id
+        product_id=product_id,
+        review_photo=review_photo
     )
 
     if request.is_json:
@@ -5917,7 +5974,7 @@ def submit_review_route():
         flash(f"⭐ {msg}", "success")
     else:
         flash(f"⚠️ {msg}", "danger")
-    return redirect(url_for('buyer_dashboard') + '#reviews')
+    return redirect(next_url)
 
 @app.route('/api/reviews/<int:review_id>/edit', methods=['POST'])
 @app.route('/buyer/reviews/<int:review_id>/edit', methods=['POST'])
@@ -5934,6 +5991,14 @@ def edit_review_route(review_id):
     price_rating = data.get('price_rating', type=float) or rating
     overall_rating = data.get('overall_rating', type=float) or rating
 
+    review_photo = None
+    if 'review_photo' in request.files and request.files['review_photo'].filename:
+        review_photo = validate_and_save_image(request.files['review_photo'])
+
+    next_url = (request.form.get('next_url') or request.referrer or (url_for('buyer_dashboard') + '#reviews'))
+    if '#customerReviewsSection' not in next_url and ('/rescue-product/' in next_url or '/listing/' in next_url):
+        next_url += '#customerReviewsSection'
+
     ok, msg, r_id = update_buyer_review(
         review_id=review_id,
         buyer_id=g.user['id'],
@@ -5943,7 +6008,8 @@ def edit_review_route(review_id):
         freshness_rating=freshness_rating,
         communication_rating=communication_rating,
         price_rating=price_rating,
-        overall_rating=overall_rating
+        overall_rating=overall_rating,
+        review_photo=review_photo
     )
 
     if request.is_json:
@@ -5953,7 +6019,7 @@ def edit_review_route(review_id):
         flash(f"⭐ {msg}", "success")
     else:
         flash(f"⚠️ {msg}", "danger")
-    return redirect(url_for('buyer_dashboard') + '#reviews')
+    return redirect(next_url)
 
 @app.route('/seller/<int:seller_id>')
 @app.route('/farmer/<int:seller_id>')

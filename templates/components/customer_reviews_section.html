@@ -1,0 +1,549 @@
+<!-- ======================================================================
+     DEDICATED CUSTOMER REVIEWS & BUYER RATINGS SECTION COMPONENT
+     ====================================================================== -->
+<section class="customer-reviews-section" id="customerReviewsSection" style="margin-top: 3.5rem; padding-top: 1rem;">
+  
+  <!-- SECTION HEADER -->
+  <div style="border-bottom: 2px solid #e2e8f0; padding-bottom: 1rem; margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 1rem;">
+    <div>
+      <div style="display: inline-flex; align-items: center; gap: 0.5rem; background: #fef3c7; color: #b45309; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.8rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.5rem;">
+        <span>⭐ Verified Buyer Feedback</span>
+      </div>
+      <h2 style="font-size: 1.75rem; font-weight: 800; color: #0f172a; margin: 0; line-height: 1.2;">
+        Customer Reviews & Ratings
+      </h2>
+      <p style="font-size: 0.92rem; color: #64748b; margin: 0.35rem 0 0 0;">
+        Real inspections and quality ratings from buyers who purchased from this harvest.
+      </p>
+    </div>
+
+    <!-- Quick action scroll or write review -->
+    {% if is_eligible_to_review and not already_reviewed %}
+      <button type="button" onclick="openProductReviewModal()" class="btn btn-primary" style="background: #16a34a; border-color: #15803d; font-weight: 800; font-size: 0.95rem; padding: 0.65rem 1.25rem; border-radius: 10px; box-shadow: 0 4px 12px rgba(22,163,74,0.25);">
+        ✍️ Write a Review
+      </button>
+    {% elif already_reviewed %}
+      <button type="button" onclick="openProductEditReviewModal()" class="btn btn-outline-primary" style="font-weight: 700; font-size: 0.9rem; padding: 0.65rem 1.25rem; border-radius: 10px;">
+        ✏️ Edit Your Review
+      </button>
+    {% endif %}
+  </div>
+
+  <!-- RATINGS OVERVIEW CARD (E-COMMERCE BENCHMARK STYLE) -->
+  <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 2rem; box-shadow: 0 4px 15px rgba(0,0,0,0.03); margin-bottom: 2.5rem;">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2.5rem; align-items: center;">
+      
+      <!-- Column 1: Big Star Score & Counts -->
+      <div style="display: flex; gap: 1.75rem; align-items: center; border-right: 1px solid #f1f5f9; padding-right: 1.5rem;">
+        <div style="text-align: center; min-width: 130px;">
+          <div style="font-size: 3.5rem; font-weight: 900; color: #0f172a; line-height: 1; letter-spacing: -1px;">
+            {{ "%.1f"|format(rating_summary.average_rating) if rating_summary and rating_summary.total_reviews > 0 else '5.0' }}
+          </div>
+          <div style="color: #f59e0b; font-size: 1.35rem; margin: 0.4rem 0;">
+            {% set avg_rnd = (rating_summary.average_rating|round|int) if rating_summary and rating_summary.total_reviews > 0 else 5 %}
+            {% for i in range(1, 6) %}
+              {% if i <= avg_rnd %}★{% else %}☆{% endif %}
+            {% endfor %}
+          </div>
+          <div style="font-size: 0.85rem; font-weight: 700; color: #64748b;">
+            {{ rating_summary.total_reviews if rating_summary else 0 }} Verified Rating{{ 's' if not rating_summary or rating_summary.total_reviews != 1 else '' }}
+          </div>
+        </div>
+
+        <!-- 5-to-1 Star Distribution Progress Bars -->
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 0.45rem;">
+          {% for s in [5, 4, 3, 2, 1] %}
+            {% set cnt = rating_summary.star_counts[s] if rating_summary and rating_summary.star_counts else 0 %}
+            {% set pct = rating_summary.star_percentages[s] if rating_summary and rating_summary.star_percentages else 0 %}
+            <div style="display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem;">
+              <span style="width: 45px; font-weight: 700; color: #475569;">{{ s }} star</span>
+              <div style="flex: 1; height: 9px; background: #f1f5f9; border-radius: 999px; overflow: hidden;">
+                <div style="height: 100%; width: {{ pct }}%; background: #f59e0b; border-radius: 999px; transition: width 0.4s ease;"></div>
+              </div>
+              <span style="width: 35px; text-align: right; color: #64748b; font-weight: 600;">{{ pct }}%</span>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Column 2: Category Breakdown & Write Review Callout -->
+      <div style="display: flex; flex-direction: column; justify-content: space-between; gap: 1.5rem;">
+        
+        <!-- Category Metrics -->
+        <div>
+          <div style="font-size: 0.85rem; font-weight: 800; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.75rem;">
+            Detailed Produce Quality Breakdown
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.75rem;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.65rem 0.85rem;">
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 600;">🥦 Quality</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #166534;">
+                {{ "%.1f"|format(rating_summary.avg_quality) if rating_summary and rating_summary.avg_quality else '5.0' }}★
+              </div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.65rem 0.85rem;">
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 600;">🌿 Freshness</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #0369a1;">
+                {{ "%.1f"|format(rating_summary.avg_freshness) if rating_summary and rating_summary.avg_freshness else '5.0' }}★
+              </div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.65rem 0.85rem;">
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 600;">💬 Communication</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #6d28d9;">
+                {{ "%.1f"|format(rating_summary.avg_communication) if rating_summary and rating_summary.avg_communication else '5.0' }}★
+              </div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 0.65rem 0.85rem;">
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 600;">💰 Fair Price</div>
+              <div style="font-size: 1.1rem; font-weight: 800; color: #b45309;">
+                {{ "%.1f"|format(rating_summary.avg_price) if rating_summary and rating_summary.avg_price else '5.0' }}★
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Write Review Callout Box -->
+        <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px; padding: 1rem 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem;">
+          <div>
+            <div style="font-weight: 800; color: #166534; font-size: 0.95rem;">
+              {% if already_reviewed %}
+                ✓ You reviewed this produce
+              {% elif is_eligible_to_review %}
+                Have you received or inspected this produce?
+              {% else %}
+                Verified Buyer Reviews
+              {% endif %}
+            </div>
+            <div style="font-size: 0.82rem; color: #15803d;">
+              {% if already_reviewed %}
+                Thank you! Your feedback helps other buyers make confident farmgate decisions.
+              {% elif is_eligible_to_review %}
+                Share your honest experience on quality, freshness, and delivery.
+              {% else %}
+                Reviews can be submitted after completing delivery or a direct farm meeting.
+              {% endif %}
+            </div>
+          </div>
+
+          <div>
+            {% if is_eligible_to_review and not already_reviewed %}
+              <button type="button" onclick="openProductReviewModal()" class="btn btn-sm btn-primary" style="background: #16a34a; font-weight: 800; white-space: nowrap; padding: 0.5rem 1rem;">
+                ✍️ Write Review
+              </button>
+            {% elif already_reviewed %}
+              <button type="button" onclick="openProductEditReviewModal()" class="btn btn-sm" style="background: #ffffff; color: #166534; border: 1px solid #16a34a; font-weight: 800; white-space: nowrap; padding: 0.5rem 1rem;">
+                ✏️ Edit Review
+              </button>
+            {% elif not current_user %}
+              <a href="{{ url_for('login') }}?next={{ request.path }}" class="btn btn-sm btn-secondary" style="font-weight: 700; white-space: nowrap;">
+                Log In to Review
+              </a>
+            {% else %}
+              <span style="font-size: 0.78rem; color: #64748b; background: #ffffff; padding: 0.35rem 0.65rem; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: 600; display: inline-flex; align-items: center; gap: 0.25rem;">
+                🔒 Unlocks after Delivery
+              </span>
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTER CHIPS BAR -->
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.75rem;">
+    <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;" id="reviewFilterChips">
+      <button type="button" class="btn btn-sm review-filter-chip active" data-filter="all" onclick="filterCustomerReviews('all', this)" style="border-radius: 20px; font-weight: 700; padding: 0.35rem 0.85rem; font-size: 0.82rem; background: #0f172a; color: white;">
+        All Reviews ({{ reviews|length }})
+      </button>
+      <button type="button" class="btn btn-sm review-filter-chip" data-filter="5" onclick="filterCustomerReviews('5', this)" style="border-radius: 20px; font-weight: 700; padding: 0.35rem 0.85rem; font-size: 0.82rem; background: #f1f5f9; color: #334155;">
+        ★ 5 Stars ({{ rating_summary.star_counts[5] if rating_summary and rating_summary.star_counts else 0 }})
+      </button>
+      <button type="button" class="btn btn-sm review-filter-chip" data-filter="4" onclick="filterCustomerReviews('4', this)" style="border-radius: 20px; font-weight: 700; padding: 0.35rem 0.85rem; font-size: 0.82rem; background: #f1f5f9; color: #334155;">
+        ★ 4 Stars ({{ rating_summary.star_counts[4] if rating_summary and rating_summary.star_counts else 0 }})
+      </button>
+      <button type="button" class="btn btn-sm review-filter-chip" data-filter="photo" onclick="filterCustomerReviews('photo', this)" style="border-radius: 20px; font-weight: 700; padding: 0.35rem 0.85rem; font-size: 0.82rem; background: #f1f5f9; color: #334155;">
+        📷 With Photos
+      </button>
+    </div>
+
+    <div style="font-size: 0.85rem; color: #64748b; font-weight: 600;">
+      Showing latest reviews first
+    </div>
+  </div>
+
+  <!-- REVIEWS CARDS GRID -->
+  {% if reviews %}
+    <div id="customerReviewsGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+      {% for r in reviews %}
+        <div class="review-card-item" data-rating="{{ r.rating|round|int }}" data-has-photo="{{ 'true' if r.review_photo else 'false' }}" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.5rem; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.04); display: flex; flex-direction: column; transition: transform 0.2s ease, box-shadow 0.2s ease; {% if loop.index > 4 %}display: none;{% endif %}" onmouseover="this.style.boxShadow='0 10px 15px -3px rgba(0,0,0,0.08)'" onmouseout="this.style.boxShadow='0 4px 6px -1px rgba(0,0,0,0.04)'">
+          
+          <!-- Top Row: Buyer Avatar, Name, Verified Badge, Date -->
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.85rem;">
+            <div style="display: flex; align-items: center; gap: 0.75rem;">
+              <!-- Dynamic Colored Avatar Initial -->
+              {% set colors = ['#0284c7', '#16a34a', '#8b5cf6', '#d97706', '#ea580c', '#0891b2'] %}
+              {% set bg_col = colors[r.buyer_name|length % colors|length] %}
+              <div style="width: 44px; height: 44px; border-radius: 50%; background: {{ bg_col }}; color: #ffffff; font-weight: 800; font-size: 1.15rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+                {{ (r.buyer_name[:1] if r.buyer_name else 'B')|upper }}
+              </div>
+              <div>
+                <div style="font-weight: 800; color: #0f172a; font-size: 0.98rem; line-height: 1.3;">
+                  {{ r.buyer_name or 'Verified Buyer' }}
+                </div>
+                <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.15rem;">
+                  <span style="background: #dcfce7; color: #15803d; font-size: 0.72rem; font-weight: 800; padding: 0.1rem 0.45rem; border-radius: 4px; display: inline-flex; align-items: center; gap: 0.2rem;" title="Verified FarmFresh Rescue Transaction">
+                    ✓ Verified Purchase
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div style="font-size: 0.78rem; color: #94a3b8; font-weight: 600; white-space: nowrap;">
+              {{ r.created_at[:10] }}
+            </div>
+          </div>
+
+          <!-- Star Rating & Score -->
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; flex-wrap: wrap;">
+            <div style="color: #f59e0b; font-size: 1.15rem; letter-spacing: 1px;">
+              {% set stars_cnt = r.rating|round|int %}
+              {% for i in range(1, 6) %}
+                {% if i <= stars_cnt %}★{% else %}☆{% endif %}
+              {% endfor %}
+            </div>
+            <strong style="font-size: 0.95rem; color: #0f172a;">{{ "%.1f"|format(r.rating) }}</strong>
+            <span style="font-size: 0.78rem; color: #64748b;">/ 5.0</span>
+          </div>
+
+          <!-- Product Name Pill with Thumbnail -->
+          <div style="background: #f8fafc; border: 1px solid #f1f5f9; border-radius: 8px; padding: 0.4rem 0.65rem; margin-bottom: 0.85rem; display: flex; align-items: center; gap: 0.5rem;">
+            {% set thumb_img = r.product_photo or product_thumb %}
+            {% if thumb_img %}
+              <img src="{{ url_for('static', filename='uploads/' ~ thumb_img if not thumb_img.startswith('uploads/') else thumb_img) }}" alt="{{ r.product_name or product_title }}" style="width: 24px; height: 24px; border-radius: 4px; object-fit: cover;" onerror="this.style.display='none'">
+            {% else %}
+              <span style="font-size: 0.9rem;">🌾</span>
+            {% endif %}
+            <span style="font-size: 0.78rem; font-weight: 700; color: #334155; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              Produce: {{ r.product_name or product_title or 'Agricultural Produce' }}
+            </span>
+          </div>
+
+          <!-- Written Review Description / Comment -->
+          <p style="color: #334155; font-size: 0.92rem; line-height: 1.6; margin: 0 0 1rem 0; word-break: break-word; flex: 1;">
+            {% if r.comment %}
+              "{{ r.comment }}"
+            {% else %}
+              <em style="color: #94a3b8;">Buyer provided star rating without additional comments.</em>
+            {% endif %}
+          </p>
+
+          <!-- Optional Uploaded Produce Photo -->
+          {% if r.review_photo %}
+            <div style="margin-bottom: 1rem;">
+              <div style="font-size: 0.72rem; font-weight: 700; color: #64748b; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.25rem;">
+                <span>📷 Received Produce Photo:</span>
+              </div>
+              {% set r_photo_src = url_for('static', filename='uploads/' ~ r.review_photo if not r.review_photo.startswith('uploads/') else r.review_photo) %}
+              <img src="{{ r_photo_src }}" alt="Customer Received Harvest Produce" style="width: 90px; height: 90px; object-fit: cover; border-radius: 8px; border: 2px solid #e2e8f0; cursor: pointer; transition: transform 0.2s ease;" onclick="openImageLightbox('{{ r_photo_src }}', '{{ (r.buyer_name ~ ' photo of ' ~ (r.product_name or 'produce'))|replace('\'', '\\\'') }}')" onmouseover="this.style.transform='scale(1.05)'" onmouseout="this.style.transform='scale(1)'">
+            </div>
+          {% endif %}
+
+          <!-- Category Rating Badges Footer -->
+          <div style="display: flex; gap: 0.4rem; flex-wrap: wrap; margin-top: auto; padding-top: 0.75rem; border-top: 1px solid #f1f5f9; font-size: 0.74rem;">
+            <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.5rem; border-radius: 6px;">Quality: <strong>{{ r.quality_rating }}★</strong></span>
+            <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.5rem; border-radius: 6px;">Freshness: <strong>{{ r.freshness_rating }}★</strong></span>
+            <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.5rem; border-radius: 6px;">Comms: <strong>{{ r.communication_rating }}★</strong></span>
+            <span style="background: #f1f5f9; color: #475569; padding: 0.2rem 0.5rem; border-radius: 6px;">Price: <strong>{{ r.price_rating }}★</strong></span>
+          </div>
+
+        </div>
+      {% endfor %}
+    </div>
+
+    <!-- VIEW ALL REVIEWS TOGGLE BUTTON -->
+    {% if reviews|length > 4 %}
+      <div style="text-align: center; margin-top: 1rem; margin-bottom: 2rem;">
+        <button type="button" id="toggleAllReviewsBtn" onclick="toggleAllCustomerReviews()" class="btn btn-secondary" style="font-weight: 700; padding: 0.65rem 1.75rem; border-radius: 10px; font-size: 0.92rem;">
+          👀 View All {{ reviews|length }} Reviews &darr;
+        </button>
+      </div>
+    {% endif %}
+
+  {% else %}
+    <!-- EMPTY STATE FOR REVIEWS -->
+    <div style="text-align: center; padding: 3.5rem 1.5rem; background: #ffffff; border: 1px dashed #cbd5e1; border-radius: 16px; margin-bottom: 2.5rem;">
+      <div style="font-size: 3rem; margin-bottom: 0.5rem;">⭐</div>
+      <h3 style="font-size: 1.25rem; font-weight: 800; color: #0f172a; margin-bottom: 0.35rem;">
+        No Customer Reviews Yet
+      </h3>
+      <p style="font-size: 0.9rem; color: #64748b; max-width: 480px; margin: 0 auto 1.5rem auto;">
+        Be the first verified buyer to purchase or inspect this harvest directly from {{ product_farmer_name or 'the farmer' }} and leave your review!
+      </p>
+      {% if is_eligible_to_review %}
+        <button type="button" onclick="openProductReviewModal()" class="btn btn-primary" style="background: #16a34a; font-weight: 700; padding: 0.6rem 1.25rem;">
+          ✍️ Write the First Review
+        </button>
+      {% endif %}
+    </div>
+  {% endif %}
+
+</section>
+
+<!-- ======================================================================
+     MODAL: WRITE / EDIT CUSTOMER REVIEW (WITH PRODUCE PHOTO UPLOAD)
+     ====================================================================== -->
+<div id="productReviewModal" class="modal-backdrop" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65); z-index: 9999; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px);">
+  <div style="background: white; border-radius: 16px; max-width: 580px; width: 100%; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); overflow: hidden; max-height: 90vh; display: flex; flex-direction: column;">
+    
+    <!-- Modal Header -->
+    <div style="background: #16a34a; color: white; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h3 id="productReviewModalTitle" style="margin: 0; font-size: 1.25rem; font-weight: 800; color: white;">
+          Rate & Review Harvest Produce
+        </h3>
+        <div style="font-size: 0.82rem; opacity: 0.95; margin-top: 0.2rem;">
+          {{ product_title or 'Produce Harvest' }} &bull; Seller: {{ product_farmer_name or 'Farmer' }}
+        </div>
+      </div>
+      <button type="button" onclick="closeProductReviewModal()" style="background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer; line-height: 1;">&times;</button>
+    </div>
+
+    <!-- Modal Form -->
+    <form action="{{ url_for('submit_review_route') }}" method="POST" enctype="multipart/form-data" style="padding: 1.5rem; overflow-y: auto;">
+      <input type="hidden" name="next_url" value="{{ request.path }}">
+      <input type="hidden" name="review_id" id="prodModalReviewId" value="{{ existing_review.id if existing_review else '' }}">
+      <input type="hidden" name="farmer_id" value="{{ product_farmer_id }}">
+      <input type="hidden" name="product_id" value="{{ product.id if product is defined else (listing.id if listing is defined else '') }}">
+      <input type="hidden" name="meeting_id" value="{{ review_context.meeting_id if review_context and review_context.meeting_id else '' }}">
+      <input type="hidden" name="transaction_id" value="{{ review_context.transaction_id if review_context and review_context.transaction_id else '' }}">
+
+      <!-- Overall Star Rating -->
+      <div style="margin-bottom: 1.25rem; text-align: center; background: #fffdf5; border: 1px solid #fef3c7; padding: 1rem; border-radius: 12px;">
+        <label style="display: block; font-size: 0.9rem; font-weight: 800; color: #92400e; margin-bottom: 0.5rem;">Overall Star Rating *</label>
+        <div style="display: flex; justify-content: center; gap: 0.5rem; font-size: 2rem; color: #d1d5db; cursor: pointer;" id="starRatingPicker">
+          <span data-val="1" onclick="setPickerStar(1)">★</span>
+          <span data-val="2" onclick="setPickerStar(2)">★</span>
+          <span data-val="3" onclick="setPickerStar(3)">★</span>
+          <span data-val="4" onclick="setPickerStar(4)">★</span>
+          <span data-val="5" onclick="setPickerStar(5)">★</span>
+        </div>
+        <input type="hidden" name="rating" id="prodModalRatingVal" value="{{ existing_review.rating|round|int if existing_review else 5 }}">
+        <div id="starRatingLabel" style="font-size: 0.85rem; font-weight: 700; color: #b45309; margin-top: 0.25rem;">
+          5 Stars - Outstanding Quality & Experience
+        </div>
+      </div>
+
+      <!-- Category Specific Ratings -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-bottom: 1.25rem; background: #f8fafc; padding: 1rem; border-radius: 10px; border: 1px solid #e2e8f0;">
+        <div>
+          <label style="font-size: 0.78rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.25rem;">Produce Quality</label>
+          <select name="quality_rating" id="modalQualityRating" class="filter-select" style="width: 100%; height: 38px; font-size: 0.82rem;">
+            <option value="5" {% if not existing_review or existing_review.quality_rating == 5.0 %}selected{% endif %}>5★ (Excellent Grade)</option>
+            <option value="4" {% if existing_review and existing_review.quality_rating == 4.0 %}selected{% endif %}>4★ (Very Good)</option>
+            <option value="3" {% if existing_review and existing_review.quality_rating == 3.0 %}selected{% endif %}>3★ (Acceptable)</option>
+            <option value="2" {% if existing_review and existing_review.quality_rating == 2.0 %}selected{% endif %}>2★ (Below Average)</option>
+            <option value="1" {% if existing_review and existing_review.quality_rating == 1.0 %}selected{% endif %}>1★ (Poor / Damaged)</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="font-size: 0.78rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.25rem;">Freshness</label>
+          <select name="freshness_rating" id="modalFreshnessRating" class="filter-select" style="width: 100%; height: 38px; font-size: 0.82rem;">
+            <option value="5" {% if not existing_review or existing_review.freshness_rating == 5.0 %}selected{% endif %}>5★ (Farm Fresh)</option>
+            <option value="4" {% if existing_review and existing_review.freshness_rating == 4.0 %}selected{% endif %}>4★ (Fresh)</option>
+            <option value="3" {% if existing_review and existing_review.freshness_rating == 3.0 %}selected{% endif %}>3★ (Fair / Stored)</option>
+            <option value="2" {% if existing_review and existing_review.freshness_rating == 2.0 %}selected{% endif %}>2★ (Wilting)</option>
+            <option value="1" {% if existing_review and existing_review.freshness_rating == 1.0 %}selected{% endif %}>1★ (Spoiled)</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="font-size: 0.78rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.25rem;">Seller Communication</label>
+          <select name="communication_rating" id="modalCommsRating" class="filter-select" style="width: 100%; height: 38px; font-size: 0.82rem;">
+            <option value="5" {% if not existing_review or existing_review.communication_rating == 5.0 %}selected{% endif %}>5★ (Prompt & Helpful)</option>
+            <option value="4" {% if existing_review and existing_review.communication_rating == 4.0 %}selected{% endif %}>4★ (Good)</option>
+            <option value="3" {% if existing_review and existing_review.communication_rating == 3.0 %}selected{% endif %}>3★ (Slow Response)</option>
+            <option value="2" {% if existing_review and existing_review.communication_rating == 2.0 %}selected{% endif %}>2★ (Unresponsive)</option>
+            <option value="1" {% if existing_review and existing_review.communication_rating == 1.0 %}selected{% endif %}>1★ (Uncooperative)</option>
+          </select>
+        </div>
+
+        <div>
+          <label style="font-size: 0.78rem; font-weight: 700; color: #334155; display: block; margin-bottom: 0.25rem;">Price Satisfaction</label>
+          <select name="price_rating" id="modalPriceRating" class="filter-select" style="width: 100%; height: 38px; font-size: 0.82rem;">
+            <option value="5" {% if not existing_review or existing_review.price_rating == 5.0 %}selected{% endif %}>5★ (High Value / Great Price)</option>
+            <option value="4" {% if existing_review and existing_review.price_rating == 4.0 %}selected{% endif %}>4★ (Fair Price)</option>
+            <option value="3" {% if existing_review and existing_review.price_rating == 3.0 %}selected{% endif %}>3★ (Market Average)</option>
+            <option value="2" {% if existing_review and existing_review.price_rating == 2.0 %}selected{% endif %}>2★ (Slightly High)</option>
+            <option value="1" {% if existing_review and existing_review.price_rating == 1.0 %}selected{% endif %}>1★ (Overpriced)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Written Review Feedback -->
+      <div style="margin-bottom: 1.25rem;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 0.35rem;">
+          Detailed Written Feedback *
+        </label>
+        <textarea name="comment" id="prodModalComment" required rows="4" class="filter-input" placeholder="Share your experience inspecting the harvest, freshness of the crops, meeting the farmer, packaging, and scale accuracy..." style="width: 100%; font-family: inherit; font-size: 0.9rem; line-height: 1.5;">{{ existing_review.comment if existing_review else '' }}</textarea>
+      </div>
+
+      <!-- Optional Product Photo Upload -->
+      <div style="margin-bottom: 1.5rem; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 10px; padding: 1rem;">
+        <label style="display: block; font-size: 0.85rem; font-weight: 700; color: #334155; margin-bottom: 0.35rem;">
+          📷 Upload Received Produce Photo (Optional)
+        </label>
+        <p style="font-size: 0.78rem; color: #64748b; margin: 0 0 0.5rem 0;">
+          Add a photo of the produce received to help other buyers verify freshness and grade.
+        </p>
+        <input type="file" name="review_photo" id="prodModalPhotoInput" accept="image/png, image/jpeg, image/webp" onchange="previewReviewPhoto(this)" style="font-size: 0.82rem;">
+        <div id="reviewPhotoPreviewWrap" style="display: none; margin-top: 0.75rem;">
+          <img id="reviewPhotoPreview" src="#" alt="Produce preview" style="max-height: 120px; border-radius: 8px; border: 1px solid #e2e8f0;">
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display: flex; gap: 0.75rem; justify-content: flex-end;">
+        <button type="button" onclick="closeProductReviewModal()" class="btn btn-secondary">
+          Cancel
+        </button>
+        <button type="submit" class="btn btn-primary" style="background: #16a34a; border-color: #15803d; font-weight: 800; padding: 0.65rem 1.5rem;">
+          <span id="prodModalSubmitText">{{ 'Update Review ⭐' if existing_review else 'Submit Review ⭐' }}</span>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ======================================================================
+     LIGHTBOX MODAL FOR REVIEW PRODUCE PHOTOS
+     ====================================================================== -->
+<div id="imageLightboxModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem;" onclick="closeImageLightbox()">
+  <div style="position: relative; max-width: 90vw; max-height: 90vh;">
+    <button type="button" onclick="closeImageLightbox()" style="position: absolute; top: -40px; right: 0; background: transparent; border: none; color: white; font-size: 2rem; cursor: pointer;">&times;</button>
+    <img id="lightboxImg" src="" alt="Customer Photo" style="max-width: 100%; max-height: 85vh; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.5);">
+    <div id="lightboxCaption" style="color: white; text-align: center; margin-top: 0.75rem; font-weight: 600; font-size: 0.95rem;"></div>
+  </div>
+</div>
+
+<!-- JAVASCRIPT CONTROLLERS FOR REVIEWS SECTION -->
+<script>
+function setPickerStar(val) {
+  var labels = {
+    1: '1 Star - Poor / Defective Harvest Experience',
+    2: '2 Stars - Below Average Produce',
+    3: '3 Stars - Average Quality',
+    4: '4 Stars - Very Good Harvest & Delivery',
+    5: '5 Stars - Outstanding Quality & Experience'
+  };
+  document.getElementById('prodModalRatingVal').value = val;
+  var stars = document.querySelectorAll('#starRatingPicker span');
+  stars.forEach(function(s, idx) {
+    if (idx < val) {
+      s.style.color = '#f59e0b';
+    } else {
+      s.style.color = '#d1d5db';
+    }
+  });
+  var lbl = document.getElementById('starRatingLabel');
+  if (lbl && labels[val]) {
+    lbl.textContent = labels[val];
+  }
+}
+
+// Initialize stars on page load
+(function() {
+  var initVal = parseInt(document.getElementById('prodModalRatingVal')?.value || '5');
+  setPickerStar(initVal);
+})();
+
+function openProductReviewModal() {
+  document.getElementById('productReviewModalTitle').textContent = 'Write a Customer Review';
+  document.getElementById('prodModalSubmitText').textContent = 'Submit Review ⭐';
+  document.getElementById('productReviewModal').style.display = 'flex';
+}
+
+function openProductEditReviewModal() {
+  document.getElementById('productReviewModalTitle').textContent = 'Edit Your Review';
+  document.getElementById('prodModalSubmitText').textContent = 'Update Review ⭐';
+  document.getElementById('productReviewModal').style.display = 'flex';
+}
+
+function closeProductReviewModal() {
+  document.getElementById('productReviewModal').style.display = 'none';
+}
+
+function previewReviewPhoto(input) {
+  if (input.files && input.files[0]) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('reviewPhotoPreview').src = e.target.result;
+      document.getElementById('reviewPhotoPreviewWrap').style.display = 'block';
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
+}
+
+function filterCustomerReviews(filterType, btn) {
+  var chips = document.querySelectorAll('.review-filter-chip');
+  chips.forEach(function(c) {
+    c.style.background = '#f1f5f9';
+    c.style.color = '#334155';
+    c.classList.remove('active');
+  });
+  btn.style.background = '#0f172a';
+  btn.style.color = '#ffffff';
+  btn.classList.add('active');
+
+  var cards = document.querySelectorAll('.review-card-item');
+  cards.forEach(function(card) {
+    var rating = card.getAttribute('data-rating');
+    var hasPhoto = card.getAttribute('data-has-photo');
+    if (filterType === 'all') {
+      card.style.display = 'flex';
+    } else if (filterType === 'photo') {
+      card.style.display = (hasPhoto === 'true') ? 'flex' : 'none';
+    } else {
+      card.style.display = (rating === filterType) ? 'flex' : 'none';
+    }
+  });
+
+  // Hide view all button if filtered
+  var toggleBtn = document.getElementById('toggleAllReviewsBtn');
+  if (toggleBtn) {
+    toggleBtn.style.display = (filterType === 'all') ? 'inline-block' : 'none';
+  }
+}
+
+function toggleAllCustomerReviews() {
+  var cards = document.querySelectorAll('.review-card-item');
+  var btn = document.getElementById('toggleAllReviewsBtn');
+  var isExpanded = btn.getAttribute('data-expanded') === 'true';
+
+  if (isExpanded) {
+    cards.forEach(function(card, idx) {
+      if (idx >= 4) card.style.display = 'none';
+    });
+    btn.setAttribute('data-expanded', 'false');
+    btn.innerHTML = '👀 View All ' + cards.length + ' Reviews &darr;';
+  } else {
+    cards.forEach(function(card) {
+      card.style.display = 'flex';
+    });
+    btn.setAttribute('data-expanded', 'true');
+    btn.innerHTML = '▲ Show Less Reviews';
+  }
+}
+
+function openImageLightbox(src, caption) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightboxCaption').textContent = caption || '';
+  document.getElementById('imageLightboxModal').style.display = 'flex';
+}
+
+function closeImageLightbox() {
+  document.getElementById('imageLightboxModal').style.display = 'none';
+}
+</script>
+

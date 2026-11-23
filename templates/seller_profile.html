@@ -261,6 +261,12 @@
                 </p>
               {% endif %}
 
+              {% if r.review_photo %}
+                <div style="margin-bottom: 0.85rem;">
+                  <img src="{{ url_for('static', filename='uploads/' ~ r.review_photo if not r.review_photo.startswith('uploads/') else r.review_photo) }}" alt="Delivered produce photo" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer;" onclick="window.open(this.src, '_blank')" title="Click to view full photo">
+                </div>
+              {% endif %}
+
               <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; font-size: 0.75rem; color: #64748b;">
                 <span style="background: #f1f5f9; padding: 0.2rem 0.55rem; border-radius: 4px;">Quality: {{ r.quality_rating }}★</span>
                 <span style="background: #f1f5f9; padding: 0.2rem 0.55rem; border-radius: 4px;">Freshness: {{ r.freshness_rating }}★</span>
@@ -330,7 +336,7 @@
                     <span style="font-size: 0.8rem; color: #64748b;">/ {{ item.unit }}</span>
                   </div>
                   <div style="margin-top: auto; display: flex; gap: 0.5rem;">
-                    <a href="{{ url_for('view_rescue_product', product_id=item.id) }}" class="btn btn-outline-primary btn-sm" style="flex: 1; text-align: center;">
+                    <a href="{{ url_for('rescue_product_detail', product_id=item.id) }}" class="btn btn-outline-primary btn-sm" style="flex: 1; text-align: center;">
                       Details
                     </a>
                     <a href="{{ url_for('schedule_direct_meeting', product_id=item.id) }}" class="btn btn-primary btn-sm" style="flex: 1; text-align: center; background: #16a34a; font-weight: 700;">

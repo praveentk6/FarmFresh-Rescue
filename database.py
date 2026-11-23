@@ -782,6 +782,16 @@ def init_db():
             cursor.execute("ALTER TABLE buyer_reviews ADD COLUMN updated_at TIMESTAMP")
         except Exception:
             pass
+    if 'review_photo' not in br_cols:
+        try:
+            cursor.execute("ALTER TABLE buyer_reviews ADD COLUMN review_photo TEXT")
+        except Exception:
+            pass
+    if 'product_photo' not in br_cols:
+        try:
+            cursor.execute("ALTER TABLE buyer_reviews ADD COLUMN product_photo TEXT")
+        except Exception:
+            pass
 
     cursor.execute("PRAGMA table_info(seller_verifications)")
     sv_cols = [r[1] for r in cursor.fetchall()]
@@ -805,6 +815,7 @@ def init_db():
         cursor.execute("ALTER TABLE listings ADD COLUMN expiry_date DATE")
     if 'rescue_price' not in l_cols:
         cursor.execute("ALTER TABLE listings ADD COLUMN rescue_price REAL")
+    conn.commit()
 
     # Seed rescue_products from existing listings if empty
     try:
@@ -836,6 +847,7 @@ def init_db():
     try:
         seed_market_prices(conn)
         seed_weather_alerts(conn)
+        seed_sample_buyer_reviews(conn)
     except Exception as _e:
         pass
 
@@ -4896,7 +4908,8 @@ def get_verification_stats():
 
 def submit_buyer_review(buyer_id, farmer_id, rating, comment, quality_rating=5.0,
                         freshness_rating=5.0, communication_rating=5.0, price_rating=5.0,
-                        overall_rating=None, meeting_id=None, transaction_id=None, product_id=None):
+                        overall_rating=None, meeting_id=None, transaction_id=None, product_id=None,
+                        review_photo=None, product_photo=None):
     """
     Buyer submits a review with 1-5 star ratings and detailed category scores.
     Enforces 1 review per completed transaction / meeting.
@@ -4935,6 +4948,35 @@ def submit_buyer_review(buyer_id, farmer_id, rating, comment, quality_rating=5.0
             if s_row:
                 prod_name = s_row['product_name']
 
+        if not prod_name and product_id:
+            cursor.execute("SELECT product_name FROM rescue_products WHERE id = ?", (product_id,))
+            rp = cursor.fetchone()
+            if rp and rp['product_name']:
+                prod_name = rp['product_name']
+            else:
+                cursor.execute("SELECT crop_name FROM listings WHERE id = ?", (product_id,))
+                lp = cursor.fetchone()
+                if lp and lp['crop_name']:
+                    prod_name = lp['crop_name']
+
+        # Product photo resolution
+        if not product_photo and product_id:
+            cursor.execute("SELECT photo FROM rescue_products WHERE id = ?", (product_id,))
+            rp = cursor.fetchone()
+            if rp and rp['photo']:
+                product_photo = rp['photo']
+            else:
+                cursor.execute("SELECT photo FROM listings WHERE id = ?", (product_id,))
+                lp = cursor.fetchone()
+                if lp and lp['photo']:
+                    product_photo = lp['photo']
+
+        if not product_photo and meeting_id:
+            cursor.execute("SELECT l.photo FROM direct_meetings m JOIN listings l ON m.listing_id = l.id WHERE m.id = ?", (meeting_id,))
+            mp = cursor.fetchone()
+            if mp and mp[0]:
+                product_photo = mp[0]
+
         # Enforce 1 review per meeting or per transaction
         if meeting_id:
             cursor.execute("SELECT id FROM buyer_reviews WHERE buyer_id = ? AND meeting_id = ?", (buyer_id, meeting_id))
@@ -4966,13 +5008,13 @@ def submit_buyer_review(buyer_id, farmer_id, rating, comment, quality_rating=5.0
                 buyer_id, farmer_id, transaction_id, meeting_id, product_id,
                 buyer_name, farmer_name, product_name, rating,
                 quality_rating, freshness_rating, communication_rating, price_rating, overall_rating,
-                comment, is_verified_purchase, created_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+                comment, review_photo, product_photo, is_verified_purchase, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
         """, (
             buyer_id, farmer_id, transaction_id, meeting_id, product_id,
             buyer_name, farmer_name, prod_name, r,
             q_r, f_r, c_r, p_r, o_r,
-            comment or '', now_str
+            comment or '', review_photo, product_photo, now_str
         ))
         review_id = cursor.lastrowid
 
@@ -5193,10 +5235,11 @@ def delete_buyer_review(review_id):
         return False, str(e)
 
 def update_buyer_review(review_id, buyer_id, rating, comment, quality_rating=None,
-                        freshness_rating=None, communication_rating=None, price_rating=None, overall_rating=None):
+                        freshness_rating=None, communication_rating=None, price_rating=None,
+                        overall_rating=None, review_photo=None):
     """
     Allow a buyer to edit their existing submitted review.
-    Updates ratings, comments, and recalculates the seller's aggregate score.
+    Updates ratings, comments, optional produce photo, and recalculates the seller's aggregate score.
     """
     try:
         conn = get_db()
@@ -5226,18 +5269,33 @@ def update_buyer_review(review_id, buyer_id, rating, comment, quality_rating=Non
 
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
-        cursor.execute("""
-            UPDATE buyer_reviews
-            SET rating = ?,
-                comment = ?,
-                quality_rating = ?,
-                freshness_rating = ?,
-                communication_rating = ?,
-                price_rating = ?,
-                overall_rating = ?,
-                updated_at = ?
-            WHERE id = ?
-        """, (r, comment or '', q_r, f_r, c_r, p_r, o_r, now_str, review_id))
+        if review_photo:
+            cursor.execute("""
+                UPDATE buyer_reviews
+                SET rating = ?,
+                    comment = ?,
+                    quality_rating = ?,
+                    freshness_rating = ?,
+                    communication_rating = ?,
+                    price_rating = ?,
+                    overall_rating = ?,
+                    review_photo = ?,
+                    updated_at = ?
+                WHERE id = ?
+            """, (r, comment or '', q_r, f_r, c_r, p_r, o_r, review_photo, now_str, review_id))
+        else:
+            cursor.execute("""
+                UPDATE buyer_reviews
+                SET rating = ?,
+                    comment = ?,
+                    quality_rating = ?,
+                    freshness_rating = ?,
+                    communication_rating = ?,
+                    price_rating = ?,
+                    overall_rating = ?,
+                    updated_at = ?
+                WHERE id = ?
+            """, (r, comment or '', q_r, f_r, c_r, p_r, o_r, now_str, review_id))
 
         # Recalculate seller rating and total reviews
         cursor.execute("SELECT COUNT(*), AVG(rating) FROM buyer_reviews WHERE farmer_id = ?", (farmer_id,))
@@ -5260,3 +5318,267 @@ def update_buyer_review(review_id, buyer_id, rating, comment, quality_rating=Non
         except Exception:
             pass
         return False, str(e), None
+
+def get_product_reviews(product_id=None, crop_name=None, farmer_id=None, limit=50):
+    """
+    Retrieve customer reviews specifically for a produce listing or farmer,
+    ordered by latest reviews first.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        query = """
+            SELECT r.*, u.phone as buyer_phone, u.location as buyer_location
+            FROM buyer_reviews r
+            LEFT JOIN users u ON r.buyer_id = u.id
+            WHERE 1=1
+        """
+        params = []
+        if product_id:
+            query += " AND (r.product_id = ? OR r.product_name = ? OR r.farmer_id = ?)"
+            params.extend([product_id, crop_name or '', farmer_id or 0])
+        elif crop_name and farmer_id:
+            query += " AND (r.product_name LIKE ? OR r.farmer_id = ?)"
+            params.extend([f"%{crop_name}%", farmer_id])
+        elif farmer_id:
+            query += " AND r.farmer_id = ?"
+            params.append(farmer_id)
+
+        query += " ORDER BY r.id DESC LIMIT ?"
+        params.append(limit)
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+    except Exception as e:
+        print(f"Error fetching product reviews: {e}")
+        return []
+
+def get_product_rating_summary(product_id=None, crop_name=None, farmer_id=None):
+    """
+    Calculate customer rating stats for this produce/farmer:
+    average rating, total count, 5-star to 1-star breakdown counts, and category scores.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        query = "SELECT rating, quality_rating, freshness_rating, communication_rating, price_rating, overall_rating FROM buyer_reviews WHERE 1=1"
+        params = []
+        if product_id:
+            query += " AND (product_id = ? OR product_name = ? OR farmer_id = ?)"
+            params.extend([product_id, crop_name or '', farmer_id or 0])
+        elif crop_name and farmer_id:
+            query += " AND (product_name LIKE ? OR farmer_id = ?)"
+            params.extend([f"%{crop_name}%", farmer_id])
+        elif farmer_id:
+            query += " AND farmer_id = ?"
+            params.append(farmer_id)
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+
+        total = len(rows)
+        if total == 0:
+            return {
+                'total_reviews': 0,
+                'average_rating': 5.0,
+                'star_counts': {5: 0, 4: 0, 3: 0, 2: 0, 1: 0},
+                'star_percentages': {5: 0, 4: 0, 3: 0, 2: 0, 1: 0},
+                'avg_quality': 5.0,
+                'avg_freshness': 5.0,
+                'avg_communication': 5.0,
+                'avg_price': 5.0
+            }
+
+        star_counts = {5: 0, 4: 0, 3: 0, 2: 0, 1: 0}
+        sum_rating = 0.0
+        sum_q = 0.0
+        sum_f = 0.0
+        sum_c = 0.0
+        sum_p = 0.0
+
+        for r in rows:
+            r_val = float(r['rating'] or 5.0)
+            star_key = max(1, min(5, int(round(r_val))))
+            star_counts[star_key] += 1
+            sum_rating += r_val
+            sum_q += float(r['quality_rating'] or r_val)
+            sum_f += float(r['freshness_rating'] or r_val)
+            sum_c += float(r['communication_rating'] or r_val)
+            sum_p += float(r['price_rating'] or r_val)
+
+        star_percentages = {s: int(round((star_counts[s] / total) * 100)) for s in star_counts}
+
+        return {
+            'total_reviews': total,
+            'average_rating': round(sum_rating / total, 1),
+            'star_counts': star_counts,
+            'star_percentages': star_percentages,
+            'avg_quality': round(sum_q / total, 1),
+            'avg_freshness': round(sum_f / total, 1),
+            'avg_communication': round(sum_c / total, 1),
+            'avg_price': round(sum_p / total, 1)
+        }
+    except Exception as e:
+        print(f"Error computing rating summary: {e}")
+        return {
+            'total_reviews': 0,
+            'average_rating': 5.0,
+            'star_counts': {5: 0, 4: 0, 3: 0, 2: 0, 1: 0},
+            'star_percentages': {5: 0, 4: 0, 3: 0, 2: 0, 1: 0},
+            'avg_quality': 5.0,
+            'avg_freshness': 5.0,
+            'avg_communication': 5.0,
+            'avg_price': 5.0
+        }
+
+def is_buyer_eligible_for_product_review(buyer_id, product_id=None, crop_name=None, farmer_id=None):
+    """
+    Check if buyer is eligible to write a review.
+    A buyer is eligible after a successful purchase, delivery, or completed direct meeting.
+    Returns: (is_eligible, already_reviewed, existing_review, context_data)
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        # Check existing review first
+        existing_review = None
+        if product_id:
+            cursor.execute("SELECT * FROM buyer_reviews WHERE buyer_id = ? AND product_id = ?", (buyer_id, product_id))
+            existing_review = cursor.fetchone()
+
+        if not existing_review and farmer_id:
+            if crop_name:
+                cursor.execute("SELECT * FROM buyer_reviews WHERE buyer_id = ? AND farmer_id = ? AND product_name LIKE ?", (buyer_id, farmer_id, f"%{crop_name}%"))
+                existing_review = cursor.fetchone()
+            if not existing_review:
+                cursor.execute("SELECT * FROM buyer_reviews WHERE buyer_id = ? AND farmer_id = ?", (buyer_id, farmer_id))
+                existing_review = cursor.fetchone()
+
+        if existing_review:
+            conn.close()
+            return True, True, dict(existing_review), {}
+
+        # Check completed purchases in direct_sales
+        context = {}
+        if farmer_id:
+            cursor.execute("""
+                SELECT id, product_name FROM direct_sales
+                WHERE buyer_id = ? AND farmer_id = ? AND status = 'Completed'
+                ORDER BY id DESC LIMIT 1
+            """, (buyer_id, farmer_id))
+            s = cursor.fetchone()
+            if s:
+                context['transaction_id'] = s['id']
+                context['product_name'] = s['product_name']
+                conn.close()
+                return True, False, None, context
+
+        # Check completed meetings in direct_meetings
+        if farmer_id:
+            cursor.execute("""
+                SELECT id, product_name FROM direct_meetings
+                WHERE buyer_id = ? AND farmer_id = ? AND status = 'Completed'
+                ORDER BY id DESC LIMIT 1
+            """, (buyer_id, farmer_id))
+            m = cursor.fetchone()
+            if m:
+                context['meeting_id'] = m['id']
+                context['product_name'] = m['product_name']
+                conn.close()
+                return True, False, None, context
+
+        # Check delivered/completed orders in enquiries table
+        cursor.execute("""
+            SELECT e.id, l.crop_name, l.farmer_id
+            FROM enquiries e
+            JOIN listings l ON e.listing_id = l.id
+            WHERE e.buyer_id = ? AND (l.farmer_id = ? OR ? IS NULL)
+              AND (e.status IN ('Delivered', 'Completed', 'Confirmed', 'Dispatched') OR e.delivery_status IN ('Delivered', 'Completed'))
+            ORDER BY e.id DESC LIMIT 1
+        """, (buyer_id, farmer_id, farmer_id))
+        enq = cursor.fetchone()
+        if enq:
+            context['enquiry_id'] = enq['id']
+            context['product_name'] = enq['crop_name']
+            conn.close()
+            return True, False, None, context
+
+        conn.close()
+        return False, False, None, {}
+    except Exception as e:
+        print(f"Error checking buyer eligibility: {e}")
+        return False, False, None, {}
+
+def seed_sample_buyer_reviews(conn=None):
+    """
+    Seed initial authentic buyer reviews with photos and category ratings
+    for the sample farmers and produce listings so product pages look complete.
+    """
+    close_at_end = False
+    try:
+        if conn is None:
+            conn = get_db()
+            close_at_end = True
+        cursor = conn.cursor()
+
+        cursor.execute("SELECT COUNT(*) FROM buyer_reviews WHERE product_photo IS NOT NULL")
+        if cursor.fetchone()[0] > 0:
+            if close_at_end:
+                conn.close()
+            return
+
+        reviews_seed = [
+            # 1. Selvi Shanmugam (farmer_id=3) - Tomatoes
+            (6, 3, 1, 'Saravana Bhavan Procurement', 'Selvi Shanmugam', 'Krishnagiri Hybrid Country Tomatoes', 5.0, 5.0, 5.0, 5.0, 5.0, 5.0,
+             'Outstanding freshness! Tomatoes were firm, deep red, and perfect for our daily restaurant kitchen batches. Farmgate pickup in Rayakottai was smooth and on time.',
+             'tomatoes.jpg', 'tomatoes.jpg', '2026-11-18 10:30:00'),
+            (7, 3, 1, 'Nilgiris Fresh Mart', 'Selvi Shanmugam', 'Krishnagiri Hybrid Country Tomatoes', 5.0, 5.0, 5.0, 4.0, 5.0, 5.0,
+             'Inspected the harvest crates at the farm; zero damage or overripe fruit. Farmer Selvi was polite and helpful. Excellent shelf life in our retail displays.',
+             'tomatoes.jpg', 'tomatoes.jpg', '2026-11-19 14:15:00'),
+
+            # 2. Muthuvel Karuppan (farmer_id=2) - Shallots / Small Onions
+            (8, 2, 2, 'Aachi Masala Foods', 'Muthuvel Karuppan', 'Dindigul Bellary Small Onions (Shallots / Chinna Vengayam)', 5.0, 5.0, 5.0, 5.0, 4.0, 5.0,
+             'Finest quality shallots! Very dry skin, no fungal decay, pungent and authentic flavor. Ottanchathiram direct meeting was professional and straightforward.',
+             'onions.jpg', 'onions.jpg', '2026-11-17 11:00:00'),
+            (9, 2, 2, 'Anjappar Chettinad Kitchens', 'Muthuvel Karuppan', 'Dindigul Bellary Small Onions (Shallots / Chinna Vengayam)', 4.0, 4.0, 5.0, 4.0, 4.0, 4.0,
+             'Very good quality small onions. Sizing was uniform and delivery dispatch was completed as agreed.',
+             None, 'onions.jpg', '2026-11-20 09:45:00'),
+
+            # 3. Ramanathan K. (farmer_id=4) - Ooty Carrots
+            (6, 4, 3, 'Saravana Bhavan Procurement', 'Ramanathan K.', 'Ooty Mountain Crispy Carrots', 5.0, 5.0, 5.0, 5.0, 5.0, 5.0,
+             'Exceptionally sweet, crunchy mountain carrots. Cleaned and packed in pristine crates. Delivered straight from Ketti Valley with maximum freshness.',
+             'carrots.jpg', 'carrots.jpg', '2026-11-21 16:20:00'),
+
+            # 4. Kandasamy P. (farmer_id=5) - Tender Coconuts
+            (7, 5, 4, 'Nilgiris Fresh Mart', 'Kandasamy P.', 'Pollachi Grade-A Tender Coconuts (Elaneer)', 5.0, 5.0, 5.0, 5.0, 5.0, 5.0,
+             'Sweetest tender water coconuts in Tamil Nadu. High volume of refreshing water and thick pulp. Sold out within two days at our Coimbatore branches!',
+             'coconuts.jpg', 'coconuts.jpg', '2026-11-22 13:10:00')
+        ]
+
+        for rev in reviews_seed:
+            cursor.execute("""
+                INSERT INTO buyer_reviews (
+                    buyer_id, farmer_id, product_id, buyer_name, farmer_name, product_name,
+                    rating, quality_rating, freshness_rating, communication_rating, price_rating, overall_rating,
+                    comment, review_photo, product_photo, is_verified_purchase, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+            """, rev)
+
+        # Recalculate seller ratings for seeded farmers
+        for fid in [2, 3, 4, 5]:
+            cursor.execute("SELECT COUNT(*), AVG(rating) FROM buyer_reviews WHERE farmer_id = ?", (fid,))
+            c_row = cursor.fetchone()
+            tot = c_row[0] or 0
+            avg = round(float(c_row[1] or 0.0), 2)
+            cursor.execute("UPDATE users SET seller_rating = ?, total_reviews = ? WHERE id = ?", (avg, tot, fid))
+
+        conn.commit()
+        if close_at_end:
+            conn.close()
+    except Exception as e:
+        print(f"Error seeding sample buyer reviews: {e}")

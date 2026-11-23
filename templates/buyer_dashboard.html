@@ -1032,6 +1032,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 <p style="color: #334155; font-size: 0.9rem; margin: 0.5rem 0 0.75rem 0;">
                   "{{ br.comment }}"
                 </p>
+                {% if br.review_photo %}
+                  <div style="margin-bottom: 0.75rem;">
+                    <img src="{{ url_for('static', filename='uploads/' ~ br.review_photo if not br.review_photo.startswith('uploads/') else br.review_photo) }}" alt="Delivered produce photo" style="width: 80px; height: 80px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; cursor: pointer;" onclick="window.open(this.src, '_blank')" title="Click to view full photo">
+                  </div>
+                {% endif %}
                 <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; font-size: 0.75rem; color: #64748b;">
                   <span style="background: #f1f5f9; padding: 0.15rem 0.5rem; border-radius: 4px;">Quality: {{ br.quality_rating }}★</span>
                   <span style="background: #f1f5f9; padding: 0.15rem 0.5rem; border-radius: 4px;">Freshness: {{ br.freshness_rating }}★</span>
@@ -1902,7 +1907,7 @@ window.closeBuyerReviewModal = function() {
       <button type="button" onclick="closeBuyerReviewModal()" style="background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
     </div>
 
-    <form action="{{ url_for('submit_review_route') }}" method="POST" style="padding: 1.5rem;">
+    <form action="{{ url_for('submit_review_route') }}" method="POST" enctype="multipart/form-data" style="padding: 1.5rem;">
       <input type="hidden" name="review_id" id="reviewEditId">
       <input type="hidden" name="farmer_id" id="reviewFarmerId">
       <input type="hidden" name="meeting_id" id="reviewMeetingId">
@@ -1968,6 +1973,12 @@ window.closeBuyerReviewModal = function() {
       <div style="margin-bottom: 1.25rem;">
         <label style="display: block; font-size: 0.825rem; font-weight: 700; color: #334155; margin-bottom: 0.35rem;">Review Comments & Feedback *</label>
         <textarea name="comment" id="reviewComment" rows="3" required class="filter-input" placeholder="Share your experience inspecting crops, meeting the farmer, product freshness, and deal fairness..." style="width: 100%; font-family: inherit; font-size: 0.85rem;"></textarea>
+      </div>
+
+      <div style="margin-bottom: 1.25rem;">
+        <label style="display: block; font-size: 0.825rem; font-weight: 700; color: #334155; margin-bottom: 0.35rem;">Upload Photo of Delivered Produce (Optional)</label>
+        <input type="file" name="review_photo" accept="image/*" class="filter-input" style="width: 100%; font-size: 0.82rem; padding: 0.4rem; background: #ffffff;">
+        <div style="font-size: 0.75rem; color: #64748b; margin-top: 0.25rem;">Upload a real photo of the received produce to verify quality for other buyers.</div>
       </div>
 
       <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
