@@ -5126,6 +5126,181 @@ def get_farmer_rating_summary(farmer_id):
             'categories': {'quality': 0, 'freshness': 0, 'communication': 0, 'price': 0, 'overall': 0}
         }
 
+def get_seller_product_reviews_dashboard(farmer_id):
+    """
+    Fetch comprehensive product-wise reviews, overall stats, and product groupings
+    for a seller's dashboard.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+
+        # 1. Fetch all reviews for this seller with buyer info
+        cursor.execute("""
+            SELECT br.*, 
+                   u.name as buyer_full_name, u.location as buyer_location,
+                   u.district as buyer_district, u.user_type as buyer_type
+            FROM buyer_reviews br
+            LEFT JOIN users u ON br.buyer_id = u.id
+            WHERE br.farmer_id = ?
+            ORDER BY br.id DESC
+        """, (farmer_id,))
+        review_rows = cursor.fetchall()
+        
+        reviews = []
+        for r in review_rows:
+            rd = dict(r)
+            # Resolve product photo if missing
+            if not rd.get('product_photo') and rd.get('product_id'):
+                cursor.execute("SELECT photo FROM listings WHERE id = ?", (rd['product_id'],))
+                lp = cursor.fetchone()
+                if lp and lp[0]:
+                    rd['product_photo'] = lp[0]
+                else:
+                    cursor.execute("SELECT photo FROM rescue_products WHERE id = ?", (rd['product_id'],))
+                    rp = cursor.fetchone()
+                    if rp and rp[0]:
+                        rd['product_photo'] = rp[0]
+            if not rd.get('product_photo') and rd.get('product_name'):
+                cursor.execute("SELECT photo FROM listings WHERE crop_name = ? AND photo IS NOT NULL LIMIT 1", (rd['product_name'],))
+                lp2 = cursor.fetchone()
+                if lp2 and lp2[0]:
+                    rd['product_photo'] = lp2[0]
+            
+            # Buyer display initials and name
+            b_name = rd.get('buyer_name') or rd.get('buyer_full_name') or 'Verified Buyer'
+            rd['buyer_name'] = b_name
+            parts = b_name.split()
+            rd['buyer_initials'] = (parts[0][0] + (parts[1][0] if len(parts) > 1 else '')).upper() if parts else 'VB'
+            reviews.append(rd)
+
+        # 2. Product-wise grouping
+        products_map = {}
+        for r in reviews:
+            p_name = r.get('product_name') or 'Direct Farm Harvest'
+            if p_name not in products_map:
+                products_map[p_name] = {
+                    'product_name': p_name,
+                    'product_photo': r.get('product_photo'),
+                    'product_id': r.get('product_id'),
+                    'reviews': [],
+                    'total_reviews': 0,
+                    'ratings_sum': 0.0,
+                    'average_rating': 5.0,
+                    'star_counts': {5: 0, 4: 0, 3: 0, 2: 0, 1: 0},
+                    'quality_sum': 0.0,
+                    'freshness_sum': 0.0,
+                    'communication_sum': 0.0,
+                    'price_sum': 0.0,
+                    'has_photos_count': 0
+                }
+            
+            if r.get('product_photo') and not products_map[p_name]['product_photo']:
+                products_map[p_name]['product_photo'] = r['product_photo']
+                
+            grp = products_map[p_name]
+            grp['reviews'].append(r)
+            grp['total_reviews'] += 1
+            rating_val = float(r.get('rating') or 5.0)
+            grp['ratings_sum'] += rating_val
+            star_int = min(5, max(1, int(round(rating_val))))
+            grp['star_counts'][star_int] = grp['star_counts'].get(star_int, 0) + 1
+            grp['quality_sum'] += float(r.get('quality_rating') or rating_val)
+            grp['freshness_sum'] += float(r.get('freshness_rating') or rating_val)
+            grp['communication_sum'] += float(r.get('communication_rating') or rating_val)
+            grp['price_sum'] += float(r.get('price_rating') or rating_val)
+            if r.get('review_photo'):
+                grp['has_photos_count'] += 1
+
+        product_groups = []
+        for p_name, grp in products_map.items():
+            tot = grp['total_reviews']
+            grp['average_rating'] = round(grp['ratings_sum'] / tot, 1) if tot > 0 else 5.0
+            grp['avg_quality'] = round(grp['quality_sum'] / tot, 1) if tot > 0 else 5.0
+            grp['avg_freshness'] = round(grp['freshness_sum'] / tot, 1) if tot > 0 else 5.0
+            grp['avg_communication'] = round(grp['communication_sum'] / tot, 1) if tot > 0 else 5.0
+            grp['avg_price'] = round(grp['price_sum'] / tot, 1) if tot > 0 else 5.0
+            grp['star_percentages'] = {
+                s: round((grp['star_counts'][s] / tot * 100), 1) if tot > 0 else 0
+                for s in [5, 4, 3, 2, 1]
+            }
+            product_groups.append(grp)
+
+        product_groups.sort(key=lambda x: (x['total_reviews'], x['average_rating']), reverse=True)
+
+        # 3. Overall Summary Statistics
+        total_reviews_count = len(reviews)
+        total_products_reviewed = len(product_groups)
+        overall_avg = round(sum(r['rating'] for r in reviews) / total_reviews_count, 1) if total_reviews_count > 0 else 5.0
+        five_star_reviews = sum(1 for r in reviews if round(float(r['rating'])) == 5)
+        four_star_reviews = sum(1 for r in reviews if round(float(r['rating'])) == 4)
+        three_star_reviews = sum(1 for r in reviews if round(float(r['rating'])) == 3)
+        two_star_reviews = sum(1 for r in reviews if round(float(r['rating'])) == 2)
+        one_star_reviews = sum(1 for r in reviews if round(float(r['rating'])) == 1)
+        photos_count = sum(1 for r in reviews if r.get('review_photo'))
+
+        star_breakdown = {
+            5: five_star_reviews,
+            4: four_star_reviews,
+            3: three_star_reviews,
+            2: two_star_reviews,
+            1: one_star_reviews
+        }
+        star_percentages = {
+            s: round((star_breakdown[s] / total_reviews_count * 100), 1) if total_reviews_count > 0 else 0
+            for s in [5, 4, 3, 2, 1]
+        }
+
+        # Calculate category averages
+        cat_averages = {
+            'quality': round(sum(float(r.get('quality_rating') or r['rating']) for r in reviews) / total_reviews_count, 1) if total_reviews_count > 0 else 5.0,
+            'freshness': round(sum(float(r.get('freshness_rating') or r['rating']) for r in reviews) / total_reviews_count, 1) if total_reviews_count > 0 else 5.0,
+            'communication': round(sum(float(r.get('communication_rating') or r['rating']) for r in reviews) / total_reviews_count, 1) if total_reviews_count > 0 else 5.0,
+            'price': round(sum(float(r.get('price_rating') or r['rating']) for r in reviews) / total_reviews_count, 1) if total_reviews_count > 0 else 5.0,
+        }
+
+        summary = {
+            'total_products_reviewed': total_products_reviewed,
+            'total_reviews': total_reviews_count,
+            'average_rating': overall_avg,
+            'five_star_reviews': five_star_reviews,
+            'four_star_reviews': four_star_reviews,
+            'three_star_reviews': three_star_reviews,
+            'two_star_reviews': two_star_reviews,
+            'one_star_reviews': one_star_reviews,
+            'photos_count': photos_count,
+            'star_breakdown': star_breakdown,
+            'star_percentages': star_percentages,
+            'categories': cat_averages
+        }
+
+        conn.close()
+        return {
+            'reviews': reviews,
+            'product_groups': product_groups,
+            'summary': summary
+        }
+    except Exception as e:
+        print(f"Error getting seller product reviews dashboard: {e}")
+        return {
+            'reviews': [],
+            'product_groups': [],
+            'summary': {
+                'total_products_reviewed': 0,
+                'total_reviews': 0,
+                'average_rating': 5.0,
+                'five_star_reviews': 0,
+                'four_star_reviews': 0,
+                'three_star_reviews': 0,
+                'two_star_reviews': 0,
+                'one_star_reviews': 0,
+                'photos_count': 0,
+                'star_breakdown': {5: 0, 4: 0, 3: 0, 2: 0, 1: 0},
+                'star_percentages': {5: 0, 4: 0, 3: 0, 2: 0, 1: 0},
+                'categories': {'quality': 5.0, 'freshness': 5.0, 'communication': 5.0, 'price': 5.0}
+            }
+        }
+
 def get_completed_transactions_for_review(buyer_id):
     """
     Find completed meetings and completed sales for a buyer that have NOT yet been reviewed.
@@ -5527,47 +5702,44 @@ def seed_sample_buyer_reviews(conn=None):
         cursor = conn.cursor()
 
         cursor.execute("SELECT COUNT(*) FROM buyer_reviews WHERE product_photo IS NOT NULL")
-        if cursor.fetchone()[0] > 0:
-            if close_at_end:
-                conn.close()
-            return
+        has_seeds = cursor.fetchone()[0] > 0
+        if not has_seeds:
+            reviews_seed = [
+                # 1. Selvi Shanmugam (farmer_id=3) - Tomatoes
+                (6, 3, 1, 'Saravana Bhavan Procurement', 'Selvi Shanmugam', 'Krishnagiri Hybrid Country Tomatoes', 5.0, 5.0, 5.0, 5.0, 5.0, 5.0,
+                 'Outstanding freshness! Tomatoes were firm, deep red, and perfect for our daily restaurant kitchen batches. Farmgate pickup in Rayakottai was smooth and on time.',
+                 'tomatoes.jpg', 'tomatoes.jpg', '2026-11-18 10:30:00'),
+                (7, 3, 1, 'Nilgiris Fresh Mart', 'Selvi Shanmugam', 'Krishnagiri Hybrid Country Tomatoes', 5.0, 5.0, 5.0, 4.0, 5.0, 5.0,
+                 'Inspected the harvest crates at the farm; zero damage or overripe fruit. Farmer Selvi was polite and helpful. Excellent shelf life in our retail displays.',
+                 'tomatoes.jpg', 'tomatoes.jpg', '2026-11-19 14:15:00'),
 
-        reviews_seed = [
-            # 1. Selvi Shanmugam (farmer_id=3) - Tomatoes
-            (6, 3, 1, 'Saravana Bhavan Procurement', 'Selvi Shanmugam', 'Krishnagiri Hybrid Country Tomatoes', 5.0, 5.0, 5.0, 5.0, 5.0, 5.0,
-             'Outstanding freshness! Tomatoes were firm, deep red, and perfect for our daily restaurant kitchen batches. Farmgate pickup in Rayakottai was smooth and on time.',
-             'tomatoes.jpg', 'tomatoes.jpg', '2026-11-18 10:30:00'),
-            (7, 3, 1, 'Nilgiris Fresh Mart', 'Selvi Shanmugam', 'Krishnagiri Hybrid Country Tomatoes', 5.0, 5.0, 5.0, 4.0, 5.0, 5.0,
-             'Inspected the harvest crates at the farm; zero damage or overripe fruit. Farmer Selvi was polite and helpful. Excellent shelf life in our retail displays.',
-             'tomatoes.jpg', 'tomatoes.jpg', '2026-11-19 14:15:00'),
+                # 2. Muthuvel Karuppan (farmer_id=2) - Shallots / Small Onions
+                (8, 2, 2, 'Aachi Masala Foods', 'Muthuvel Karuppan', 'Dindigul Bellary Small Onions (Shallots / Chinna Vengayam)', 5.0, 5.0, 5.0, 5.0, 4.0, 5.0,
+                 'Finest quality shallots! Very dry skin, no fungal decay, pungent and authentic flavor. Ottanchathiram direct meeting was professional and straightforward.',
+                 'onions.jpg', 'onions.jpg', '2026-11-17 11:00:00'),
+                (9, 2, 2, 'Anjappar Chettinad Kitchens', 'Muthuvel Karuppan', 'Dindigul Bellary Small Onions (Shallots / Chinna Vengayam)', 4.0, 4.0, 5.0, 4.0, 4.0, 4.0,
+                 'Very good quality small onions. Sizing was uniform and delivery dispatch was completed as agreed.',
+                 None, 'onions.jpg', '2026-11-20 09:45:00'),
 
-            # 2. Muthuvel Karuppan (farmer_id=2) - Shallots / Small Onions
-            (8, 2, 2, 'Aachi Masala Foods', 'Muthuvel Karuppan', 'Dindigul Bellary Small Onions (Shallots / Chinna Vengayam)', 5.0, 5.0, 5.0, 5.0, 4.0, 5.0,
-             'Finest quality shallots! Very dry skin, no fungal decay, pungent and authentic flavor. Ottanchathiram direct meeting was professional and straightforward.',
-             'onions.jpg', 'onions.jpg', '2026-11-17 11:00:00'),
-            (9, 2, 2, 'Anjappar Chettinad Kitchens', 'Muthuvel Karuppan', 'Dindigul Bellary Small Onions (Shallots / Chinna Vengayam)', 4.0, 4.0, 5.0, 4.0, 4.0, 4.0,
-             'Very good quality small onions. Sizing was uniform and delivery dispatch was completed as agreed.',
-             None, 'onions.jpg', '2026-11-20 09:45:00'),
+                # 3. Ramanathan K. (farmer_id=4) - Ooty Carrots
+                (6, 4, 3, 'Saravana Bhavan Procurement', 'Ramanathan K.', 'Ooty Mountain Crispy Carrots', 5.0, 5.0, 5.0, 5.0, 5.0, 5.0,
+                 'Exceptionally sweet, crunchy mountain carrots. Cleaned and packed in pristine crates. Delivered straight from Ketti Valley with maximum freshness.',
+                 'carrots.jpg', 'carrots.jpg', '2026-11-21 16:20:00'),
 
-            # 3. Ramanathan K. (farmer_id=4) - Ooty Carrots
-            (6, 4, 3, 'Saravana Bhavan Procurement', 'Ramanathan K.', 'Ooty Mountain Crispy Carrots', 5.0, 5.0, 5.0, 5.0, 5.0, 5.0,
-             'Exceptionally sweet, crunchy mountain carrots. Cleaned and packed in pristine crates. Delivered straight from Ketti Valley with maximum freshness.',
-             'carrots.jpg', 'carrots.jpg', '2026-11-21 16:20:00'),
+                # 4. Kandasamy P. (farmer_id=5) - Tender Coconuts
+                (7, 5, 4, 'Nilgiris Fresh Mart', 'Kandasamy P.', 'Pollachi Grade-A Tender Coconuts (Elaneer)', 5.0, 5.0, 5.0, 5.0, 5.0, 5.0,
+                 'Sweetest tender water coconuts in Tamil Nadu. High volume of refreshing water and thick pulp. Sold out within two days at our Coimbatore branches!',
+                 'coconuts.jpg', 'coconuts.jpg', '2026-11-22 13:10:00')
+            ]
 
-            # 4. Kandasamy P. (farmer_id=5) - Tender Coconuts
-            (7, 5, 4, 'Nilgiris Fresh Mart', 'Kandasamy P.', 'Pollachi Grade-A Tender Coconuts (Elaneer)', 5.0, 5.0, 5.0, 5.0, 5.0, 5.0,
-             'Sweetest tender water coconuts in Tamil Nadu. High volume of refreshing water and thick pulp. Sold out within two days at our Coimbatore branches!',
-             'coconuts.jpg', 'coconuts.jpg', '2026-11-22 13:10:00')
-        ]
-
-        for rev in reviews_seed:
-            cursor.execute("""
-                INSERT INTO buyer_reviews (
-                    buyer_id, farmer_id, product_id, buyer_name, farmer_name, product_name,
-                    rating, quality_rating, freshness_rating, communication_rating, price_rating, overall_rating,
-                    comment, review_photo, product_photo, is_verified_purchase, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
-            """, rev)
+            for rev in reviews_seed:
+                cursor.execute("""
+                    INSERT INTO buyer_reviews (
+                        buyer_id, farmer_id, product_id, buyer_name, farmer_name, product_name,
+                        rating, quality_rating, freshness_rating, communication_rating, price_rating, overall_rating,
+                        comment, review_photo, product_photo, is_verified_purchase, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+                """, rev)
 
         # Recalculate seller ratings for seeded farmers
         for fid in [2, 3, 4, 5]:
@@ -5576,6 +5748,33 @@ def seed_sample_buyer_reviews(conn=None):
             tot = c_row[0] or 0
             avg = round(float(c_row[1] or 0.0), 2)
             cursor.execute("UPDATE users SET seller_rating = ?, total_reviews = ? WHERE id = ?", (avg, tot, fid))
+
+        # Ensure farmers 2 and 3 have at least 2 distinct products reviewed for clear product-wise breakdown
+        cursor.execute("SELECT COUNT(DISTINCT product_name) FROM buyer_reviews WHERE farmer_id = 3")
+        f3_cnt = cursor.fetchone()[0] or 0
+        if f3_cnt < 2:
+            extra_seeds = [
+                (8, 3, 6, 'Aachi Masala Foods', 'Selvi Shanmugam', 'Thanjavur Ponni Raw Rice (Deluxe Harvest)', 5.0, 5.0, 5.0, 4.5, 5.0, 5.0,
+                 'Top quality aged Ponni rice. Perfect grain length, zero impurities or broken grains. Directly loaded onto our transport vehicle.',
+                 'tomatoes.jpg', 'rice.jpg', '2026-11-20 17:30:00'),
+                (6, 2, 7, 'Saravana Bhavan Procurement', 'Muthuvel Karuppan', 'Ottanchathiram Fresh Green Chillies', 5.0, 5.0, 5.0, 5.0, 5.0, 5.0,
+                 'Crisp, pungent, and freshly picked green chillies. Very minimal sorting required. We will order continuously!',
+                 'onions.jpg', 'chillies.jpg', '2026-11-21 14:00:00')
+            ]
+            for rev in extra_seeds:
+                cursor.execute("""
+                    INSERT INTO buyer_reviews (
+                        buyer_id, farmer_id, product_id, buyer_name, farmer_name, product_name,
+                        rating, quality_rating, freshness_rating, communication_rating, price_rating, overall_rating,
+                        comment, review_photo, product_photo, is_verified_purchase, created_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
+                """, rev)
+            for fid in [2, 3]:
+                cursor.execute("SELECT COUNT(*), AVG(rating) FROM buyer_reviews WHERE farmer_id = ?", (fid,))
+                c_row = cursor.fetchone()
+                tot = c_row[0] or 0
+                avg = round(float(c_row[1] or 0.0), 2)
+                cursor.execute("UPDATE users SET seller_rating = ?, total_reviews = ? WHERE id = ?", (avg, tot, fid))
 
         conn.commit()
         if close_at_end:

@@ -54,7 +54,8 @@ from database import (
     submit_buyer_review, update_buyer_review, get_farmer_reviews, get_farmer_rating_summary,
     get_completed_transactions_for_review, get_buyer_reviews_submitted,
     get_all_buyer_reviews, delete_buyer_review,
-    get_product_reviews, get_product_rating_summary, is_buyer_eligible_for_product_review
+    get_product_reviews, get_product_rating_summary, is_buyer_eligible_for_product_review,
+    get_seller_product_reviews_dashboard
 )
 import email_service
 from razorpay_gateway import (
@@ -3555,6 +3556,8 @@ def analytics_view():
 
 @app.route('/farmer/dashboard')
 @app.route('/dashboard/farmer')
+@app.route('/seller/dashboard')
+@app.route('/dashboard/seller')
 @login_required
 @farmer_required
 def farmer_dashboard():
@@ -3748,6 +3751,7 @@ def farmer_dashboard():
         farmer_meetings=get_farmer_meetings(farmer_id),
         farmer_direct_sales=get_direct_sales_for_user(farmer_id, 'farmer'),
         farmer_verification=get_seller_verification_by_farmer_id(farmer_id),
+        seller_reviews_data=get_seller_product_reviews_dashboard(farmer_id),
         farmer_reviews=get_farmer_reviews(farmer_id),
         farmer_rating_summary=get_farmer_rating_summary(farmer_id),
         farmer_reschedule_requests=get_reschedule_requests_for_user(farmer_id, 'farmer'),
@@ -6020,6 +6024,19 @@ def edit_review_route(review_id):
     else:
         flash(f"⚠️ {msg}", "danger")
     return redirect(next_url)
+
+@app.route('/api/seller/product-reviews', methods=['GET'])
+@login_required
+@farmer_required
+def api_seller_product_reviews():
+    """API endpoint returning product reviews and product-wise breakdown for the logged-in seller."""
+    data = get_seller_product_reviews_dashboard(g.user['id'])
+    return jsonify({
+        'success': True,
+        'summary': data['summary'],
+        'product_groups': data['product_groups'],
+        'reviews': data['reviews']
+    })
 
 @app.route('/seller/<int:seller_id>')
 @app.route('/farmer/<int:seller_id>')

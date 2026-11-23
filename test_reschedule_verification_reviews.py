@@ -538,5 +538,68 @@ class TestRescheduleVerificationReviews(unittest.TestCase):
         self.assertIn(b"Buyer Reviews", res_seller.data)
         self.assertIn(b"Outstanding fresh harvest", res_seller.data)
 
+    def test_10_seller_dashboard_product_reviews(self):
+        """Test Product Reviews & Ratings feature in Seller Dashboard, product-wise breakdown, and API."""
+        from app import app
+        app.config['TESTING'] = True
+        client = app.test_client()
+
+        # Submit a buyer review for this test run's farmer & listing
+        ok, msg, rev_id = database.submit_buyer_review(
+            buyer_id=self.buyer_id,
+            farmer_id=self.farmer_id,
+            rating=5,
+            comment="Outstanding fresh harvest directly from farmgate! High quality produce.",
+            meeting_id=None,
+            transaction_id=None,
+            product_id=self.listing_id,
+            quality_rating=5.0,
+            freshness_rating=5.0,
+            communication_rating=4.5,
+            price_rating=5.0,
+            review_photo="tomatoes.jpg"
+        )
+        self.assertTrue(ok, msg)
+
+        # 1. Verify get_seller_product_reviews_dashboard function
+        data = database.get_seller_product_reviews_dashboard(self.farmer_id)
+        self.assertIn('summary', data)
+        self.assertIn('product_groups', data)
+        self.assertIn('reviews', data)
+        self.assertGreaterEqual(data['summary']['total_reviews'], 1)
+        self.assertGreaterEqual(data['summary']['total_products_reviewed'], 1)
+        self.assertGreaterEqual(data['summary']['average_rating'], 4.0)
+
+        # 2. Login as the farmer in test session
+        with client.session_transaction() as sess:
+            sess['user_id'] = self.farmer_id
+            sess['user_role'] = 'farmer'
+
+        # 3. Test GET /dashboard/farmer (Seller Dashboard)
+        res_dash = client.get('/dashboard/farmer')
+        self.assertEqual(res_dash.status_code, 200)
+        self.assertIn(b"Product Reviews &amp; Ratings", res_dash.data)
+        self.assertIn(b"Product-wise Review Management", res_dash.data)
+        self.assertIn(b"Total Products Reviewed", res_dash.data)
+        self.assertIn(b"Total Reviews Received", res_dash.data)
+        self.assertIn(b"Average Seller Rating", res_dash.data)
+        self.assertIn(b"5-Star Reviews", res_dash.data)
+        self.assertIn(b"Ponni Rice Harvest", res_dash.data)
+        self.assertIn(b"Outstanding fresh harvest", res_dash.data)
+
+        # 4. Test GET /seller/dashboard alias
+        res_alias = client.get('/seller/dashboard')
+        self.assertEqual(res_alias.status_code, 200)
+
+        # 5. Test API endpoint GET /api/seller/product-reviews
+        res_api = client.get('/api/seller/product-reviews')
+        self.assertEqual(res_api.status_code, 200)
+        json_resp = res_api.get_json()
+        self.assertTrue(json_resp['success'])
+        self.assertIn('summary', json_resp)
+        self.assertIn('product_groups', json_resp)
+        self.assertGreaterEqual(len(json_resp['product_groups']), 1)
+        self.assertEqual(json_resp['product_groups'][0]['product_name'], "Ponni Rice Harvest")
+
 if __name__ == '__main__':
     unittest.main()

@@ -72,6 +72,10 @@ document.addEventListener('DOMContentLoaded', function() {
         '#rescueProductsSection': 'rescue',
         '#meetingsSection': 'meetings',
         '#directSalesSection': 'direct-sales',
+        '#verificationSection': 'verification',
+        '#reviewsSection': 'reviews',
+        '#product-reviews': 'reviews',
+        '#reviews': 'reviews',
         '#listingsSection': 'listings',
         '#offersSection': 'offers',
         '#escrowSection': 'escrow'
@@ -90,6 +94,10 @@ document.addEventListener('DOMContentLoaded', function() {
     '#rescueProductsSection': 'rescue',
     '#meetingsSection': 'meetings',
     '#directSalesSection': 'direct-sales',
+    '#verificationSection': 'verification',
+    '#reviewsSection': 'reviews',
+    '#product-reviews': 'reviews',
+    '#reviews': 'reviews',
     '#listingsSection': 'listings',
     '#offersSection': 'offers',
     '#escrowSection': 'escrow',
@@ -226,9 +234,9 @@ document.addEventListener('DOMContentLoaded', function() {
       </button>
       <button type="button" class="farmer-tab-btn" data-farmer-tab="reviews">
         <span class="tab-icon">⭐</span>
-        <span>{{ 'Buyer Reviews' if lang == 'en' else 'வாங்குபவர் மதிப்புரைகள்' }}</span>
+        <span>{{ 'Product Reviews & Ratings' if lang == 'en' else 'பொருள் மதிப்புரைகள் & மதிப்பீடுகள்' }}</span>
         <span class="tab-badge" style="background: #f59e0b; color: white;">
-          ★ {{ farmer_rating_summary.average_rating if farmer_rating_summary and farmer_rating_summary.total_reviews > 0 else '5.0' }} ({{ farmer_reviews|length }})
+          ★ {{ "%.1f"|format(seller_reviews_data.summary.average_rating) if seller_reviews_data and seller_reviews_data.summary.total_reviews > 0 else '5.0' }} ({{ seller_reviews_data.summary.total_reviews if seller_reviews_data else 0 }})
         </span>
       </button>
       <button type="button" class="farmer-tab-btn" data-farmer-tab="offers">
@@ -1487,125 +1495,450 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
   </div>
 
-  <!-- 5. BUYER REVIEWS PANE -->
+  <!-- 5. PRODUCT REVIEWS & RATINGS PANE -->
   <div class="farmer-feature-pane" data-farmer-pane="reviews">
     <div class="data-table-card" id="reviewsSection" style="margin-bottom: 2.5rem; border-top: 4px solid #f59e0b;">
-      <div class="data-table-header" style="flex-wrap: wrap; gap: 1rem;">
+      
+      <!-- Pane Header -->
+      <div class="data-table-header" style="flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between;">
         <div>
-          <h2 style="font-size: 1.35rem; font-weight: 700; color: #0f172a; display: flex; align-items: center; gap: 0.5rem;">
-            <span>⭐</span> Buyer Reviews & Reputation Performance
+          <div style="display: inline-flex; align-items: center; gap: 0.4rem; background: #fef3c7; color: #b45309; padding: 0.2rem 0.65rem; border-radius: 20px; font-size: 0.78rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.35rem;">
+            <span>⭐ Customer Feedback Hub</span>
+          </div>
+          <h2 style="font-size: 1.4rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+            <span>⭐</span> Product Reviews & Ratings
           </h2>
           <span style="font-size: 0.85rem; color: var(--text-muted);">
-            Transparent reviews and ratings submitted by buyers after completed farm visits and direct sales.
+            Transparent customer reviews, verified delivery ratings, and produce-wise satisfaction metrics for your harvest.
           </span>
         </div>
+
+        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+          <a href="{{ url_for('view_seller_profile', seller_id=g.user.id) }}" target="_blank" class="btn btn-sm" style="background: #ffffff; border: 1px solid #cbd5e1; color: #0f172a; font-weight: 700; text-decoration: none; border-radius: 8px; padding: 0.45rem 0.85rem; display: inline-flex; align-items: center; gap: 0.35rem;">
+            <span>👁️</span> View Public Profile Reviews ↗
+          </a>
+        </div>
       </div>
 
-      <!-- Rating Breakdown Cards -->
-      <div style="padding: 1.75rem; border-bottom: 1px solid #e2e8f0; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem;">
-        <!-- Card 1: Overall Rating -->
-        <div style="background: #fffdf5; border: 1px solid #fef3c7; border-radius: 12px; padding: 1.5rem; text-align: center;">
-          <div style="font-size: 3.5rem; font-weight: 900; color: #1e293b; line-height: 1;">
-            {{ farmer_rating_summary.average_rating if farmer_rating_summary and farmer_rating_summary.total_reviews > 0 else '5.0' }}
-          </div>
-          <div style="color: #f59e0b; font-size: 1.5rem; margin: 0.35rem 0;">
-            ★★★★★
-          </div>
-          <div style="font-size: 0.9rem; font-weight: 700; color: #475569;">
-            Based on {{ farmer_reviews|length }} verified buyer reviews
-          </div>
-        </div>
-
-        <!-- Card 2: Star Breakdown -->
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem;">
-          <div style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.75rem;">Rating Breakdown</div>
-          {% for star in [5, 4, 3, 2, 1] %}
-            {% set cnt = farmer_rating_summary.breakdown[star] if farmer_rating_summary and farmer_rating_summary.breakdown else 0 %}
-            {% set pct = farmer_rating_summary.percentages[star] if farmer_rating_summary and farmer_rating_summary.percentages else 0 %}
-            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; font-size: 0.8rem;">
-              <span style="width: 30px; font-weight: 700; color: #475569;">{{ star }}★</span>
-              <div style="flex: 1; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
-                <div style="width: {{ pct }}%; height: 100%; background: #f59e0b;"></div>
+      <!-- 1. TOP SUMMARY KPI CARDS (Requirement 3) -->
+      <div style="padding: 1.5rem; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1.25rem;">
+          
+          <!-- Card 1: Total Products Reviewed -->
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.25rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03); display: flex; align-items: center; gap: 1rem; border-left: 4px solid #16a34a;">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: #dcfce7; color: #16a34a; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0;">
+              📦
+            </div>
+            <div>
+              <div style="font-size: 1.75rem; font-weight: 900; color: #0f172a; line-height: 1.1;">
+                {{ seller_reviews_data.summary.total_products_reviewed if seller_reviews_data else 0 }}
               </div>
-              <span style="width: 45px; text-align: right; color: #64748b; font-size: 0.75rem;">{{ cnt }} ({{ pct|round(0)|int }}%)</span>
-            </div>
-          {% endfor %}
-        </div>
-
-        <!-- Card 3: Categories -->
-        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem;">
-          <div style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.75rem;">Category Scores</div>
-          <div style="display: flex; flex-direction: column; gap: 0.5rem; font-size: 0.85rem;">
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: #64748b;">Product Quality</span>
-              <strong style="color: #15803d;">{{ farmer_rating_summary.categories.quality if farmer_rating_summary else 5.0 }}★ / 5.0</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: #64748b;">Product Freshness</span>
-              <strong style="color: #15803d;">{{ farmer_rating_summary.categories.freshness if farmer_rating_summary else 5.0 }}★ / 5.0</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: #64748b;">Seller Communication</span>
-              <strong style="color: #0284c7;">{{ farmer_rating_summary.categories.communication if farmer_rating_summary else 5.0 }}★ / 5.0</strong>
-            </div>
-            <div style="display: flex; justify-content: space-between;">
-              <span style="color: #64748b;">Price Satisfaction</span>
-              <strong style="color: #0284c7;">{{ farmer_rating_summary.categories.price if farmer_rating_summary else 5.0 }}★ / 5.0</strong>
+              <div style="font-size: 0.82rem; font-weight: 700; color: #334155; margin-top: 0.15rem;">Total Products Reviewed</div>
+              <div style="font-size: 0.72rem; color: #64748b;">Distinct crops rated</div>
             </div>
           </div>
+
+          <!-- Card 2: Total Reviews Received -->
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.25rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03); display: flex; align-items: center; gap: 1rem; border-left: 4px solid #f59e0b;">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: #fef3c7; color: #b45309; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0;">
+              ⭐
+            </div>
+            <div>
+              <div style="font-size: 1.75rem; font-weight: 900; color: #0f172a; line-height: 1.1;">
+                {{ seller_reviews_data.summary.total_reviews if seller_reviews_data else 0 }}
+              </div>
+              <div style="font-size: 0.82rem; font-weight: 700; color: #334155; margin-top: 0.15rem;">Total Reviews Received</div>
+              <div style="font-size: 0.72rem; color: #64748b;">Verified buyer ratings</div>
+            </div>
+          </div>
+
+          <!-- Card 3: Average Seller Rating -->
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.25rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03); display: flex; align-items: center; gap: 1rem; border-left: 4px solid #0284c7;">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: #e0f2fe; color: #0284c7; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0;">
+              🏆
+            </div>
+            <div>
+              <div style="font-size: 1.75rem; font-weight: 900; color: #0f172a; line-height: 1.1;">
+                {{ "%.1f"|format(seller_reviews_data.summary.average_rating) if seller_reviews_data and seller_reviews_data.summary.total_reviews > 0 else '5.0' }} <span style="font-size: 1rem; color: #f59e0b;">★</span>
+              </div>
+              <div style="font-size: 0.82rem; font-weight: 700; color: #334155; margin-top: 0.15rem;">Average Seller Rating</div>
+              <div style="font-size: 0.72rem; color: #64748b;">Out of 5.0 satisfaction</div>
+            </div>
+          </div>
+
+          <!-- Card 4: 5-Star Reviews -->
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1.25rem; box-shadow: 0 2px 6px rgba(0,0,0,0.03); display: flex; align-items: center; gap: 1rem; border-left: 4px solid #8b5cf6;">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: #ede9fe; color: #7c3aed; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; flex-shrink: 0;">
+              🌟
+            </div>
+            <div>
+              <div style="font-size: 1.75rem; font-weight: 900; color: #0f172a; line-height: 1.1;">
+                {{ seller_reviews_data.summary.five_star_reviews if seller_reviews_data else 0 }}
+              </div>
+              <div style="font-size: 0.82rem; font-weight: 700; color: #334155; margin-top: 0.15rem;">5-Star Reviews</div>
+              <div style="font-size: 0.72rem; color: #64748b;">
+                {{ seller_reviews_data.summary.star_percentages[5] if seller_reviews_data and seller_reviews_data.summary.star_percentages else 100 }}% top tier ratings
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
 
-      <!-- Reviews Feed -->
-      <div style="padding: 1.75rem;">
-        <h3 style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin-bottom: 1rem;">
-          Customer Review Feed ({{ farmer_reviews|length }})
-        </h3>
-        {% if farmer_reviews %}
-          <div style="display: flex; flex-direction: column; gap: 1rem;">
-            {% for r in farmer_reviews %}
-              <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 1.25rem;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
-                  <div>
-                    <div style="display: flex; align-items: center; gap: 0.5rem;">
-                      <span style="font-weight: 800; color: #1e293b;">{{ r.buyer_name }}</span>
-                      <span style="background: #dcfce7; color: #15803d; font-size: 0.7rem; font-weight: 800; padding: 0.15rem 0.45rem; border-radius: 4px;">
-                        ✓ Verified Purchase
-                      </span>
+      <!-- 2. SCORECARD & PRODUCE QUALITY METRICS -->
+      <div style="padding: 1.75rem; border-bottom: 1px solid #e2e8f0; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; align-items: center;">
+        
+        <!-- Big Star Score & 5-to-1 Distribution Bars -->
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; display: flex; gap: 1.5rem; align-items: center;">
+          <div style="text-align: center; min-width: 105px;">
+            <div style="font-size: 3rem; font-weight: 900; color: #0f172a; line-height: 1;">
+              {{ "%.1f"|format(seller_reviews_data.summary.average_rating) if seller_reviews_data and seller_reviews_data.summary.total_reviews > 0 else '5.0' }}
+            </div>
+            <div style="color: #f59e0b; font-size: 1.25rem; margin: 0.25rem 0;">
+              ★★★★★
+            </div>
+            <div style="font-size: 0.75rem; font-weight: 700; color: #64748b;">
+              {{ seller_reviews_data.summary.total_reviews if seller_reviews_data else 0 }} Reviews
+            </div>
+          </div>
+
+          <div style="flex: 1; display: flex; flex-direction: column; gap: 0.35rem;">
+            {% for s in [5, 4, 3, 2, 1] %}
+              {% set cnt = seller_reviews_data.summary.star_breakdown[s] if seller_reviews_data and seller_reviews_data.summary.star_breakdown else 0 %}
+              {% set pct = seller_reviews_data.summary.star_percentages[s] if seller_reviews_data and seller_reviews_data.summary.star_percentages else 0 %}
+              <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.78rem; cursor: pointer;" onclick="setSellerStarFilter({{ s }})" title="Click to filter {{ s }}★ reviews">
+                <span style="width: 30px; font-weight: 700; color: #475569;">{{ s }} ★</span>
+                <div style="flex: 1; height: 8px; background: #f1f5f9; border-radius: 999px; overflow: hidden;">
+                  <div style="height: 100%; width: {{ pct }}%; background: #f59e0b; border-radius: 999px;"></div>
+                </div>
+                <span style="width: 45px; text-align: right; color: #64748b; font-weight: 600;">{{ cnt }} ({{ pct|round(0)|int }}%)</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Category Averages -->
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem;">
+          <div style="font-weight: 800; font-size: 0.85rem; color: #0f172a; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 0.75rem;">
+            Produce & Service Quality Breakdown
+          </div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.6rem 0.75rem;">
+              <div style="font-size: 0.75rem; color: #64748b;">🥦 Produce Quality</div>
+              <div style="font-size: 1.15rem; font-weight: 800; color: #166534;">
+                {{ "%.1f"|format(seller_reviews_data.summary.categories.quality) if seller_reviews_data and seller_reviews_data.summary.categories else '5.0' }}★
+              </div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.6rem 0.75rem;">
+              <div style="font-size: 0.75rem; color: #64748b;">🌿 Freshness</div>
+              <div style="font-size: 1.15rem; font-weight: 800; color: #0284c7;">
+                {{ "%.1f"|format(seller_reviews_data.summary.categories.freshness) if seller_reviews_data and seller_reviews_data.summary.categories else '5.0' }}★
+              </div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.6rem 0.75rem;">
+              <div style="font-size: 0.75rem; color: #64748b;">💬 Communication</div>
+              <div style="font-size: 1.15rem; font-weight: 800; color: #7c3aed;">
+                {{ "%.1f"|format(seller_reviews_data.summary.categories.communication) if seller_reviews_data and seller_reviews_data.summary.categories else '5.0' }}★
+              </div>
+            </div>
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.6rem 0.75rem;">
+              <div style="font-size: 0.75rem; color: #64748b;">💰 Fair Pricing</div>
+              <div style="font-size: 1.15rem; font-weight: 800; color: #b45309;">
+                {{ "%.1f"|format(seller_reviews_data.summary.categories.price) if seller_reviews_data and seller_reviews_data.summary.categories else '5.0' }}★
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- 3. PRODUCT-WISE REVIEW MANAGEMENT SECTION (Requirement 2) -->
+      <div style="padding: 1.75rem; border-bottom: 1px solid #e2e8f0; background: #ffffff;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 1.25rem;">
+          <div>
+            <h3 style="font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+              <span>🌾</span> Product-wise Review Management
+            </h3>
+            <p style="font-size: 0.85rem; color: #64748b; margin: 0.2rem 0 0 0;">
+              Separate ratings and buyer feedback organized individually for each of your crops.
+            </p>
+          </div>
+          <div style="font-size: 0.82rem; font-weight: 700; color: #166534; background: #dcfce7; padding: 0.25rem 0.75rem; border-radius: 20px;">
+            {{ seller_reviews_data.product_groups|length if seller_reviews_data else 0 }} Products Active
+          </div>
+        </div>
+
+        {% if seller_reviews_data and seller_reviews_data.product_groups %}
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem;">
+            {% for grp in seller_reviews_data.product_groups %}
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; transition: transform 0.2s ease, box-shadow 0.2s ease; display: flex; flex-direction: column; justify-content: space-between;" class="product-group-card">
+                <div>
+                  <!-- Product Image + Title Row -->
+                  <div style="display: flex; gap: 0.85rem; align-items: center; margin-bottom: 1rem;">
+                    <div style="width: 58px; height: 58px; border-radius: 10px; overflow: hidden; background: #ffffff; border: 1px solid #cbd5e1; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                      {% if grp.product_photo %}
+                        <img src="{{ url_for('static', filename='uploads/' ~ grp.product_photo if not grp.product_photo.startswith('uploads/') else grp.product_photo) }}" alt="{{ grp.product_name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                      {% else %}
+                        <span style="font-size: 1.75rem;">🥦</span>
+                      {% endif %}
                     </div>
-                    <div style="font-size: 0.78rem; color: #64748b;">
-                      Produce: <strong>{{ r.product_name or 'Direct Purchase' }}</strong> &bull; {{ r.created_at[:10] }}
+                    <div style="flex: 1; min-width: 0;">
+                      <h4 style="font-size: 0.98rem; font-weight: 800; color: #0f172a; margin: 0; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="{{ grp.product_name }}">
+                        {{ grp.product_name }}
+                      </h4>
+                      <div style="display: flex; align-items: center; gap: 0.5rem; margin-top: 0.25rem;">
+                        <span style="background: #fef3c7; color: #b45309; font-size: 0.78rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 6px;">
+                          ★ {{ "%.1f"|format(grp.average_rating) }} / 5.0
+                        </span>
+                        <span style="font-size: 0.78rem; font-weight: 700; color: #64748b;">
+                          {{ grp.total_reviews }} review{{ 's' if grp.total_reviews != 1 else '' }}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <div style="display: flex; align-items: center; gap: 0.25rem;">
-                    <span style="color: #f59e0b; font-size: 1rem;">★</span>
-                    <strong style="font-size: 1rem; color: #1e293b;">{{ r.rating }}</strong>
-                    <span style="color: #94a3b8; font-size: 0.8rem;">/ 5.0</span>
+
+                  <!-- Product Category Ratings Pills -->
+                  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; font-size: 0.75rem; margin-bottom: 0.85rem;">
+                    <div style="background: #ffffff; padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between;">
+                      <span style="color: #64748b;">Quality:</span>
+                      <strong style="color: #166534;">{{ "%.1f"|format(grp.avg_quality) }}★</strong>
+                    </div>
+                    <div style="background: #ffffff; padding: 0.35rem 0.5rem; border-radius: 6px; border: 1px solid #e2e8f0; display: flex; justify-content: space-between;">
+                      <span style="color: #64748b;">Freshness:</span>
+                      <strong style="color: #0284c7;">{{ "%.1f"|format(grp.avg_freshness) }}★</strong>
+                    </div>
+                  </div>
+
+                  <!-- 5-Star Mini Distribution -->
+                  <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 0.5rem 0.65rem; margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; font-size: 0.72rem; color: #64748b; font-weight: 600; margin-bottom: 0.2rem;">
+                      <span>5-Star Ratings</span>
+                      <span>{{ grp.star_counts[5] }} ({{ grp.star_percentages[5] }}%)</span>
+                    </div>
+                    <div style="height: 6px; background: #f1f5f9; border-radius: 999px; overflow: hidden;">
+                      <div style="height: 100%; width: {{ grp.star_percentages[5] }}%; background: #f59e0b; border-radius: 999px;"></div>
+                    </div>
                   </div>
                 </div>
 
-                <p style="color: #334155; font-size: 0.9rem; margin: 0.5rem 0 0.75rem 0;">
-                  "{{ r.comment }}"
-                </p>
-
-                <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; font-size: 0.75rem; color: #64748b;">
-                  <span style="background: #f1f5f9; padding: 0.15rem 0.5rem; border-radius: 4px;">Quality: {{ r.quality_rating }}★</span>
-                  <span style="background: #f1f5f9; padding: 0.15rem 0.5rem; border-radius: 4px;">Freshness: {{ r.freshness_rating }}★</span>
-                  <span style="background: #f1f5f9; padding: 0.15rem 0.5rem; border-radius: 4px;">Communication: {{ r.communication_rating }}★</span>
-                  <span style="background: #f1f5f9; padding: 0.15rem 0.5rem; border-radius: 4px;">Price: {{ r.price_rating }}★</span>
-                </div>
+                <!-- Action: Filter down to this product -->
+                <button type="button" class="btn btn-sm btn-outline-primary" style="width: 100%; font-size: 0.82rem; font-weight: 700; border-radius: 8px;" onclick="filterToSpecificProduct('{{ grp.product_name|replace('\'', '\\\'') }}')">
+                  🔍 View {{ grp.reviews|length }} Review{{ 's' if grp.reviews|length != 1 else '' }} for this Crop
+                </button>
               </div>
             {% endfor %}
           </div>
         {% else %}
-          <div style="text-align: center; padding: 3rem 1.5rem; color: #64748b; background: #f8fafc; border-radius: 12px;">
-            <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">⭐</div>
-            <div style="font-weight: 700; color: #0f172a; margin-bottom: 0.25rem;">No Reviews Received Yet</div>
-            <p style="font-size: 0.85rem; margin: 0;">
-              Once you complete direct meetings and sales, buyers will leave 1-5 star reviews and comments that will appear here.
+          <div style="text-align: center; padding: 2rem 1rem; color: #64748b; background: #f8fafc; border-radius: 10px;">
+            <div style="font-size: 2rem; margin-bottom: 0.25rem;">📦</div>
+            <div style="font-weight: 700; color: #0f172a;">No Product Reviews Logged Yet</div>
+            <p style="font-size: 0.85rem; margin: 0.25rem 0 0 0;">As buyers complete direct orders and meetings, product reviews will automatically populate here.</p>
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- 4. FILTER TOOLBAR & REVIEWS FEED (Requirement 3 & 5) -->
+      <div style="padding: 1.75rem;">
+        
+        <!-- Controls Header: Product Filter, Star Filter, and Sorting -->
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,0.03);">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+            <div>
+              <h3 style="font-size: 1.1rem; font-weight: 800; color: #0f172a; margin: 0;">
+                All Buyer Reviews & Ratings Feed
+              </h3>
+              <span id="sellerReviewCountText" style="font-size: 0.8rem; color: #64748b;">
+                Showing {{ seller_reviews_data.reviews|length if seller_reviews_data else 0 }} of {{ seller_reviews_data.summary.total_reviews if seller_reviews_data else 0 }} reviews
+              </span>
+            </div>
+
+            <!-- Sorting Dropdown (Requirement 3) -->
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+              <label for="sellerReviewSortOrder" style="font-size: 0.82rem; font-weight: 700; color: #475569;">Sort By:</label>
+              <select id="sellerReviewSortOrder" class="filter-select" style="height: 36px; font-size: 0.82rem; padding: 0.2rem 0.75rem; border-radius: 8px;" onchange="applySellerReviewFilters()">
+                <option value="latest" selected>Latest Reviews</option>
+                <option value="highest">Highest Ratings (5 ★ → 1 ★)</option>
+                <option value="lowest">Lowest Ratings (1 ★ → 5 ★)</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Product Filter + Star Filter Chips -->
+          <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+            
+            <!-- Product Filter Dropdown -->
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+              <span style="font-size: 0.82rem; font-weight: 700; color: #475569; min-width: 95px;">Filter Product:</span>
+              <select id="sellerReviewProductFilter" class="filter-select" style="flex: 1; min-width: 200px; height: 36px; font-size: 0.82rem; padding: 0.2rem 0.75rem; border-radius: 8px;" onchange="applySellerReviewFilters()">
+                <option value="all" selected>All Products ({{ seller_reviews_data.summary.total_reviews if seller_reviews_data else 0 }} total)</option>
+                {% if seller_reviews_data and seller_reviews_data.product_groups %}
+                  {% for grp in seller_reviews_data.product_groups %}
+                    <option value="{{ grp.product_name }}">{{ grp.product_name }} ({{ grp.total_reviews }} reviews &bull; {{ grp.average_rating }}★)</option>
+                  {% endfor %}
+                {% endif %}
+              </select>
+            </div>
+
+            <!-- Star Filter Chips (Requirement 3) -->
+            <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
+              <span style="font-size: 0.82rem; font-weight: 700; color: #475569; min-width: 95px;">Filter Rating:</span>
+              <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;" id="sellerStarFilterGroup">
+                <button type="button" class="seller-star-chip active" data-star="all" onclick="setSellerStarFilter('all')">
+                  All Reviews
+                </button>
+                <button type="button" class="seller-star-chip" data-star="5" onclick="setSellerStarFilter(5)">
+                  5 Star ({{ seller_reviews_data.summary.five_star_reviews if seller_reviews_data else 0 }})
+                </button>
+                <button type="button" class="seller-star-chip" data-star="4" onclick="setSellerStarFilter(4)">
+                  4 Star ({{ seller_reviews_data.summary.four_star_reviews if seller_reviews_data else 0 }})
+                </button>
+                <button type="button" class="seller-star-chip" data-star="3" onclick="setSellerStarFilter(3)">
+                  3 Star ({{ seller_reviews_data.summary.three_star_reviews if seller_reviews_data else 0 }})
+                </button>
+                <button type="button" class="seller-star-chip" data-star="2" onclick="setSellerStarFilter(2)">
+                  2 Star ({{ seller_reviews_data.summary.two_star_reviews if seller_reviews_data else 0 }})
+                </button>
+                <button type="button" class="seller-star-chip" data-star="1" onclick="setSellerStarFilter(1)">
+                  1 Star ({{ seller_reviews_data.summary.one_star_reviews if seller_reviews_data else 0 }})
+                </button>
+                <button type="button" class="seller-star-chip" data-star="photo" onclick="setSellerStarFilter('photo')">
+                  📷 With Photos ({{ seller_reviews_data.summary.photos_count if seller_reviews_data else 0 }})
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- 5. INDIVIDUAL REVIEW CARDS GRID (Requirement 1, 4, 5) -->
+        {% if seller_reviews_data and seller_reviews_data.reviews %}
+          <div id="sellerReviewsCardsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 1.25rem;">
+            {% for r in seller_reviews_data.reviews %}
+              <div class="seller-review-card" 
+                   data-id="{{ r.id }}"
+                   data-product="{{ r.product_name or '' }}"
+                   data-rating="{{ r.rating|round|int }}"
+                   data-has-photo="{{ 'true' if r.review_photo else 'false' }}"
+                   data-date="{{ r.created_at }}"
+                   style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 4px rgba(0,0,0,0.03); display: flex; flex-direction: column; justify-content: space-between;">
+                
+                <div>
+                  <!-- Top Row: Buyer Avatar, Name, Verification Badge & Date -->
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.75rem; margin-bottom: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.65rem;">
+                      <div style="width: 40px; height: 40px; border-radius: 50%; background: #e0f2fe; color: #0284c7; font-weight: 800; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border: 1px solid #bae6fd;">
+                        {{ r.buyer_initials or 'VB' }}
+                      </div>
+                      <div>
+                        <div style="font-weight: 800; color: #0f172a; font-size: 0.92rem; line-height: 1.2;">
+                          {{ r.buyer_name or 'Verified Buyer' }}
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 0.35rem; margin-top: 0.15rem;">
+                          <span style="background: #dcfce7; color: #15803d; font-size: 0.68rem; font-weight: 800; padding: 0.1rem 0.4rem; border-radius: 4px;">
+                            ✓ Verified Purchase
+                          </span>
+                          <span style="font-size: 0.72rem; color: #64748b;">
+                            &bull; {{ r.created_at[:10] }}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 5-Star Rating -->
+                    <div style="text-align: right; flex-shrink: 0;">
+                      <div style="color: #f59e0b; font-size: 0.95rem; line-height: 1;">
+                        {% set r_rnd = (r.rating|round|int) %}
+                        {% for i in range(1, 6) %}
+                          {% if i <= r_rnd %}★{% else %}☆{% endif %}
+                        {% endfor %}
+                      </div>
+                      <div style="font-size: 0.75rem; font-weight: 800; color: #0f172a; margin-top: 0.15rem;">
+                        {{ "%.1f"|format(r.rating) }} / 5.0
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Product Reference Banner (Requirement 1: Show product name and image) -->
+                  <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.5rem 0.65rem; display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem;">
+                    <div style="width: 32px; height: 32px; border-radius: 6px; overflow: hidden; background: #ffffff; border: 1px solid #cbd5e1; flex-shrink: 0; display: flex; align-items: center; justify-content: center;">
+                      {% if r.product_photo %}
+                        <img src="{{ url_for('static', filename='uploads/' ~ r.product_photo if not r.product_photo.startswith('uploads/') else r.product_photo) }}" alt="{{ r.product_name }}" style="width: 100%; height: 100%; object-fit: cover;" onerror="this.style.display='none'">
+                      {% else %}
+                        <span style="font-size: 1rem;">🥦</span>
+                      {% endif %}
+                    </div>
+                    <div style="font-size: 0.8rem; font-weight: 700; color: #1e293b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                      Product: <strong>{{ r.product_name or 'Agricultural Produce' }}</strong>
+                    </div>
+                  </div>
+
+                  <!-- Written Buyer Feedback (Requirement 1) -->
+                  <div style="margin-bottom: 0.85rem;">
+                    <p style="color: #334155; font-size: 0.88rem; line-height: 1.55; margin: 0; white-space: pre-line;">
+                      "{{ r.comment }}"
+                    </p>
+                  </div>
+
+                  <!-- Optional Buyer Uploaded Produce Photo (Requirement 1) -->
+                  {% if r.review_photo %}
+                    <div style="margin-bottom: 0.85rem; padding: 0.5rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px;">
+                      <div style="font-size: 0.72rem; font-weight: 700; color: #166534; margin-bottom: 0.35rem; display: flex; align-items: center; gap: 0.35rem;">
+                        <span>📷</span> Delivered Produce Photo Uploaded by Buyer:
+                      </div>
+                      <img src="{{ url_for('static', filename='uploads/' ~ r.review_photo if not r.review_photo.startswith('uploads/') else r.review_photo) }}" 
+                           alt="Delivered produce by {{ r.buyer_name }}" 
+                           style="width: 72px; height: 72px; object-fit: cover; border-radius: 6px; border: 1px solid #cbd5e1; cursor: pointer; transition: transform 0.2s ease;" 
+                           onclick="openSellerPhotoLightbox(this.src)" 
+                           title="Click to view full photo">
+                    </div>
+                  {% endif %}
+                </div>
+
+                <!-- Category Breakdown Tags -->
+                <div style="display: flex; gap: 0.35rem; flex-wrap: wrap; font-size: 0.72rem; color: #64748b; padding-top: 0.65rem; border-top: 1px dashed #e2e8f0;">
+                  <span style="background: #f1f5f9; padding: 0.15rem 0.45rem; border-radius: 4px;">Quality: {{ r.quality_rating }}★</span>
+                  <span style="background: #f1f5f9; padding: 0.15rem 0.45rem; border-radius: 4px;">Freshness: {{ r.freshness_rating }}★</span>
+                  <span style="background: #f1f5f9; padding: 0.15rem 0.45rem; border-radius: 4px;">Comms: {{ r.communication_rating }}★</span>
+                  <span style="background: #f1f5f9; padding: 0.15rem 0.45rem; border-radius: 4px;">Price: {{ r.price_rating }}★</span>
+                </div>
+
+              </div>
+            {% endfor %}
+          </div>
+
+          <!-- Empty State when Filter Produces 0 Results -->
+          <div id="sellerReviewsEmptyFilter" style="display: none; text-align: center; padding: 3rem 1.5rem; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 12px; margin-top: 1rem;">
+            <div style="font-size: 2.25rem; margin-bottom: 0.5rem;">🔍</div>
+            <h4 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0 0 0.25rem 0;">No Reviews Found for this Filter</h4>
+            <p style="font-size: 0.85rem; color: #64748b; margin: 0 0 1rem 0;">Try selecting a different star rating or product.</p>
+            <button type="button" class="btn btn-sm btn-primary" onclick="resetSellerReviewFilters()">Reset Filters</button>
+          </div>
+
+        {% else %}
+          <!-- Zero Reviews Overall -->
+          <div style="text-align: center; padding: 3.5rem 1.5rem; color: #64748b; background: #f8fafc; border-radius: 12px; border: 1px dashed #cbd5e1;">
+            <div style="font-size: 3rem; margin-bottom: 0.5rem;">⭐</div>
+            <div style="font-weight: 800; color: #0f172a; font-size: 1.15rem; margin-bottom: 0.25rem;">No Reviews Received Yet</div>
+            <p style="font-size: 0.88rem; max-width: 480px; margin: 0 auto;">
+              Once buyers complete deliveries, direct farmgate meetings, or purchase orders for your crops, verified reviews and photo ratings will automatically display here.
             </p>
           </div>
         {% endif %}
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PHOTO LIGHTBOX MODAL -->
+  <div id="sellerPhotoLightboxModal" style="display: none; position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85); z-index: 10000; align-items: center; justify-content: center; padding: 1.5rem; backdrop-filter: blur(4px);" onclick="closeSellerPhotoLightbox()">
+    <div style="max-width: 600px; width: 100%; background: #ffffff; border-radius: 14px; overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.35);" onclick="event.stopPropagation()">
+      <div style="padding: 0.75rem 1rem; background: #0f172a; color: white; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 0.88rem; font-weight: 700;">📷 Delivered Produce Photo</span>
+        <button type="button" onclick="closeSellerPhotoLightbox()" style="background: none; border: none; color: white; font-size: 1.4rem; cursor: pointer; line-height: 1;">&times;</button>
+      </div>
+      <div style="padding: 1rem; text-align: center; background: #000000;">
+        <img id="sellerLightboxImg" src="" alt="Enlarged produce preview" style="max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 4px;">
       </div>
     </div>
   </div>
@@ -2084,5 +2417,130 @@ document.addEventListener('DOMContentLoaded', function() {
   // Initialize counts on load
   updateOrderTabCounts();
 
+  /* ========================================================
+     PRODUCT REVIEWS & RATINGS DASHBOARD SCRIPT & HANDLERS
+     ======================================================== */
+  window.currentSellerStarFilter = 'all';
+
+  window.setSellerStarFilter = function(starVal) {
+    window.currentSellerStarFilter = starVal.toString();
+    document.querySelectorAll('#sellerStarFilterGroup .seller-star-chip').forEach(btn => {
+      btn.classList.toggle('active', btn.getAttribute('data-star') === window.currentSellerStarFilter);
+    });
+    applySellerReviewFilters();
+  };
+
+  window.filterToSpecificProduct = function(productName) {
+    const prodSelect = document.getElementById('sellerReviewProductFilter');
+    if (prodSelect) {
+      prodSelect.value = productName;
+      applySellerReviewFilters();
+      const feed = document.getElementById('sellerReviewsCardsContainer');
+      if (feed) feed.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  window.resetSellerReviewFilters = function() {
+    const prodSelect = document.getElementById('sellerReviewProductFilter');
+    if (prodSelect) prodSelect.value = 'all';
+    const sortSelect = document.getElementById('sellerReviewSortOrder');
+    if (sortSelect) sortSelect.value = 'latest';
+    setSellerStarFilter('all');
+  };
+
+  window.applySellerReviewFilters = function() {
+    const prodFilter = (document.getElementById('sellerReviewProductFilter')?.value || 'all').toLowerCase();
+    const sortOrder = document.getElementById('sellerReviewSortOrder')?.value || 'latest';
+    const container = document.getElementById('sellerReviewsCardsContainer');
+    if (!container) return;
+
+    const cards = Array.from(container.querySelectorAll('.seller-review-card'));
+    let visibleCount = 0;
+
+    cards.forEach(card => {
+      const cardProd = (card.getAttribute('data-product') || '').toLowerCase();
+      const cardRating = card.getAttribute('data-rating') || '5';
+      const cardHasPhoto = card.getAttribute('data-has-photo') === 'true';
+
+      const prodMatch = (prodFilter === 'all' || cardProd === prodFilter || cardProd.includes(prodFilter));
+
+      let starMatch = true;
+      if (window.currentSellerStarFilter === 'photo') {
+        starMatch = cardHasPhoto;
+      } else if (window.currentSellerStarFilter !== 'all') {
+        starMatch = (cardRating === window.currentSellerStarFilter);
+      }
+
+      if (prodMatch && starMatch) {
+        card.style.display = 'flex';
+        visibleCount++;
+      } else {
+        card.style.display = 'none';
+      }
+    });
+
+    cards.sort((a, b) => {
+      if (sortOrder === 'highest') {
+        return parseFloat(b.getAttribute('data-rating')) - parseFloat(a.getAttribute('data-rating'));
+      } else if (sortOrder === 'lowest') {
+        return parseFloat(a.getAttribute('data-rating')) - parseFloat(b.getAttribute('data-rating'));
+      } else {
+        return (b.getAttribute('data-date') || '').localeCompare(a.getAttribute('data-date') || '');
+      }
+    });
+    cards.forEach(card => container.appendChild(card));
+
+    const countText = document.getElementById('sellerReviewCountText');
+    if (countText) {
+      countText.innerText = `Showing ${visibleCount} of ${cards.length} reviews`;
+    }
+
+    const emptyBox = document.getElementById('sellerReviewsEmptyFilter');
+    if (emptyBox) {
+      emptyBox.style.display = (visibleCount === 0 && cards.length > 0) ? 'block' : 'none';
+    }
+  };
+
+  window.openSellerPhotoLightbox = function(src) {
+    const modal = document.getElementById('sellerPhotoLightboxModal');
+    const img = document.getElementById('sellerLightboxImg');
+    if (modal && img) {
+      img.src = src;
+      modal.style.display = 'flex';
+    }
+  };
+
+  window.closeSellerPhotoLightbox = function() {
+    const modal = document.getElementById('sellerPhotoLightboxModal');
+    if (modal) modal.style.display = 'none';
+  };
 </script>
+
+<style>
+.seller-star-chip {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0.35rem 0.75rem;
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.seller-star-chip:hover {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+.seller-star-chip.active {
+  background: #f59e0b;
+  border-color: #d97706;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(245,158,11,0.3);
+}
+.product-group-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+</style>
 {% endblock %}
