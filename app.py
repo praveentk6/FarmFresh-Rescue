@@ -5062,6 +5062,7 @@ def browse_rescue_products():
     min_qty = request.args.get('min_qty', '').strip()
     search_q = request.args.get('q', '').strip()
     sort_by = request.args.get('sort', 'recent').strip()
+    only_available = request.args.get('only_available', '1').strip()
 
     filters = {
         'category': category,
@@ -5070,7 +5071,8 @@ def browse_rescue_products():
         'min_price': min_price,
         'max_price': max_price,
         'min_qty': min_qty,
-        'search_q': search_q
+        'search_q': search_q,
+        'only_available': (only_available in ('1', 'true', 'on', True))
     }
 
     products = get_shared_rescue_products(filters, sort_by=sort_by)

@@ -601,5 +601,104 @@ class TestRescheduleVerificationReviews(unittest.TestCase):
         self.assertGreaterEqual(len(json_resp['product_groups']), 1)
         self.assertEqual(json_resp['product_groups'][0]['product_name'], "Ponni Rice Harvest")
 
+    def test_11_expanded_rescue_market_products(self):
+        """Test the expanded Rescue Market products (30 items), images, filters, sorting, and UI."""
+        import os
+
+        # 1. Run seeding to ensure all 30 products are up-to-date
+        database.seed_expanded_rescue_products()
+
+        # 2. Check all 30 agricultural products are accounted for
+        expected_crops = [
+            # Fresh Vegetables (12)
+            ('Tomato', 'tomatoes.jpg'),
+            ('Onion', 'onions.jpg'),
+            ('Potato', 'potatoes.jpg'),
+            ('Carrot', 'carrots.jpg'),
+            ('Cabbage', 'cabbage.jpg'),
+            ('Cauliflower', 'cauliflower.jpg'),
+            ('Brinjal', 'brinjal.jpg'),
+            ('Green Chilli', 'chillies.jpg'),
+            ('Lady\'s Finger', 'ladysfinger.jpg'),
+            ('Beans', 'beans.jpg'),
+            ('Drumstick', 'drumstick.jpg'),
+            ('Beetroot', 'beetroot.jpg'),
+
+            # Fresh Fruits (10)
+            ('Banana', 'banana.jpg'),
+            ('Mango', 'mango.jpg'),
+            ('Apple', 'apple.jpg'),
+            ('Orange', 'orange.jpg'),
+            ('Papaya', 'papaya.jpg'),
+            ('Watermelon', 'watermelon.jpg'),
+            ('Guava', 'guava.jpg'),
+            ('Pineapple', 'pineapple.jpg'),
+            ('Grapes', 'grapes.jpg'),
+            ('Pomegranate', 'pomegranate.jpg'),
+
+            # Other Farm Products (8)
+            ('Coconut', 'coconuts.jpg'),
+            ('Groundnut', 'groundnut.jpg'),
+            ('Rice', 'rice.jpg'),
+            ('Maize', 'maize.jpg'),
+            ('Wheat', 'wheat.jpg'),
+            ('Green Leaves', 'green_leaves.jpg'),
+            ('Coriander Leaves', 'coriander.jpg'),
+            ('Curry Leaves', 'curry_leaves.jpg'),
+        ]
+
+        # Verify matching image files exist in static/uploads
+        for crop_name, img_file in expected_crops:
+            img_path = os.path.join('static', 'uploads', img_file)
+            self.assertTrue(os.path.exists(img_path), f"Missing image file: {img_path} for {crop_name}")
+            self.assertGreater(os.path.getsize(img_path), 0, f"Empty image file: {img_path}")
+
+        # 3. Verify category filtering
+        all_items = database.get_shared_rescue_products({'category': 'All'})
+        self.assertGreaterEqual(len(all_items), 30)
+
+        veg_items = database.get_shared_rescue_products({'category': 'Fresh Vegetables'})
+        self.assertGreaterEqual(len(veg_items), 12)
+
+        fruit_items = database.get_shared_rescue_products({'category': 'Fresh Fruits'})
+        self.assertGreaterEqual(len(fruit_items), 10)
+
+        other_items = database.get_shared_rescue_products({'category': 'Other Farm Products'})
+        self.assertGreaterEqual(len(other_items), 8)
+
+        # 4. Verify sorting
+        lowest_price_items = database.get_shared_rescue_products({'category': 'All'}, sort_by='lowest_price')
+        low_prices = [p['rescue_price'] for p in lowest_price_items]
+        self.assertEqual(low_prices, sorted(low_prices))
+
+        highest_price_items = database.get_shared_rescue_products({'category': 'All'}, sort_by='highest_price')
+        high_prices = [p['rescue_price'] for p in highest_price_items]
+        self.assertEqual(high_prices, sorted(high_prices, reverse=True))
+
+        # 5. Verify search functionality
+        tomato_results = database.get_shared_rescue_products({'search_q': 'Tomato'})
+        self.assertGreaterEqual(len(tomato_results), 1)
+        self.assertTrue(any('Tomato' in p['product_name'] for p in tomato_results))
+
+        # 6. Verify HTTP GET /rescue-products page renders cleanly
+        from app import app
+        app.config['TESTING'] = True
+        client = app.test_client()
+        res = client.get('/rescue-products')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(b"Rescue Products Marketplace", res.data)
+        self.assertIn(b"Fresh Vegetables", res.data)
+        self.assertIn(b"Fresh Fruits", res.data)
+        self.assertIn(b"Other Farm Products", res.data)
+        self.assertIn(b"Order Now", res.data)
+        self.assertIn(b"Schedule Direct Meeting", res.data)
+
+        # 7. Verify product details page for first product
+        first_pid = all_items[0]['id']
+        res_detail = client.get(f'/rescue-product/{first_pid}')
+        self.assertEqual(res_detail.status_code, 200)
+        self.assertIn(b"FARMER INFORMATION", res_detail.data)
+        self.assertIn(b"Schedule Direct Meeting", res_detail.data)
+
 if __name__ == '__main__':
     unittest.main()

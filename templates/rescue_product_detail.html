@@ -176,8 +176,15 @@
               ✏️ Edit Product Details
             </a>
           {% else %}
+            <!-- Direct Purchase / Online Order Option -->
+            {% if product.listing_id %}
+              <a href="{{ url_for('checkout_direct', listing_id=product.listing_id) }}" class="btn" style="background: #16a34a; color: white; padding: 0.85rem; font-size: 1.05rem; font-weight: 800; text-align: center; border-radius: 10px; text-decoration: none; box-shadow: 0 4px 15px rgba(22, 163, 74, 0.35);">
+                🛒 Order Now (Direct Checkout & Delivery)
+              </a>
+            {% endif %}
+
             <!-- Schedule Direct Face-to-Face Meeting -->
-            <a href="{{ url_for('schedule_direct_meeting', product_id=product.id) }}" class="btn btn-primary" style="padding: 0.85rem; font-size: 1.05rem; font-weight: 800; text-align: center; border-radius: 10px; box-shadow: 0 4px 15px rgba(22, 163, 74, 0.3);">
+            <a href="{{ url_for('schedule_direct_meeting', product_id=product.id) }}" class="btn" style="background: #f0fdf4; color: #15803d; border: 2px solid #86efac; padding: 0.85rem; font-size: 1.05rem; font-weight: 800; text-align: center; border-radius: 10px; text-decoration: none;">
               🤝 Schedule Direct Meeting at Farm
             </a>
 

@@ -848,6 +848,7 @@ def init_db():
         seed_market_prices(conn)
         seed_weather_alerts(conn)
         seed_sample_buyer_reviews(conn)
+        seed_expanded_rescue_products(conn)
     except Exception as _e:
         pass
 
@@ -3123,8 +3124,16 @@ def get_shared_rescue_products(filters=None, sort_by='recent'):
         filters = filters or {}
 
         if filters.get('category') and filters['category'] != 'All':
-            query += " AND rp.category = ?"
-            params.append(filters['category'])
+            cat = filters['category']
+            if cat in ('Fresh Vegetables', 'Vegetables'):
+                query += " AND rp.category IN ('Vegetables', 'Leafy Vegetables')"
+            elif cat in ('Fresh Fruits', 'Fruits'):
+                query += " AND rp.category = 'Fruits'"
+            elif cat in ('Other Farm Products', 'Other Products'):
+                query += " AND rp.category IN ('Grains', 'Other Agricultural Products', 'Leafy Vegetables')"
+            else:
+                query += " AND rp.category = ?"
+                params.append(cat)
 
         if filters.get('district') and filters['district'] != 'All':
             query += " AND (rp.district LIKE ? OR rp.farm_location LIKE ?)"
@@ -3157,12 +3166,17 @@ def get_shared_rescue_products(filters=None, sort_by='recent'):
 
         if filters.get('search_q'):
             q_pat = f"%{filters['search_q'].strip()}%"
-            query += " AND (rp.product_name LIKE ? OR rp.description LIKE ? OR rp.farmer_name LIKE ? OR rp.farm_location LIKE ?)"
-            params.extend([q_pat, q_pat, q_pat, q_pat])
+            query += " AND (rp.product_name LIKE ? OR rp.description LIKE ? OR rp.farmer_name LIKE ? OR rp.farm_location LIKE ? OR rp.district LIKE ? OR rp.category LIKE ?)"
+            params.extend([q_pat, q_pat, q_pat, q_pat, q_pat, q_pat])
+
+        if filters.get('only_available') in (True, 'true', '1', 'on', 1):
+            query += " AND rp.status = 'Available' AND rp.quantity > 0"
 
         # Sorting
         if sort_by == 'lowest_price':
             query += " ORDER BY rp.rescue_price ASC, rp.created_at DESC"
+        elif sort_by == 'highest_price':
+            query += " ORDER BY rp.rescue_price DESC, rp.created_at DESC"
         elif sort_by == 'highest_qty':
             query += " ORDER BY rp.quantity DESC, rp.created_at DESC"
         elif sort_by == 'discount':
@@ -5781,3 +5795,442 @@ def seed_sample_buyer_reviews(conn=None):
             conn.close()
     except Exception as e:
         print(f"Error seeding sample buyer reviews: {e}")
+
+def seed_expanded_rescue_products(conn=None):
+    """
+    Seed and synchronize all 30 distinct agricultural rescue products covering:
+    - Fresh Vegetables (12): Tomato, Onion, Potato, Carrot, Cabbage, Cauliflower,
+                            Brinjal, Green Chilli, Lady's Finger, Beans, Drumstick, Beetroot
+    - Fresh Fruits (10): Banana, Mango, Apple, Orange, Papaya, Watermelon, Guava,
+                        Pineapple, Grapes, Pomegranate
+    - Other Farm Products (8): Coconut, Groundnut, Rice, Maize, Wheat, Green Leaves,
+                              Coriander Leaves, Curry Leaves
+    All with high-res matching images, genuine farmer details, verified badges,
+    and valid future expiry dates.
+    """
+    from datetime import date, timedelta
+    close_at_end = False
+    try:
+        if conn is None:
+            conn = get_db()
+            close_at_end = True
+        cursor = conn.cursor()
+
+        # 1. Ensure core farmers are verified sellers
+        cursor.execute("""
+            UPDATE users
+            SET is_verified_seller = 1,
+                verification_status = 'Verified'
+            WHERE id IN (2, 3, 4, 5)
+        """)
+
+        today = date.today()
+        h_date = (today - timedelta(days=1)).strftime('%Y-%m-%d')
+        exp_date = (today + timedelta(days=25)).strftime('%Y-%m-%d')
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        # 30 Curated agricultural products with realistic prices & details
+        catalog = [
+            # --- FRESH VEGETABLES (12) ---
+            {
+                'name': 'Krishnagiri Hybrid Country Tomatoes',
+                'category': 'Vegetables',
+                'photo': 'tomatoes.jpg',
+                'farmer_id': 2, 'farmer_name': 'Muthuvel Karuppan', 'phone': '9842112345',
+                'location': 'Rayakottai Road, Krishnagiri', 'district': 'Krishnagiri', 'pin': '635001',
+                'orig_price': 28.0, 'rescue_price': 18.0, 'qty': 500.0,
+                'grade': 'Grade A (AI Inspected)',
+                'desc': 'Naturally ripened farm-fresh country tomatoes. Juicy and firm texture, ideal for commercial kitchens, sauces, and retail sale. Rescued directly from post-harvest surplus.'
+            },
+            {
+                'name': 'Dindigul Bellary Small Onions (Shallots / Chinna Vengayam)',
+                'category': 'Vegetables',
+                'photo': 'onions.jpg',
+                'farmer_id': 3, 'farmer_name': 'Selvi Shanmugam', 'phone': '9876543210',
+                'location': 'Ottanchathiram Farm Valley', 'district': 'Dindigul', 'pin': '624619',
+                'orig_price': 65.0, 'rescue_price': 42.0, 'qty': 450.0,
+                'grade': 'Grade A (Export Surplus)',
+                'desc': 'Crisp, pungent small onions harvested in Dindigul farm belts. Cleaned, dried outer skin, long shelf life. Premium culinary grade offered at rescue price.'
+            },
+            {
+                'name': 'Ooty Mountain Crispy Potatoes',
+                'category': 'Vegetables',
+                'photo': 'potatoes.jpg',
+                'farmer_id': 4, 'farmer_name': 'Ramanathan K.', 'phone': '9789012345',
+                'location': 'Ketti Valley', 'district': 'Nilgiris', 'pin': '643215',
+                'orig_price': 45.0, 'rescue_price': 30.0, 'qty': 600.0,
+                'grade': 'Grade A',
+                'desc': 'High-altitude mountain grown potatoes from Ooty. Firm texture, low moisture, superior cooking quality for frying, curries, and bulk food services.'
+            },
+            {
+                'name': 'Ooty Mountain Crispy Carrots',
+                'category': 'Vegetables',
+                'photo': 'carrots.jpg',
+                'farmer_id': 4, 'farmer_name': 'Ramanathan K.', 'phone': '9789012345',
+                'location': 'Kotagiri Hillside', 'district': 'Nilgiris', 'pin': '643217',
+                'orig_price': 50.0, 'rescue_price': 35.0, 'qty': 350.0,
+                'grade': 'Grade A (AI Inspected)',
+                'desc': 'Crunchy, deep-orange Nilgiris carrots packed with sweetness and vitamins. Freshly washed, graded, and packed at farmgate to prevent transit loss.'
+            },
+            {
+                'name': 'Fresh Green Field Cabbage',
+                'category': 'Vegetables',
+                'photo': 'cabbage.jpg',
+                'farmer_id': 2, 'farmer_name': 'Muthuvel Karuppan', 'phone': '9842112345',
+                'location': 'Thally Agro Valley', 'district': 'Krishnagiri', 'pin': '635118',
+                'orig_price': 25.0, 'rescue_price': 15.0, 'qty': 400.0,
+                'grade': 'Grade A',
+                'desc': 'Tight, dense green cabbage heads harvested early morning. Pure, crisp leaves with no pesticide residues. Ideal for hotels, hostels, and food vendors.'
+            },
+            {
+                'name': 'Crisp Snowball Cauliflower',
+                'category': 'Vegetables',
+                'photo': 'cauliflower.jpg',
+                'farmer_id': 3, 'farmer_name': 'Selvi Shanmugam', 'phone': '9876543210',
+                'location': 'Oddanchatram Foothills', 'district': 'Dindigul', 'pin': '624619',
+                'orig_price': 40.0, 'rescue_price': 26.0, 'qty': 300.0,
+                'grade': 'Grade A',
+                'desc': 'Compact, immaculate white florets with vibrant green outer protection leaves. Surplus harvest rescued to ensure immediate consumption while fresh.'
+            },
+            {
+                'name': 'Country Purple Brinjal (Kathirikai)',
+                'category': 'Vegetables',
+                'photo': 'brinjal.jpg',
+                'farmer_id': 5, 'farmer_name': 'Kandasamy P.', 'phone': '9488123456',
+                'location': 'Alanganallur Greenfields', 'district': 'Madurai', 'pin': '625501',
+                'orig_price': 38.0, 'rescue_price': 24.0, 'qty': 280.0,
+                'grade': 'Grade A',
+                'desc': 'Tender, seedless purple brinjals with glossy skin. High cooking yield and authentic traditional taste. Direct farmgate pickup available.'
+            },
+            {
+                'name': 'Ottanchathiram Fresh Green Chillies',
+                'category': 'Vegetables',
+                'photo': 'chillies.jpg',
+                'farmer_id': 3, 'farmer_name': 'Selvi Shanmugam', 'phone': '9876543210',
+                'location': 'Ottanchathiram Market Hub', 'district': 'Dindigul', 'pin': '624619',
+                'orig_price': 45.0, 'rescue_price': 28.0, 'qty': 220.0,
+                'grade': 'Grade A',
+                'desc': 'Pungent, vibrant spicy green chillies. Plucked within 24 hours to preserve moisture and heat level. Suitable for spice extractors and wholesale markets.'
+            },
+            {
+                'name': 'Tender Lady\'s Finger (Okra / Vendakkai)',
+                'category': 'Vegetables',
+                'photo': 'ladysfinger.jpg',
+                'farmer_id': 5, 'farmer_name': 'Kandasamy P.', 'phone': '9488123456',
+                'location': 'Bhavani Riverside Farms', 'district': 'Erode', 'pin': '638301',
+                'orig_price': 42.0, 'rescue_price': 26.0, 'qty': 250.0,
+                'grade': 'Grade A',
+                'desc': 'Snappy, fiber-free tender okras. Uniform medium size, rich green color, perfect for south Indian culinary recipes and bulk catering.'
+            },
+            {
+                'name': 'French Green Cluster Beans',
+                'category': 'Vegetables',
+                'photo': 'beans.jpg',
+                'farmer_id': 3, 'farmer_name': 'Selvi Shanmugam', 'phone': '9876543210',
+                'location': 'Kodaikanal Valley Farms', 'district': 'Dindigul', 'pin': '624101',
+                'orig_price': 55.0, 'rescue_price': 36.0, 'qty': 260.0,
+                'grade': 'Grade A (AI Inspected)',
+                'desc': 'Stringless, succulent French green beans. High crunch and crispness, harvested at early maturity to guarantee sweetness and tenderness.'
+            },
+            {
+                'name': 'Muringai Hybrid Fresh Drumsticks',
+                'category': 'Vegetables',
+                'photo': 'drumstick.jpg',
+                'farmer_id': 5, 'farmer_name': 'Kandasamy P.', 'phone': '9488123456',
+                'location': 'Dharapuram Riverbank', 'district': 'Tirupur', 'pin': '638656',
+                'orig_price': 60.0, 'rescue_price': 38.0, 'qty': 320.0,
+                'grade': 'Grade A',
+                'desc': 'Pulp-rich, tender drumsticks with soft edible seeds. Famous Kongu-belt variety offering rich iron and aroma for sambar and soups.'
+            },
+            {
+                'name': 'Ooty Crimson Sweet Beetroot',
+                'category': 'Vegetables',
+                'photo': 'beetroot.jpg',
+                'farmer_id': 4, 'farmer_name': 'Ramanathan K.', 'phone': '9789012345',
+                'location': 'Coonoor Hill Station', 'district': 'Nilgiris', 'pin': '643101',
+                'orig_price': 48.0, 'rescue_price': 30.0, 'qty': 310.0,
+                'grade': 'Grade A',
+                'desc': 'Deep-red, round table beetroots cultivated in cool mountain climates. Rich in natural sweetness and nitrates, harvested with foliage intact.'
+            },
+
+            # --- FRESH FRUITS (10) ---
+            {
+                'name': 'G9 Grand Naine Cavendish Bananas',
+                'category': 'Fruits',
+                'photo': 'banana.jpg',
+                'farmer_id': 2, 'farmer_name': 'Muthuvel Karuppan', 'phone': '9842112345',
+                'location': 'Thottiyam Riverbank', 'district': 'Tiruchirappalli', 'pin': '621215',
+                'orig_price': 35.0, 'rescue_price': 22.0, 'qty': 800.0,
+                'grade': 'Grade A (Naturally Ripened)',
+                'desc': 'Golden yellow, chemical-free Cavendish bananas. Smooth creamy texture, natural ripening in farm chambers, zero calcium carbide.'
+            },
+            {
+                'name': 'Alphonso & Banganapalli Sweet Mangoes',
+                'category': 'Fruits',
+                'photo': 'mango.jpg',
+                'farmer_id': 2, 'farmer_name': 'Muthuvel Karuppan', 'phone': '9842112345',
+                'location': 'Pochampalli Orchard Belts', 'district': 'Krishnagiri', 'pin': '635206',
+                'orig_price': 120.0, 'rescue_price': 75.0, 'qty': 550.0,
+                'grade': 'Grade A (Export Grade)',
+                'desc': 'Sun-ripened orchard mangoes with aromatic fragrance and thick sweet pulp. Tree-ripened surplus rescued directly for juice processors and retail.'
+            },
+            {
+                'name': 'Fresh Crisp Royal Gala Apples',
+                'category': 'Fruits',
+                'photo': 'apple.jpg',
+                'farmer_id': 3, 'farmer_name': 'Selvi Shanmugam', 'phone': '9876543210',
+                'location': 'Kodaikanal Hill Orchards', 'district': 'Dindigul', 'pin': '624101',
+                'orig_price': 160.0, 'rescue_price': 110.0, 'qty': 400.0,
+                'grade': 'Grade A',
+                'desc': 'Crunchy, aromatic red apples with thin skin and refreshing sweet-tart balance. Mountain orchard harvest offered at significant rescue savings.'
+            },
+            {
+                'name': 'Nagpur Sweet Mandarin Oranges',
+                'category': 'Fruits',
+                'photo': 'orange.jpg',
+                'farmer_id': 3, 'farmer_name': 'Selvi Shanmugam', 'phone': '9876543210',
+                'location': 'Periyakulam Foothills', 'district': 'Theni', 'pin': '625601',
+                'orig_price': 80.0, 'rescue_price': 52.0, 'qty': 480.0,
+                'grade': 'Grade A',
+                'desc': 'Juice-rich, easily peeled mandarin oranges. Packed with vitamin C and refreshing citrus oils. Ideal for fresh juice stalls and fruit retailers.'
+            },
+            {
+                'name': 'Red Lady Hybrid Sweet Papaya',
+                'category': 'Fruits',
+                'photo': 'papaya.jpg',
+                'farmer_id': 5, 'farmer_name': 'Kandasamy P.', 'phone': '9488123456',
+                'location': 'Sathyamangalam Agro Tract', 'district': 'Erode', 'pin': '638401',
+                'orig_price': 35.0, 'rescue_price': 20.0, 'qty': 650.0,
+                'grade': 'Grade A',
+                'desc': 'Thick reddish-orange sweet flesh with high brix sweetness index. Rescued from farm to reduce transit overripening; ready for immediate table serving.'
+            },
+            {
+                'name': 'Kiran Dark Green Sugar Watermelon',
+                'category': 'Fruits',
+                'photo': 'watermelon.jpg',
+                'farmer_id': 2, 'farmer_name': 'Muthuvel Karuppan', 'phone': '9842112345',
+                'location': 'Tindivanam Coastal Plains', 'district': 'Villupuram', 'pin': '604001',
+                'orig_price': 22.0, 'rescue_price': 13.0, 'qty': 1200.0,
+                'grade': 'Grade A',
+                'desc': 'Ultra-juicy, seed-sparse red watermelons with thin rind. High hydration fruit harvested at peak sweetness for supermarkets and juice bars.'
+            },
+            {
+                'name': 'Taiwan Pink Crisp Guava (Koyya)',
+                'category': 'Fruits',
+                'photo': 'guava.jpg',
+                'farmer_id': 3, 'farmer_name': 'Selvi Shanmugam', 'phone': '9876543210',
+                'location': 'Ayakudi Guava Capital', 'district': 'Dindigul', 'pin': '624613',
+                'orig_price': 60.0, 'rescue_price': 38.0, 'qty': 380.0,
+                'grade': 'Grade A',
+                'desc': 'Famous Ayakudi pink guavas with edible seeds, crispy texture, and rich guava fragrance. Hand-picked and sorted to prevent bruising.'
+            },
+            {
+                'name': 'Mauritius Golden Queen Pineapple',
+                'category': 'Fruits',
+                'photo': 'pineapple.jpg',
+                'farmer_id': 3, 'farmer_name': 'Selvi Shanmugam', 'phone': '9876543210',
+                'location': 'Cumbum Valley', 'district': 'Theni', 'pin': '625516',
+                'orig_price': 50.0, 'rescue_price': 32.0, 'qty': 420.0,
+                'grade': 'Grade A',
+                'desc': 'Honey-sweet golden pineapples with aromatic core. Hand harvested at 80% ripeness for extended shelf life and superb juicing performance.'
+            },
+            {
+                'name': 'Paneer Black Seeded Grapes (Cumbum Famous)',
+                'category': 'Fruits',
+                'photo': 'grapes.jpg',
+                'farmer_id': 3, 'farmer_name': 'Selvi Shanmugam', 'phone': '9876543210',
+                'location': 'Cumbum Grape Valley', 'district': 'Theni', 'pin': '625516',
+                'orig_price': 70.0, 'rescue_price': 45.0, 'qty': 360.0,
+                'grade': 'Grade A (GI Tag Variety)',
+                'desc': 'GI tagged Cumbum valley Paneer grapes. High natural sugar, juicy pulpy flesh, and authentic rustic grape aroma prized across Tamil Nadu.'
+            },
+            {
+                'name': 'Bhagwa Ruby Red Pomegranate',
+                'category': 'Fruits',
+                'photo': 'pomegranate.jpg',
+                'farmer_id': 5, 'farmer_name': 'Kandasamy P.', 'phone': '9488123456',
+                'location': 'Dharapuram Dry Orchards', 'district': 'Tirupur', 'pin': '638656',
+                'orig_price': 140.0, 'rescue_price': 92.0, 'qty': 320.0,
+                'grade': 'Grade A',
+                'desc': 'Glossy red rind containing soft, dark ruby arils. Sweet juice profile with low tannin bitterness. Superb antioxidant powerhouse rescued at farmgate.'
+            },
+
+            # --- OTHER FARM PRODUCTS (8) ---
+            {
+                'name': 'Pollachi Grade-A Tender Coconuts (Elaneer)',
+                'category': 'Other Agricultural Products',
+                'photo': 'coconuts.jpg',
+                'farmer_id': 5, 'farmer_name': 'Kandasamy P.', 'phone': '9488123456',
+                'location': 'Anamalai Grove Estates', 'district': 'Coimbatore', 'pin': '642104',
+                'orig_price': 48.0, 'rescue_price': 32.0, 'qty': 1500.0,
+                'grade': 'Grade A',
+                'desc': 'Sweet mineral-rich coconut water and tender pulp from Pollachi coconut groves. Harvested straight from tree crowns, zero chemical treatment.'
+            },
+            {
+                'name': 'Dharmapuri Pod Groundnuts (Peanuts)',
+                'category': 'Other Agricultural Products',
+                'photo': 'groundnut.jpg',
+                'farmer_id': 2, 'farmer_name': 'Muthuvel Karuppan', 'phone': '9842112345',
+                'location': 'Harur Drylands', 'district': 'Dharmapuri', 'pin': '636903',
+                'orig_price': 85.0, 'rescue_price': 58.0, 'qty': 500.0,
+                'grade': 'Grade A (Sun Dried)',
+                'desc': 'Two-kernel full pods with thin shell and high oil recovery. Sun-dried thoroughly on farm thresholds to prevent aflatoxin and moisture rot.'
+            },
+            {
+                'name': 'Thanjavur Ponni Raw Rice (Deluxe Harvest)',
+                'category': 'Grains',
+                'photo': 'rice.jpg',
+                'farmer_id': 4, 'farmer_name': 'Ramanathan K.', 'phone': '9789012345',
+                'location': 'Cauvery Delta Agro Fields', 'district': 'Thanjavur', 'pin': '613001',
+                'orig_price': 65.0, 'rescue_price': 45.0, 'qty': 1000.0,
+                'grade': 'Grade A (Single Origin)',
+                'desc': 'Traditional Ponni paddy harvested from Cauvery delta soil. Polished cleanly, slender long grains, non-sticky cooking outcome.'
+            },
+            {
+                'name': 'Yellow Hybrid Corn / Feed Maize',
+                'category': 'Grains',
+                'photo': 'maize.jpg',
+                'farmer_id': 5, 'farmer_name': 'Kandasamy P.', 'phone': '9488123456',
+                'location': 'Udumalaipettai Agro Belts', 'district': 'Tirupur', 'pin': '642126',
+                'orig_price': 32.0, 'rescue_price': 21.0, 'qty': 750.0,
+                'grade': 'Grade A',
+                'desc': 'Sun-dried whole yellow corn kernels. High starch content, cleaned of dust and chaff, perfect for food starch, poultry feed, and milling.'
+            },
+            {
+                'name': 'Farmgate Golden Durum Wheat Grain',
+                'category': 'Grains',
+                'photo': 'wheat.jpg',
+                'farmer_id': 2, 'farmer_name': 'Muthuvel Karuppan', 'phone': '9842112345',
+                'location': 'Hosur Plateau Farms', 'district': 'Krishnagiri', 'pin': '635109',
+                'orig_price': 38.0, 'rescue_price': 26.0, 'qty': 600.0,
+                'grade': 'Grade A',
+                'desc': 'Hard amber durum wheat grains with high gluten and protein index. Machine-cleaned and bagged for wholesale flour mills and bakers.'
+            },
+            {
+                'name': 'Fresh Farm Spinach & Green Amaranth (Keerai)',
+                'category': 'Leafy Vegetables',
+                'photo': 'green_leaves.jpg',
+                'farmer_id': 5, 'farmer_name': 'Kandasamy P.', 'phone': '9488123456',
+                'location': 'Madurai South Greenbelts', 'district': 'Madurai', 'pin': '625001',
+                'orig_price': 30.0, 'rescue_price': 18.0, 'qty': 200.0,
+                'grade': 'Grade A',
+                'desc': 'Pristine iron-rich green leaves harvested at sunrise. Free from wilt and stem rot, wrapped in moist farm jute sacks for farmgate pickup.'
+            },
+            {
+                'name': 'Fragrant Country Coriander (Kothamalli)',
+                'category': 'Leafy Vegetables',
+                'photo': 'coriander.jpg',
+                'farmer_id': 3, 'farmer_name': 'Selvi Shanmugam', 'phone': '9876543210',
+                'location': 'Ottanchathiram Veg Belts', 'district': 'Dindigul', 'pin': '624619',
+                'orig_price': 40.0, 'rescue_price': 22.0, 'qty': 180.0,
+                'grade': 'Grade A',
+                'desc': 'Intensely fragrant country variety coriander with thin stems and lush green leaves. Kept cold at farm gate to prevent wilting.'
+            },
+            {
+                'name': 'Kariveppilai Dark Green Curry Leaves',
+                'category': 'Leafy Vegetables',
+                'photo': 'curry_leaves.jpg',
+                'farmer_id': 5, 'farmer_name': 'Kandasamy P.', 'phone': '9488123456',
+                'location': 'Mettupalayam Foot Plains', 'district': 'Coimbatore', 'pin': '641301',
+                'orig_price': 45.0, 'rescue_price': 25.0, 'qty': 220.0,
+                'grade': 'Grade A',
+                'desc': 'Dark green aromatic curry leaves directly from Mettupalayam agro plantations. Thick pungent leaves packed with natural essential oils.'
+            }
+        ]
+
+        for p in catalog:
+            disc_pct = round(((p['orig_price'] - p['rescue_price']) / p['orig_price']) * 100, 1)
+
+            # Check if this rescue product is already in database (by product_name or photo)
+            cursor.execute("SELECT id, listing_id FROM rescue_products WHERE product_name = ? OR photo = ?", (p['name'], p['photo']))
+            existing = cursor.fetchone()
+
+            if existing:
+                rp_id = existing[0]
+                lst_id = existing[1]
+                # Update existing item to ensure valid active status, quantities, and freshness
+                cursor.execute("""
+                    UPDATE rescue_products
+                    SET product_name = ?,
+                        category = ?,
+                        photo = ?,
+                        quantity = ?,
+                        initial_quantity = ?,
+                        original_price = ?,
+                        rescue_price = ?,
+                        discount_percent = ?,
+                        quality_grade = ?,
+                        harvest_date = ?,
+                        expiry_date = ?,
+                        farm_location = ?,
+                        district = ?,
+                        pin_code = ?,
+                        farmer_name = ?,
+                        farmer_phone = ?,
+                        whatsapp_number = ?,
+                        description = ?,
+                        status = 'Available',
+                        updated_at = ?
+                    WHERE id = ?
+                """, (
+                    p['name'], p['category'], p['photo'], p['qty'], p['qty'],
+                    p['orig_price'], p['rescue_price'], disc_pct, p['grade'],
+                    h_date, exp_date, p['location'], p['district'], p['pin'],
+                    p['farmer_name'], p['phone'], p['phone'], p['desc'],
+                    now_str, rp_id
+                ))
+
+                if lst_id:
+                    cursor.execute("""
+                        UPDATE listings
+                        SET crop_name = ?,
+                            category = ?,
+                            photo = ?,
+                            quantity = ?,
+                            price_per_unit = ?,
+                            original_price = ?,
+                            status = 'Available',
+                            updated_at = ?
+                        WHERE id = ?
+                    """, (p['name'], p['category'], p['photo'], p['qty'], p['rescue_price'], p['orig_price'], now_str, lst_id))
+            else:
+                # 1. Insert into listings table for platform-wide compatibility & checkout
+                cursor.execute("""
+                    INSERT INTO listings (
+                        farmer_id, crop_name, category, photo, quantity, unit,
+                        price_per_unit, original_price, harvest_date, estimated_freshness_date,
+                        village_town, district, pin_code, farmer_name, farmer_phone,
+                        whatsapp_number, description, quality_grade, urgency_level,
+                        status, rescued_from_waste, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, 'kg', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Normal', 'Available', 0, ?, ?)
+                """, (
+                    p['farmer_id'], p['name'], p['category'], p['photo'], p['qty'],
+                    p['rescue_price'], p['orig_price'], h_date, exp_date,
+                    p['location'], p['district'], p['pin'], p['farmer_name'], p['phone'],
+                    p['phone'], p['desc'], p['grade'], now_str, now_str
+                ))
+                new_listing_id = cursor.lastrowid
+
+                # 2. Insert into rescue_products shared marketplace table
+                cursor.execute("""
+                    INSERT INTO rescue_products (
+                        farmer_id, listing_id, product_name, category, photo, additional_photos,
+                        quantity, initial_quantity, unit, original_price, rescue_price,
+                        discount_percent, quality_grade, harvest_date, expiry_date,
+                        farm_location, district, pin_code, farmer_name, farmer_phone,
+                        whatsapp_number, description, status, created_at, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, '[]', ?, ?, 'kg', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Available', ?, ?)
+                """, (
+                    p['farmer_id'], new_listing_id, p['name'], p['category'], p['photo'],
+                    p['qty'], p['qty'], p['orig_price'], p['rescue_price'],
+                    disc_pct, p['grade'], h_date, exp_date,
+                    p['location'], p['district'], p['pin'], p['farmer_name'], p['phone'],
+                    p['phone'], p['desc'], now_str, now_str
+                ))
+
+        conn.commit()
+        if close_at_end:
+            conn.close()
+        print(f"Successfully synchronized {len(catalog)} expanded agricultural rescue products.")
+    except Exception as e:
+        print(f"Error seeding expanded rescue products: {e}")
