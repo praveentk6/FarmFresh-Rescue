@@ -5309,6 +5309,7 @@ def list_direct_meetings():
     return render_template('meetings_list.html', meetings=meetings, current_filter=status_filter, role=role)
 
 @app.route('/meeting/<int:meeting_id>')
+@app.route('/meetings/<int:meeting_id>')
 @login_required
 def view_direct_meeting(meeting_id):
     """
@@ -5330,13 +5331,19 @@ def view_direct_meeting(meeting_id):
     counterpart_id = meeting['farmer_id'] if is_buyer else meeting['buyer_id']
     messages = get_direct_chat_messages(g.user['id'], counterpart_id, meeting_id=meeting_id)
 
+    # Fetch meeting rescheduling history and pending requests
+    reschedule_history = get_meeting_reschedule_history(meeting_id)
+    pending_reschedule = next((r for r in reschedule_history if r.get('status') == 'Pending'), None)
+
     return render_template(
         'meeting_detail.html',
         meeting=meeting,
         is_farmer=is_farmer,
         is_buyer=is_buyer,
         is_admin=is_admin,
-        messages=messages
+        messages=messages,
+        reschedule_history=reschedule_history,
+        pending_reschedule=pending_reschedule
     )
 
 @app.route('/api/meeting/<int:meeting_id>/respond', methods=['POST'])

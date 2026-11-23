@@ -104,6 +104,11 @@
             <a href="{{ url_for('view_direct_meeting', meeting_id=m.id) }}" class="btn btn-primary" style="font-weight: 700; padding: 0.6rem 1.15rem; border-radius: 8px; font-size: 0.9rem;">
               View Meeting Details &rarr;
             </a>
+            {% if m.status in ['Pending', 'Confirmed', 'Rescheduled'] %}
+              <a href="{{ url_for('view_direct_meeting', meeting_id=m.id) }}#rescheduleSection" class="btn btn-outline-secondary" style="font-weight: 700; padding: 0.6rem 0.85rem; border-radius: 8px; font-size: 0.9rem;" title="Reschedule Meeting">
+                🔄 Reschedule
+              </a>
+            {% endif %}
             {% set chat_user = m.buyer_id if role == 'farmer' else m.farmer_id %}
             <a href="{{ url_for('direct_messages_view', other_user_id=chat_user, meeting_id=m.id) }}" class="btn btn-secondary" style="font-weight: 700; padding: 0.6rem 0.85rem; border-radius: 8px; font-size: 0.9rem;" title="Message Counterpart">
               💬 Chat

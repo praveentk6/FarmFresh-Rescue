@@ -411,5 +411,55 @@ class TestRescheduleVerificationReviews(unittest.TestCase):
         res2 = client.get(f"/farmer/{self.farmer_id}")
         self.assertEqual(res2.status_code, 200)
 
+    def test_08_meeting_detail_view_with_reschedule(self):
+        """Test GET /meetings/<id> view includes reschedule history and controls."""
+        from app import app
+        app.config['TESTING'] = True
+        client = app.test_client()
+
+        # Login as farmer in test session
+        with client.session_transaction() as sess:
+            sess['user_id'] = self.farmer_id
+            sess['user_role'] = 'farmer'
+
+        # Create meeting with reschedule request
+        m_code = f"MEET-DET-{self.suffix[:6].upper()}"
+        conn = database.get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO direct_meetings (
+                meeting_code, listing_id, farmer_id, buyer_id, buyer_name, buyer_phone,
+                farmer_name, farmer_phone, product_name, required_quantity,
+                proposed_date, proposed_time, meeting_location, status
+            ) VALUES (
+                ?, ?, ?, ?, 'Buyer Test', '9876543211',
+                'Farmer Test', '9876543210', 'Ponni Rice Harvest', 50.0,
+                '2026-11-28', '02:00 PM', 'Farm Yard', 'Confirmed'
+            )
+        """, (m_code, self.listing_id, self.farmer_id, self.buyer_id))
+        meeting_id = cur.lastrowid
+        conn.commit()
+        conn.close()
+
+        # Buyer requests reschedule
+        ok_res, _, req_id = database.request_meeting_reschedule(
+            meeting_id=meeting_id,
+            requester_id=self.buyer_id,
+            requester_role='buyer',
+            proposed_date='2026-11-29',
+            proposed_time='04:00 PM',
+            reason='Logistics adjustment'
+        )
+        self.assertTrue(ok_res)
+
+        res = client.get(f"/meetings/{meeting_id}")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(b"Reschedule", res.data)
+        self.assertIn(b"Logistics adjustment", res.data)
+
+        # Also test singular /meeting/<id> route
+        res2 = client.get(f"/meeting/{meeting_id}")
+        self.assertEqual(res2.status_code, 200)
+
 if __name__ == '__main__':
     unittest.main()

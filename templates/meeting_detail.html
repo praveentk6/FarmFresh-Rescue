@@ -53,49 +53,98 @@
         </div>
       </div>
 
-      <!-- Quick Action on Pending -->
-      {% if is_farmer and meeting.status == 'Pending' %}
-        <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+      <!-- Quick Actions and Reschedule Controls -->
+      <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+        {% if is_farmer and meeting.status == 'Pending' %}
           <form action="{{ url_for('api_respond_meeting', meeting_id=meeting.id) }}" method="POST" style="margin: 0;">
             <input type="hidden" name="action" value="accept">
             <button type="submit" class="btn btn-primary" style="font-weight: 700; padding: 0.65rem 1.25rem;">
               ✓ Accept Meeting
             </button>
           </form>
-          <button onclick="document.getElementById('rescheduleSection').style.display='block'" class="btn btn-secondary" style="font-weight: 700; padding: 0.65rem 1rem;">
-            🔄 Suggest Other Time
-          </button>
           <form action="{{ url_for('api_respond_meeting', meeting_id=meeting.id) }}" method="POST" style="margin: 0;">
             <input type="hidden" name="action" value="reject">
             <button type="submit" class="btn" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; font-weight: 700; padding: 0.65rem 1rem;">
               ✕ Decline
             </button>
           </form>
-        </div>
-      {% endif %}
+        {% endif %}
+
+        {% if meeting.status in ['Pending', 'Confirmed', 'Rescheduled'] and not pending_reschedule %}
+          <button onclick="document.getElementById('rescheduleSection').style.display='block'" class="btn btn-secondary" style="font-weight: 700; padding: 0.65rem 1rem;">
+            🔄 Reschedule Meeting
+          </button>
+        {% endif %}
+      </div>
     </div>
+
+    <!-- Pending Reschedule Alert Banner (if any) -->
+    {% if pending_reschedule %}
+      <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 12px; padding: 1.25rem 1.5rem; margin-top: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+            <span style="font-size: 1.25rem;">🔄</span>
+            <strong style="color: #92400e; font-size: 1rem;">Reschedule Request Awaiting Response</strong>
+            <span style="background: #f59e0b; color: white; font-size: 0.72rem; font-weight: 800; padding: 0.15rem 0.5rem; border-radius: 12px;">Pending</span>
+          </div>
+          <div style="font-size: 0.88rem; color: #78350f;">
+            Proposed Date: <strong>{{ pending_reschedule.proposed_date }}</strong> at <strong>{{ pending_reschedule.proposed_time }}</strong>
+            {% if pending_reschedule.proposed_location %}&bull; Location: <strong>{{ pending_reschedule.proposed_location }}</strong>{% endif %}
+          </div>
+          {% if pending_reschedule.reason %}
+            <div style="font-size: 0.82rem; color: #92400e; margin-top: 0.25rem;">
+              <em>Reason: "{{ pending_reschedule.reason }}"</em> (submitted by {{ pending_reschedule.requester_role|capitalize }})
+            </div>
+          {% endif %}
+        </div>
+
+        {% if pending_reschedule.requester_id != g.user['id'] %}
+          <div style="display: flex; gap: 0.5rem;">
+            <form action="{{ url_for('route_respond_meeting_reschedule', reschedule_id=pending_reschedule.id) }}" method="POST" style="margin: 0;">
+              <input type="hidden" name="action" value="accept">
+              <button type="submit" class="btn btn-primary btn-sm" style="background: #16a34a; font-weight: 700; padding: 0.5rem 1rem;">
+                ✓ Accept New Schedule
+              </button>
+            </form>
+            <form action="{{ url_for('route_respond_meeting_reschedule', reschedule_id=pending_reschedule.id) }}" method="POST" style="margin: 0;">
+              <input type="hidden" name="action" value="reject">
+              <button type="submit" class="btn btn-sm" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; font-weight: 700; padding: 0.5rem 1rem;">
+                ✕ Decline
+              </button>
+            </form>
+          </div>
+        {% else %}
+          <span style="font-size: 0.85rem; color: #b45309; font-weight: 600;">
+            ⏳ Awaiting response from {{ 'farmer' if is_buyer else 'buyer' }}
+          </span>
+        {% endif %}
+      </div>
+    {% endif %}
 
     <!-- Reschedule Box (Hidden by default) -->
     <div id="rescheduleSection" style="display: none; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.25rem; margin-top: 1.5rem;">
-      <h4 style="font-size: 1rem; font-weight: 800; color: #111827; margin: 0 0 0.75rem 0;">Suggest Another Date, Time or Location</h4>
-      <form action="{{ url_for('api_respond_meeting', meeting_id=meeting.id) }}" method="POST">
-        <input type="hidden" name="action" value="reschedule">
+      <h4 style="font-size: 1rem; font-weight: 800; color: #111827; margin: 0 0 0.75rem 0;">Request New Meeting Date & Time</h4>
+      <form action="{{ url_for('route_request_meeting_reschedule', meeting_id=meeting.id) }}" method="POST">
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.75rem; margin-bottom: 0.75rem;">
           <div>
-            <label style="font-size: 0.8rem; font-weight: 700;">New Date</label>
+            <label style="font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">New Date *</label>
             <input type="date" name="proposed_date" required value="{{ meeting.proposed_date }}" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
           </div>
           <div>
-            <label style="font-size: 0.8rem; font-weight: 700;">New Time</label>
-            <input type="text" name="proposed_time" required value="{{ meeting.proposed_time }}" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+            <label style="font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">New Time *</label>
+            <input type="text" name="proposed_time" required value="{{ meeting.proposed_time }}" placeholder="e.g. 10:30 AM" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
           </div>
           <div>
-            <label style="font-size: 0.8rem; font-weight: 700;">New Location</label>
-            <input type="text" name="meeting_location" required value="{{ meeting.meeting_location }}" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
+            <label style="font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">Meeting Location</label>
+            <input type="text" name="proposed_location" value="{{ meeting.meeting_location }}" style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px;">
           </div>
         </div>
+        <div style="margin-bottom: 0.75rem;">
+          <label style="font-size: 0.8rem; font-weight: 700; display: block; margin-bottom: 0.25rem;">Reason for Rescheduling *</label>
+          <textarea name="reason" required rows="2" placeholder="e.g. Transport delay, adjusting harvest schedule..." style="width: 100%; padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 6px; font-family: inherit; font-size: 0.85rem;"></textarea>
+        </div>
         <div style="display: flex; gap: 0.5rem;">
-          <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem; font-weight: 700;">Send Reschedule Proposal</button>
+          <button type="submit" class="btn btn-primary" style="padding: 0.5rem 1rem; font-weight: 700;">Send Reschedule Request &rarr;</button>
           <button type="button" onclick="document.getElementById('rescheduleSection').style.display='none'" class="btn btn-secondary" style="padding: 0.5rem 1rem;">Cancel</button>
         </div>
       </form>
@@ -128,6 +177,33 @@
         {% if meeting.farmer_notes %}
           <div style="background: #f9fafb; padding: 0.65rem 0.85rem; border-radius: 8px; font-size: 0.88rem; color: #4b5563;">
             <strong>Farmer Note:</strong> {{ meeting.farmer_notes }}
+          </div>
+        {% endif %}
+
+        {% if reschedule_history %}
+          <div style="margin-top: 1rem; border-top: 1px solid #f1f5f9; padding-top: 0.75rem;">
+            <div style="font-weight: 700; font-size: 0.85rem; color: #334155; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.35rem;">
+              <span>📜</span> Reschedule Request History ({{ reschedule_history|length }})
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+              {% for rh in reschedule_history %}
+                <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.6rem 0.85rem; font-size: 0.82rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                  <div>
+                    <div><strong>Proposed:</strong> {{ rh.proposed_date }} at {{ rh.proposed_time }} by <em>{{ rh.requester_role|capitalize }}</em></div>
+                    {% if rh.reason %}<div style="color: #64748b; font-size: 0.78rem;">Reason: "{{ rh.reason }}"</div>{% endif %}
+                  </div>
+                  <div>
+                    {% if rh.status == 'Accepted' %}
+                      <span style="background: #dcfce7; color: #16a34a; font-weight: 800; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 12px;">✓ Accepted</span>
+                    {% elif rh.status == 'Rejected' %}
+                      <span style="background: #fee2e2; color: #dc2626; font-weight: 800; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 12px;">✕ Rejected</span>
+                    {% else %}
+                      <span style="background: #fef3c7; color: #d97706; font-weight: 800; font-size: 0.72rem; padding: 0.15rem 0.5rem; border-radius: 12px;">⏳ Pending</span>
+                    {% endif %}
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
           </div>
         {% endif %}
       </div>
