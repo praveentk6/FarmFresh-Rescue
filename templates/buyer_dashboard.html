@@ -1018,10 +1018,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     </div>
                     <div style="font-size: 0.78rem; color: #64748b;">{{ br.created_at[:10] }}</div>
                   </div>
-                  <div style="display: flex; align-items: center; gap: 0.25rem;">
-                    <span style="color: #f59e0b; font-size: 1.1rem;">★</span>
-                    <strong style="font-size: 1.05rem; color: #1e293b;">{{ br.rating }}</strong>
-                    <span style="color: #94a3b8; font-size: 0.8rem;">/ 5.0</span>
+                  <div style="display: flex; align-items: center; gap: 0.75rem;">
+                    <div style="display: flex; align-items: center; gap: 0.25rem;">
+                      <span style="color: #f59e0b; font-size: 1.1rem;">★</span>
+                      <strong style="font-size: 1.05rem; color: #1e293b;">{{ br.rating }}</strong>
+                      <span style="color: #94a3b8; font-size: 0.8rem;">/ 5.0</span>
+                    </div>
+                    <button type="button" class="btn btn-sm" style="background: #f1f5f9; color: #334155; border: 1px solid #cbd5e1; font-weight: 700; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 6px;" onclick="openBuyerEditReviewModal({{ br.id }}, {{ br.farmer_id }}, '{{ br.farmer_name|replace('\'', '\\\'') }}', '{{ br.product_name|replace('\'', '\\\'') if br.product_name else 'Agricultural Produce' }}', {{ br.rating }}, '{{ br.comment|replace('\'', '\\\'')|replace('\n', ' ') if br.comment else '' }}', {{ br.quality_rating or br.rating }}, {{ br.freshness_rating or br.rating }}, {{ br.communication_rating or br.rating }}, {{ br.price_rating or br.rating }}, {{ br.overall_rating or br.rating }});">
+                      ✏️ Edit Review
+                    </button>
                   </div>
                 </div>
                 <p style="color: #334155; font-size: 0.9rem; margin: 0.5rem 0 0.75rem 0;">
@@ -1804,12 +1809,38 @@ window.closeBuyerRescheduleModal = function() {
 
 // Review Modal Handlers
 window.openBuyerReviewModal = function(farmerId, farmerName, productName, meetingId, transactionId) {
+  document.getElementById('reviewEditId').value = '';
   document.getElementById('reviewFarmerId').value = farmerId;
   document.getElementById('reviewMeetingId').value = meetingId || '';
   document.getElementById('reviewTransactionId').value = transactionId || '';
   document.getElementById('reviewFarmerName').textContent = farmerName;
   document.getElementById('reviewProductName').textContent = productName;
   document.getElementById('reviewComment').value = '';
+  document.getElementById('reviewModalTitle').textContent = 'Rate Seller & Write Review';
+  document.getElementById('reviewSubmitBtnText').textContent = 'Submit Review ⭐';
+  document.getElementById('buyerReviewModal').style.display = 'flex';
+};
+
+window.openBuyerEditReviewModal = function(reviewId, farmerId, farmerName, productName, rating, comment, qRating, fRating, cRating, pRating, oRating) {
+  document.getElementById('reviewEditId').value = reviewId;
+  document.getElementById('reviewFarmerId').value = farmerId;
+  document.getElementById('reviewMeetingId').value = '';
+  document.getElementById('reviewTransactionId').value = '';
+  document.getElementById('reviewFarmerName').textContent = farmerName;
+  document.getElementById('reviewProductName').textContent = productName;
+  document.getElementById('reviewComment').value = comment || '';
+  var ratingSelect = document.querySelector('#buyerReviewModal select[name="rating"]');
+  if (ratingSelect) ratingSelect.value = Math.round(rating).toString();
+  var qSelect = document.querySelector('#buyerReviewModal select[name="quality_rating"]');
+  if (qSelect) qSelect.value = Math.round(qRating || rating).toString();
+  var fSelect = document.querySelector('#buyerReviewModal select[name="freshness_rating"]');
+  if (fSelect) fSelect.value = Math.round(fRating || rating).toString();
+  var cSelect = document.querySelector('#buyerReviewModal select[name="communication_rating"]');
+  if (cSelect) cSelect.value = Math.round(cRating || rating).toString();
+  var pSelect = document.querySelector('#buyerReviewModal select[name="price_rating"]');
+  if (pSelect) pSelect.value = Math.round(pRating || rating).toString();
+  document.getElementById('reviewModalTitle').textContent = 'Edit Your Review';
+  document.getElementById('reviewSubmitBtnText').textContent = 'Update Review ⭐';
   document.getElementById('buyerReviewModal').style.display = 'flex';
 };
 
@@ -1865,13 +1896,14 @@ window.closeBuyerReviewModal = function() {
   <div style="background: white; border-radius: 16px; max-width: 560px; width: 100%; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.2); overflow: hidden;">
     <div style="background: #f59e0b; color: white; padding: 1.25rem 1.5rem; display: flex; justify-content: space-between; align-items: center;">
       <div>
-        <h3 style="margin: 0; font-size: 1.2rem; font-weight: 800; color: white;">Rate Seller & Write Review</h3>
+        <h3 id="reviewModalTitle" style="margin: 0; font-size: 1.2rem; font-weight: 800; color: white;">Rate Seller & Write Review</h3>
         <div style="font-size: 0.8rem; opacity: 0.95; margin-top: 0.15rem;">Seller: <strong id="reviewFarmerName"></strong> &bull; Product: <strong id="reviewProductName"></strong></div>
       </div>
       <button type="button" onclick="closeBuyerReviewModal()" style="background: transparent; border: none; color: white; font-size: 1.5rem; cursor: pointer;">&times;</button>
     </div>
 
     <form action="{{ url_for('submit_review_route') }}" method="POST" style="padding: 1.5rem;">
+      <input type="hidden" name="review_id" id="reviewEditId">
       <input type="hidden" name="farmer_id" id="reviewFarmerId">
       <input type="hidden" name="meeting_id" id="reviewMeetingId">
       <input type="hidden" name="transaction_id" id="reviewTransactionId">
@@ -1941,7 +1973,7 @@ window.closeBuyerReviewModal = function() {
       <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
         <button type="button" onclick="closeBuyerReviewModal()" class="btn btn-secondary">Cancel</button>
         <button type="submit" class="btn btn-primary" style="background: #f59e0b; border-color: #d97706; font-weight: 700;">
-          Submit Review ⭐
+          <span id="reviewSubmitBtnText">Submit Review ⭐</span>
         </button>
       </div>
     </form>

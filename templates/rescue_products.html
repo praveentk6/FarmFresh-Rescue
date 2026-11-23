@@ -176,7 +176,7 @@
 
               <!-- Farmer & Location -->
               <div style="font-size: 0.88rem; color: #4b5563; margin-bottom: 0.65rem; display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap;">
-                <span>👨‍🌾 <strong>{{ item.farmer_name }}</strong></span>
+                <span>👨‍🌾 <a href="{{ url_for('view_seller_profile', seller_id=item.farmer_id) }}" style="color: inherit; text-decoration: none;" title="View Verified Seller Profile"><strong>{{ item.farmer_name }}</strong></a></span>
                 {% if item.is_verified_seller %}
                   <span style="background: #dcfce7; color: #15803d; font-size: 0.72rem; font-weight: 800; padding: 0.15rem 0.45rem; border-radius: 4px;" title="Admin Verified Seller">✓ Verified</span>
                 {% elif item.verification_status == 'Verification Pending' %}

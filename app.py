@@ -51,7 +51,7 @@ from database import (
     submit_seller_verification, get_seller_verification_by_farmer_id,
     get_all_seller_verifications, admin_review_seller_verification,
     get_verification_stats,
-    submit_buyer_review, get_farmer_reviews, get_farmer_rating_summary,
+    submit_buyer_review, update_buyer_review, get_farmer_reviews, get_farmer_rating_summary,
     get_completed_transactions_for_review, get_buyer_reviews_submitted,
     get_all_buyer_reviews, delete_buyer_review
 )
@@ -738,7 +738,8 @@ def browse_listings():
         total_urgent=total_urgent
     )
 
-@app.route('/listing/<int:listing_id>')
+@app.route('/listing/<int:listing_id>', endpoint='listing_detail')
+@app.route('/listing/<int:listing_id>', endpoint='view_listing')
 def listing_detail(listing_id):
     conn = get_db()
     cursor = conn.cursor()
@@ -5729,6 +5730,7 @@ def farmer_verification_submit():
     """Farmer submits identity/business verification details and uploads document."""
     seller_name = request.form.get('seller_name', '').strip() or g.user['name']
     mobile_number = request.form.get('mobile_number', '').strip() or g.user.get('phone', '')
+    email = request.form.get('email', '').strip() or g.user.get('email', '')
     farm_name = request.form.get('farm_name', '').strip()
     farm_address = request.form.get('farm_address', '').strip() or g.user.get('location', '')
     farm_location = request.form.get('farm_location', '').strip() or farm_address
@@ -5765,7 +5767,8 @@ def farmer_verification_submit():
         document_type=document_type,
         document_number=document_number,
         document_file=saved_doc_path,
-        additional_document_file=add_doc_path
+        additional_document_file=add_doc_path,
+        email=email
     )
 
     if ok:
@@ -5826,8 +5829,15 @@ def admin_review_verification_route(verification_id):
 @login_required
 @buyer_required
 def submit_review_route():
-    """Buyer submits rating and review for a completed direct meeting or sale."""
+    """Buyer submits rating and review for a completed direct meeting or sale, or updates an existing review."""
     data = request.get_json(silent=True) or request.form
+    review_id = data.get('review_id')
+    if review_id:
+        try:
+            review_id = int(review_id)
+        except (ValueError, TypeError):
+            review_id = None
+
     farmer_id = data.get('farmer_id', type=int)
     meeting_id = data.get('meeting_id', type=int)
     transaction_id = data.get('transaction_id', type=int)
@@ -5839,6 +5849,27 @@ def submit_review_route():
     communication_rating = data.get('communication_rating', type=float) or rating
     price_rating = data.get('price_rating', type=float) or rating
     overall_rating = data.get('overall_rating', type=float) or rating
+
+    # If review_id is provided, perform review edit/update
+    if review_id:
+        ok, msg, r_id = update_buyer_review(
+            review_id=review_id,
+            buyer_id=g.user['id'],
+            rating=rating,
+            comment=comment,
+            quality_rating=quality_rating,
+            freshness_rating=freshness_rating,
+            communication_rating=communication_rating,
+            price_rating=price_rating,
+            overall_rating=overall_rating
+        )
+        if request.is_json:
+            return jsonify({'success': ok, 'message': msg, 'review_id': r_id}), (200 if ok else 400)
+        if ok:
+            flash(f"⭐ {msg}", "success")
+        else:
+            flash(f"⚠️ {msg}", "danger")
+        return redirect(url_for('buyer_dashboard') + '#reviews')
 
     if not farmer_id:
         if meeting_id:
@@ -5880,6 +5911,79 @@ def submit_review_route():
     else:
         flash(f"⚠️ {msg}", "danger")
     return redirect(url_for('buyer_dashboard') + '#reviews')
+
+@app.route('/api/reviews/<int:review_id>/edit', methods=['POST'])
+@app.route('/buyer/reviews/<int:review_id>/edit', methods=['POST'])
+@login_required
+@buyer_required
+def edit_review_route(review_id):
+    """Buyer updates/edits an existing submitted review."""
+    data = request.get_json(silent=True) or request.form
+    rating = data.get('rating', type=float) or 5.0
+    comment = (data.get('comment') or '').strip()
+    quality_rating = data.get('quality_rating', type=float) or rating
+    freshness_rating = data.get('freshness_rating', type=float) or rating
+    communication_rating = data.get('communication_rating', type=float) or rating
+    price_rating = data.get('price_rating', type=float) or rating
+    overall_rating = data.get('overall_rating', type=float) or rating
+
+    ok, msg, r_id = update_buyer_review(
+        review_id=review_id,
+        buyer_id=g.user['id'],
+        rating=rating,
+        comment=comment,
+        quality_rating=quality_rating,
+        freshness_rating=freshness_rating,
+        communication_rating=communication_rating,
+        price_rating=price_rating,
+        overall_rating=overall_rating
+    )
+
+    if request.is_json:
+        return jsonify({'success': ok, 'message': msg, 'review_id': r_id}), (200 if ok else 400)
+
+    if ok:
+        flash(f"⭐ {msg}", "success")
+    else:
+        flash(f"⚠️ {msg}", "danger")
+    return redirect(url_for('buyer_dashboard') + '#reviews')
+
+@app.route('/seller/<int:seller_id>')
+@app.route('/farmer/<int:seller_id>')
+def view_seller_profile(seller_id):
+    """Public profile for a farmer/seller showing verification badge, ratings breakdown, reviews, and active listings."""
+    seller = auth_service.get_user_by_id(seller_id)
+    if not seller:
+        flash("Seller profile not found.", "warning")
+        return redirect(url_for('browse_rescue_products'))
+
+    verification = get_seller_verification_by_farmer_id(seller_id)
+    is_verified = bool(seller.get('is_verified_seller') or seller.get('verification_status') == 'Verified' or (verification and verification.get('status') == 'Verified'))
+
+    reviews = get_farmer_reviews(seller_id)
+    rating_summary = get_farmer_rating_summary(seller_id)
+    rescue_products = get_farmer_rescue_products(seller_id)
+
+    conn = get_db()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT * FROM listings
+        WHERE farmer_id = ? AND status = 'Available'
+        ORDER BY created_at DESC
+    """, (seller_id,))
+    regular_listings = cursor.fetchall()
+    conn.close()
+
+    return render_template(
+        'seller_profile.html',
+        seller=seller,
+        verification=verification,
+        is_verified=is_verified,
+        reviews=reviews,
+        rating_summary=rating_summary,
+        rescue_products=rescue_products,
+        regular_listings=regular_listings
+    )
 
 @app.route('/buyer/reviews')
 @login_required

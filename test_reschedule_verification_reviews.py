@@ -315,5 +315,101 @@ class TestRescheduleVerificationReviews(unittest.TestCase):
         )
         self.assertTrue(is_valid)
 
+    def test_05_update_buyer_review(self):
+        """Test buyer review editing and authorization checks."""
+        # 1. Create a meeting and initial review
+        m_code = f"MEET-EDIT-{self.suffix[:6].upper()}"
+        conn = database.get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO direct_meetings (
+                meeting_code, listing_id, farmer_id, buyer_id, buyer_name, buyer_phone,
+                farmer_name, farmer_phone, product_name, required_quantity,
+                proposed_date, proposed_time, meeting_location, status
+            ) VALUES (
+                ?, ?, ?, ?, 'Buyer Test', '9876543211',
+                'Farmer Test', '9876543210', 'Ponni Rice Harvest', 50.0,
+                '2026-11-15', '11:00 AM', 'Farm Site', 'Completed'
+            )
+        """, (m_code, self.listing_id, self.farmer_id, self.buyer_id))
+        meeting_id = cur.lastrowid
+        conn.commit()
+        conn.close()
+
+        ok, msg, r_id = database.submit_buyer_review(
+            buyer_id=self.buyer_id,
+            farmer_id=self.farmer_id,
+            rating=5.0,
+            comment="Initial rating was perfect.",
+            meeting_id=meeting_id
+        )
+        self.assertTrue(ok, msg)
+
+        # 2. Buyer updates the review
+        ok_edit, msg_edit, _ = database.update_buyer_review(
+            review_id=r_id,
+            buyer_id=self.buyer_id,
+            rating=4.0,
+            comment="Updated: Quality was very good overall.",
+            quality_rating=4.0,
+            freshness_rating=4.0,
+            communication_rating=4.0,
+            price_rating=4.0,
+            overall_rating=4.0
+        )
+        self.assertTrue(ok_edit, msg_edit)
+
+        # Verify review row has updated values
+        conn = database.get_db()
+        cur = conn.cursor()
+        cur.execute("SELECT rating, comment, updated_at FROM buyer_reviews WHERE id = ?", (r_id,))
+        row = cur.fetchone()
+        conn.close()
+        self.assertEqual(float(row['rating']), 4.0)
+        self.assertEqual(row['comment'], "Updated: Quality was very good overall.")
+        self.assertIsNotNone(row['updated_at'])
+
+        # 3. Another user should NOT be able to edit this review
+        other_buyer_id = 999999
+        ok_unauth, msg_unauth, _ = database.update_buyer_review(
+            review_id=r_id,
+            buyer_id=other_buyer_id,
+            rating=1.0,
+            comment="Hacked review"
+        )
+        self.assertFalse(ok_unauth)
+        self.assertIn("Unauthorized", msg_unauth)
+
+    def test_06_seller_verification_email(self):
+        """Test that seller verification stores and retains email address."""
+        ok, msg, v_id = database.submit_seller_verification(
+            farmer_id=self.farmer_id,
+            seller_name="Farmer Email Test",
+            mobile_number="9876543210",
+            farm_name="Organic Acres",
+            farm_address="123 Farm Rd",
+            district="Salem",
+            document_type="Aadhaar Card",
+            document_file="static/uploads/verifications/test.pdf",
+            email=self.farmer_email
+        )
+        self.assertTrue(ok, msg)
+        v = database.get_seller_verification_by_farmer_id(self.farmer_id)
+        self.assertIsNotNone(v)
+        self.assertEqual(v['email'], self.farmer_email)
+
+    def test_07_seller_profile_and_routes(self):
+        """Test GET /seller/<id> and GET /farmer/<id> profile views."""
+        from app import app
+        app.config['TESTING'] = True
+        client = app.test_client()
+
+        res = client.get(f"/seller/{self.farmer_id}")
+        self.assertEqual(res.status_code, 200)
+        self.assertIn(b"Seller Profile:", res.data)
+
+        res2 = client.get(f"/farmer/{self.farmer_id}")
+        self.assertEqual(res2.status_code, 200)
+
 if __name__ == '__main__':
     unittest.main()

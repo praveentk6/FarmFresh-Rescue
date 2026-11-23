@@ -1,0 +1,395 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ seller.name }} - Verified Seller Profile | FarmFresh Rescue{% endblock %}
+{% block meta_desc %}View verified profile, buyer ratings, reviews, and active agricultural produce listed by {{ seller.name }} in {{ seller.district or seller.location }}, Tamil Nadu.{% endblock %}
+
+{% block content %}
+<div class="container" style="padding-top: 2rem; padding-bottom: 5rem;">
+
+  <!-- Breadcrumb -->
+  <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.5rem;">
+    <a href="{{ url_for('browse_rescue_products') }}" style="color: var(--primary); text-decoration: none; font-weight: 600;">Rescue Marketplace</a>
+    <span>&rsaquo;</span>
+    <span style="color: #0f172a; font-weight: 700;">Seller Profile: {{ seller.name }}</span>
+  </div>
+
+  <!-- SELLER HERO CARD -->
+  <div class="data-table-card" style="margin-bottom: 2rem; border-top: 5px solid #16a34a; overflow: hidden;">
+    <div style="padding: 2rem; background: linear-gradient(135deg, #f0fdf4 0%, #ffffff 100%);">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1.5rem;">
+        
+        <!-- Left: Farmer Identity & Badges -->
+        <div style="display: flex; gap: 1.25rem; align-items: flex-start;">
+          <div style="width: 80px; height: 80px; border-radius: 50%; background: #dcfce7; color: #16a34a; font-size: 3rem; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(22,163,74,0.15); flex-shrink: 0; border: 3px solid white;">
+            👨‍🌾
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.35rem;">
+              <h1 style="font-size: 1.65rem; font-weight: 800; color: #0f172a; margin: 0;">{{ seller.name }}</h1>
+              
+              <!-- Verification Badge -->
+              {% if is_verified or seller.is_verified_seller or (verification and verification.status == 'Verified') or seller.verification_status == 'Verified' %}
+                <span style="background: #16a34a; color: white; font-size: 0.8rem; font-weight: 800; padding: 0.25rem 0.75rem; border-radius: 20px; display: inline-flex; align-items: center; gap: 0.35rem; box-shadow: 0 2px 4px rgba(22,163,74,0.2);" title="Admin Verified Seller with Govt ID and Farm Documents">
+                  ✓ Verified Seller
+                </span>
+              {% elif (verification and verification.status == 'Verification Pending') or seller.verification_status == 'Verification Pending' %}
+                <span style="background: #f59e0b; color: white; font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.65rem; border-radius: 20px; display: inline-flex; align-items: center; gap: 0.25rem;" title="Identity documents submitted and pending admin review">
+                  ⏳ Verification Pending
+                </span>
+              {% elif (verification and verification.status == 'Rejected') or seller.verification_status == 'Rejected' %}
+                <span style="background: #ef4444; color: white; font-size: 0.75rem; font-weight: 800; padding: 0.2rem 0.65rem; border-radius: 20px; display: inline-flex; align-items: center; gap: 0.25rem;" title="Verification was not approved">
+                  ⚠️ Unverified
+                </span>
+              {% else %}
+                <span style="background: #94a3b8; color: white; font-size: 0.75rem; font-weight: 700; padding: 0.2rem 0.65rem; border-radius: 20px;" title="Standard seller profile">
+                  ⚪ Not Verified
+                </span>
+              {% endif %}
+            </div>
+
+            <div style="font-size: 0.92rem; color: #475569; display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+              <span>📍 {{ seller.district or 'Tamil Nadu' }}{% if seller.location and seller.location != seller.district %}, {{ seller.location }}{% endif %}</span>
+              <span>🌾 Registered Agricultural Seller</span>
+              {% if seller.created_at %}
+                <span>📅 Member since {{ seller.created_at[:10] }}</span>
+              {% endif %}
+            </div>
+
+            <!-- Aggregate Star Rating -->
+            <div style="display: flex; align-items: center; gap: 0.6rem; margin-top: 0.75rem; flex-wrap: wrap;">
+              <div style="display: flex; align-items: center; gap: 0.25rem; background: #fffdf5; border: 1px solid #fde68a; padding: 0.3rem 0.75rem; border-radius: 8px;">
+                <span style="color: #f59e0b; font-size: 1.25rem;">★</span>
+                <strong style="font-size: 1.15rem; color: #1e293b;">
+                  {{ "%.1f"|format(rating_summary.average_rating) if rating_summary and rating_summary.total_reviews > 0 else '5.0' }}
+                </strong>
+                <span style="color: #64748b; font-size: 0.85rem;">/ 5.0</span>
+              </div>
+              <span style="font-size: 0.88rem; font-weight: 600; color: #64748b;">
+                ({{ rating_summary.total_reviews if rating_summary else 0 }} buyer review{{ 's' if not rating_summary or rating_summary.total_reviews != 1 else '' }})
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Direct Communication & Deal Actions -->
+        <div style="display: flex; flex-direction: column; gap: 0.6rem; min-width: 220px;">
+          {% if seller.phone %}
+            <a href="tel:{{ seller.phone }}" class="btn btn-outline-primary" style="font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.65rem 1rem;">
+              📞 Call Farmer: {{ seller.phone }}
+            </a>
+            {% set clean_phone = seller.phone|replace(' ', '')|replace('-', '')|replace('+', '') %}
+            {% if clean_phone|length == 10 %}
+              {% set wa_phone = '91' ~ clean_phone %}
+            {% else %}
+              {% set wa_phone = clean_phone %}
+            {% endif %}
+            <a href="https://wa.me/{{ wa_phone }}?text={{ ('Hello ' ~ seller.name ~ ', I saw your verified profile on FarmFresh Rescue and would like to inquire about your produce.')|urlencode }}" target="_blank" class="btn" style="background: #25d366; color: white; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.65rem 1rem; border-radius: 8px; text-decoration: none;">
+              💬 Chat on WhatsApp
+            </a>
+          {% endif %}
+          <a href="{{ url_for('direct_messages_view', other_user_id=seller.id) }}" class="btn btn-secondary" style="font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 0.5rem; padding: 0.65rem 1rem;">
+            ✉️ In-App Direct Message
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Verification Details Banner (if verified) -->
+    {% if is_verified or (verification and verification.status == 'Verified') %}
+      <div style="background: #f8fafc; border-top: 1px solid #e2e8f0; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; font-size: 0.85rem; color: #475569;">
+        <div style="display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;">
+          <span style="color: #16a34a; font-weight: 700; display: flex; align-items: center; gap: 0.35rem;">
+            🛡️ Official Verification Confirmed:
+          </span>
+          {% if verification and verification.farm_name %}
+            <span>Farm Name: <strong>{{ verification.farm_name }}</strong></span>
+            <span>&bull;</span>
+          {% endif %}
+          {% if verification and verification.document_type %}
+            <span>Document: <strong>{{ verification.document_type }}</strong></span>
+            <span>&bull;</span>
+          {% endif %}
+          <span>Location: <strong>{{ verification.farm_address or seller.location or seller.district }}</strong></span>
+        </div>
+        <span style="color: #16a34a; font-weight: 700;">✓ Trust & Safety Verified</span>
+      </div>
+    {% endif %}
+  </div>
+
+  <!-- RATINGS & REVIEWS SECTION -->
+  <div class="data-table-card" style="margin-bottom: 2.5rem; border-top: 4px solid #f59e0b;">
+    <div class="data-table-header" style="flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <h2 style="font-size: 1.35rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+          <span>⭐</span> Buyer Reviews & Feedback
+        </h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">
+          Actual reviews and star ratings submitted by buyers after completing direct farm meetings and produce purchases.
+        </span>
+      </div>
+      {% if current_user and current_user['role'] == 'buyer' %}
+        <a href="{{ url_for('buyer_dashboard') }}#reviews" class="btn btn-sm" style="background: #f59e0b; color: white; font-weight: 700; border-radius: 8px; text-decoration: none; padding: 0.5rem 0.85rem;">
+          ✍️ Submit / Edit Your Review
+        </a>
+      {% endif %}
+    </div>
+
+    <div style="padding: 1.75rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 2rem; margin-bottom: 2rem;">
+        
+        <!-- Score Card & Star Breakdown -->
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem; text-align: center;">
+          <div style="font-size: 3rem; font-weight: 900; color: #0f172a; line-height: 1;">
+            {{ "%.1f"|format(rating_summary.average_rating) if rating_summary and rating_summary.total_reviews > 0 else '5.0' }}
+          </div>
+          <div style="color: #f59e0b; font-size: 1.5rem; margin: 0.35rem 0;">
+            {% set avg_rounded = (rating_summary.average_rating|round|int) if rating_summary and rating_summary.total_reviews > 0 else 5 %}
+            {% for i in range(1, 6) %}
+              {% if i <= avg_rounded %}★{% else %}☆{% endif %}
+            {% endfor %}
+          </div>
+          <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 1.25rem;">
+            Based on {{ rating_summary.total_reviews if rating_summary else 0 }} verified buyer review{{ 's' if not rating_summary or rating_summary.total_reviews != 1 else '' }}
+          </div>
+
+          <!-- Star distribution bars -->
+          <div style="display: flex; flex-direction: column; gap: 0.4rem; text-align: left; font-size: 0.78rem;">
+            {% for s in [5, 4, 3, 2, 1] %}
+              {% set count = rating_summary.star_counts[s] if rating_summary and rating_summary.star_counts else 0 %}
+              {% set total = rating_summary.total_reviews if rating_summary and rating_summary.total_reviews > 0 else 1 %}
+              {% set pct = (count / total * 100)|round|int %}
+              <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <span style="width: 35px; color: #475569; font-weight: 600;">{{ s }} ★</span>
+                <div style="flex: 1; height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                  <div style="height: 100%; width: {{ pct }}%; background: #f59e0b; border-radius: 4px;"></div>
+                </div>
+                <span style="width: 25px; text-align: right; color: #64748b;">{{ count }}</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+
+        <!-- Category Metrics Breakdown -->
+        <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.5rem;">
+          <h3 style="font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0 0 1rem 0;">
+            Category Ratings
+          </h3>
+          <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 0.35rem;">
+                <span>🥦 Produce Quality</span>
+                <strong>{{ "%.1f"|format(rating_summary.avg_quality) if rating_summary and rating_summary.avg_quality else '5.0' }} / 5.0</strong>
+              </div>
+              <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                <div style="height: 100%; width: {{ ((rating_summary.avg_quality if rating_summary and rating_summary.avg_quality else 5.0) / 5.0 * 100)|round|int }}%; background: #16a34a;"></div>
+              </div>
+            </div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 0.35rem;">
+                <span>🌿 Product Freshness</span>
+                <strong>{{ "%.1f"|format(rating_summary.avg_freshness) if rating_summary and rating_summary.avg_freshness else '5.0' }} / 5.0</strong>
+              </div>
+              <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                <div style="height: 100%; width: {{ ((rating_summary.avg_freshness if rating_summary and rating_summary.avg_freshness else 5.0) / 5.0 * 100)|round|int }}%; background: #0284c7;"></div>
+              </div>
+            </div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 0.35rem;">
+                <span>💬 Seller Communication</span>
+                <strong>{{ "%.1f"|format(rating_summary.avg_communication) if rating_summary and rating_summary.avg_communication else '5.0' }} / 5.0</strong>
+              </div>
+              <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                <div style="height: 100%; width: {{ ((rating_summary.avg_communication if rating_summary and rating_summary.avg_communication else 5.0) / 5.0 * 100)|round|int }}%; background: #8b5cf6;"></div>
+              </div>
+            </div>
+
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; color: #334155; margin-bottom: 0.35rem;">
+                <span>💰 Price Satisfaction & Value</span>
+                <strong>{{ "%.1f"|format(rating_summary.avg_price) if rating_summary and rating_summary.avg_price else '5.0' }} / 5.0</strong>
+              </div>
+              <div style="height: 8px; background: #e2e8f0; border-radius: 4px; overflow: hidden;">
+                <div style="height: 100%; width: {{ ((rating_summary.avg_price if rating_summary and rating_summary.avg_price else 5.0) / 5.0 * 100)|round|int }}%; background: #f59e0b;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Reviews Feed List -->
+      <h3 style="font-size: 1.15rem; font-weight: 800; color: #0f172a; margin-bottom: 1rem;">
+        Detailed Reviews ({{ reviews|length if reviews else 0 }})
+      </h3>
+
+      {% if reviews %}
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+          {% for r in reviews %}
+            <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; box-shadow: 0 1px 3px rgba(0,0,0,0.04);">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.5rem;">
+                <div style="display: flex; align-items: center; gap: 0.65rem;">
+                  <div style="width: 40px; height: 40px; border-radius: 50%; background: #e0f2fe; color: #0369a1; font-weight: 800; display: flex; align-items: center; justify-content: center; font-size: 1rem;">
+                    {{ r.buyer_name[:1] if r.buyer_name else 'B' }}
+                  </div>
+                  <div>
+                    <div style="font-weight: 800; color: #0f172a;">
+                      {{ r.buyer_name or 'Verified Buyer' }}
+                      {% if r.product_name %}
+                        <span style="font-weight: 500; font-size: 0.8rem; color: #64748b;">&bull; Purchased {{ r.product_name }}</span>
+                      {% endif %}
+                    </div>
+                    <div style="font-size: 0.78rem; color: #94a3b8;">
+                      Reviewed on {{ r.created_at[:10] }}
+                      {% if r.updated_at and r.updated_at != r.created_at %}
+                        <span style="color: #64748b;">(edited {{ r.updated_at[:10] }})</span>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 0.25rem;">
+                  <span style="color: #f59e0b; font-size: 1.15rem;">★</span>
+                  <strong style="font-size: 1.1rem; color: #0f172a;">{{ r.rating }}</strong>
+                  <span style="color: #94a3b8; font-size: 0.8rem;">/ 5.0</span>
+                </div>
+              </div>
+
+              {% if r.comment %}
+                <p style="color: #334155; font-size: 0.92rem; line-height: 1.5; margin: 0.65rem 0 0.85rem 0;">
+                  "{{ r.comment }}"
+                </p>
+              {% endif %}
+
+              <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; font-size: 0.75rem; color: #64748b;">
+                <span style="background: #f1f5f9; padding: 0.2rem 0.55rem; border-radius: 4px;">Quality: {{ r.quality_rating }}★</span>
+                <span style="background: #f1f5f9; padding: 0.2rem 0.55rem; border-radius: 4px;">Freshness: {{ r.freshness_rating }}★</span>
+                <span style="background: #f1f5f9; padding: 0.2rem 0.55rem; border-radius: 4px;">Communication: {{ r.communication_rating }}★</span>
+                <span style="background: #f1f5f9; padding: 0.2rem 0.55rem; border-radius: 4px;">Price: {{ r.price_rating }}★</span>
+              </div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div style="text-align: center; padding: 3rem 1.5rem; background: #f8fafc; border-radius: 12px; color: #64748b;">
+          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">⭐</div>
+          <div style="font-weight: 700; color: #0f172a; margin-bottom: 0.25rem;">No Reviews Yet</div>
+          <p style="font-size: 0.85rem; margin: 0;">Be the first buyer to complete a deal or meeting with {{ seller.name }} and leave a review!</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- CURRENT ACTIVE PRODUCE LISTINGS -->
+  <div class="data-table-card" style="border-top: 4px solid var(--primary);">
+    <div class="data-table-header" style="flex-wrap: wrap; gap: 1rem;">
+      <div>
+        <h2 style="font-size: 1.35rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 0.5rem;">
+          <span>🌾</span> Active Produce Listed by {{ seller.name }}
+        </h2>
+        <span style="font-size: 0.85rem; color: var(--text-muted);">
+          Inspect fresh produce available for direct farmgate meeting, urgent rescue, or bulk purchase.
+        </span>
+      </div>
+      <a href="{{ url_for('browse_rescue_products') }}" class="btn btn-secondary btn-sm">
+        View All Marketplace Produce &rarr;
+      </a>
+    </div>
+
+    <div style="padding: 1.75rem;">
+      {% set total_items = (rescue_products|length if rescue_products else 0) + (regular_listings|length if regular_listings else 0) %}
+      {% if total_items > 0 %}
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1.5rem;">
+          
+          <!-- Rescue Products -->
+          {% if rescue_products %}
+            {% for item in rescue_products %}
+              <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04); display: flex; flex-direction: column;">
+                <div style="height: 160px; background: #f1f5f9; position: relative;">
+                  {% if item.photo %}
+                    <img src="{{ url_for('static', filename=item.photo) }}" alt="{{ item.product_name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                  {% else %}
+                    <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem; background: #f0fdf4;">
+                      🥦
+                    </div>
+                  {% endif %}
+                  <span style="position: absolute; top: 10px; right: 10px; background: #ef4444; color: white; font-weight: 800; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 20px;">
+                    {{ item.discount_percentage }}% OFF Rescue
+                  </span>
+                </div>
+                <div style="padding: 1.25rem; flex: 1; display: flex; flex-direction: column;">
+                  <div style="font-weight: 800; font-size: 1.1rem; color: #0f172a; margin-bottom: 0.25rem;">
+                    {{ item.product_name }}
+                  </div>
+                  <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.75rem;">
+                    Qty Available: <strong>{{ item.quantity }} {{ item.unit }}</strong>
+                  </div>
+                  <div style="display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 1rem;">
+                    <span style="font-size: 1.3rem; font-weight: 900; color: #16a34a;">₹{{ item.rescue_price }}</span>
+                    <span style="font-size: 0.85rem; color: #94a3b8; text-decoration: line-through;">₹{{ item.original_price }}</span>
+                    <span style="font-size: 0.8rem; color: #64748b;">/ {{ item.unit }}</span>
+                  </div>
+                  <div style="margin-top: auto; display: flex; gap: 0.5rem;">
+                    <a href="{{ url_for('view_rescue_product', product_id=item.id) }}" class="btn btn-outline-primary btn-sm" style="flex: 1; text-align: center;">
+                      Details
+                    </a>
+                    <a href="{{ url_for('schedule_direct_meeting', product_id=item.id) }}" class="btn btn-primary btn-sm" style="flex: 1; text-align: center; background: #16a34a; font-weight: 700;">
+                      🤝 Meet & Buy
+                    </a>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          {% endif %}
+
+          <!-- Regular Listings -->
+          {% if regular_listings %}
+            {% for item in regular_listings %}
+              <div style="background: white; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.04); display: flex; flex-direction: column;">
+                <div style="height: 160px; background: #f1f5f9; position: relative;">
+                  {% if item.photo %}
+                    <img src="{{ url_for('static', filename=item.photo) }}" alt="{{ item.crop_name }}" style="width: 100%; height: 100%; object-fit: cover;">
+                  {% else %}
+                    <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 3rem; background: #f0fdf4;">
+                      🌾
+                    </div>
+                  {% endif %}
+                  <span style="position: absolute; top: 10px; right: 10px; background: #16a34a; color: white; font-weight: 800; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 20px;">
+                    Fresh Harvest
+                  </span>
+                </div>
+                <div style="padding: 1.25rem; flex: 1; display: flex; flex-direction: column;">
+                  <div style="font-weight: 800; font-size: 1.1rem; color: #0f172a; margin-bottom: 0.25rem;">
+                    {{ item.crop_name }}
+                  </div>
+                  <div style="font-size: 0.85rem; color: #64748b; margin-bottom: 0.75rem;">
+                    Qty Available: <strong>{{ item.quantity }} {{ item.unit }}</strong>
+                  </div>
+                  <div style="display: flex; align-items: baseline; gap: 0.5rem; margin-bottom: 1rem;">
+                    <span style="font-size: 1.3rem; font-weight: 900; color: #0f172a;">₹{{ item.price_per_unit }}</span>
+                    <span style="font-size: 0.8rem; color: #64748b;">/ {{ item.unit }}</span>
+                  </div>
+                  <div style="margin-top: auto;">
+                    <a href="{{ url_for('listing_detail', listing_id=item.id) }}" class="btn btn-outline-primary btn-sm" style="width: 100%; text-align: center;">
+                      View Crop Details &rarr;
+                    </a>
+                  </div>
+                </div>
+              </div>
+            {% endfor %}
+          {% endif %}
+
+        </div>
+      {% else %}
+        <div style="text-align: center; padding: 3rem 1.5rem; background: #f8fafc; border-radius: 12px; color: #64748b;">
+          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📦</div>
+          <div style="font-weight: 700; color: #0f172a; margin-bottom: 0.25rem;">No Active Listings Right Now</div>
+          <p style="font-size: 0.85rem; margin: 0;">This seller does not currently have active surplus produce listed. Check back soon or contact them directly.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+

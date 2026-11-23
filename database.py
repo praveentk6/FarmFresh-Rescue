@@ -766,12 +766,30 @@ def init_db():
         comment TEXT,
         is_verified_purchase INTEGER DEFAULT 1,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP,
         FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (farmer_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (transaction_id) REFERENCES direct_sales(id) ON DELETE SET NULL,
         FOREIGN KEY (meeting_id) REFERENCES direct_meetings(id) ON DELETE SET NULL
     )
     ''')
+
+    # Migrations for buyer_reviews and seller_verifications
+    cursor.execute("PRAGMA table_info(buyer_reviews)")
+    br_cols = [r[1] for r in cursor.fetchall()]
+    if 'updated_at' not in br_cols:
+        try:
+            cursor.execute("ALTER TABLE buyer_reviews ADD COLUMN updated_at TIMESTAMP")
+        except Exception:
+            pass
+
+    cursor.execute("PRAGMA table_info(seller_verifications)")
+    sv_cols = [r[1] for r in cursor.fetchall()]
+    if 'email' not in sv_cols:
+        try:
+            cursor.execute("ALTER TABLE seller_verifications ADD COLUMN email TEXT")
+        except Exception:
+            pass
 
     # Migrations for chat_messages & listings
     cursor.execute("PRAGMA table_info(chat_messages)")
@@ -4652,9 +4670,9 @@ def get_meeting_reschedule_history(meeting_id):
 # SELLER VERIFICATION SYSTEM
 # ----------------------------------------------------------------------------
 
-def submit_seller_verification(farmer_id, seller_name, mobile_number, farm_name, farm_address,
-                               farm_location, district, document_type, document_number,
-                               document_file, additional_document_file=None):
+def submit_seller_verification(farmer_id, seller_name, mobile_number, farm_name=None, farm_address=None,
+                               farm_location=None, district=None, document_type='Farmer ID / Uzhavar Attai', document_number=None,
+                               document_file=None, additional_document_file=None, email=None):
     """
     Farmer submits verification details and documents for administrative approval.
     """
@@ -4663,16 +4681,29 @@ def submit_seller_verification(farmer_id, seller_name, mobile_number, farm_name,
         cursor = conn.cursor()
         now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
+        # Fallback values
+        farm_address = farm_address or ''
+        farm_location = farm_location or farm_address
+        district = district or 'Tamil Nadu'
+        document_type = document_type or 'Identity Document'
+
+        # Fallback email from user account if not supplied
+        if not email:
+            cursor.execute("SELECT email FROM users WHERE id = ?", (farmer_id,))
+            u_row = cursor.fetchone()
+            if u_row:
+                email = u_row['email']
+
         cursor.execute("""
             INSERT INTO seller_verifications (
                 farmer_id, seller_name, mobile_number, farm_name, farm_address,
                 farm_location, district, document_type, document_number,
-                document_file, additional_document_file, status, submitted_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Verification Pending', ?)
+                document_file, additional_document_file, email, status, submitted_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Verification Pending', ?)
         """, (
             farmer_id, seller_name, mobile_number, farm_name, farm_address,
             farm_location, district, document_type, document_number,
-            document_file, additional_document_file, now_str
+            document_file, additional_document_file, email, now_str
         ))
         v_id = cursor.lastrowid
 
@@ -5160,3 +5191,72 @@ def delete_buyer_review(review_id):
         return True, "Review removed and seller rating recalculated"
     except Exception as e:
         return False, str(e)
+
+def update_buyer_review(review_id, buyer_id, rating, comment, quality_rating=None,
+                        freshness_rating=None, communication_rating=None, price_rating=None, overall_rating=None):
+    """
+    Allow a buyer to edit their existing submitted review.
+    Updates ratings, comments, and recalculates the seller's aggregate score.
+    """
+    try:
+        conn = get_db()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM buyer_reviews WHERE id = ?", (review_id,))
+        review = cursor.fetchone()
+        if not review:
+            conn.close()
+            return False, "Review record not found", None
+
+        # Verify ownership: only original buyer (or admin) can edit
+        if review['buyer_id'] != buyer_id:
+            conn.close()
+            return False, "Unauthorized: You can only edit your own reviews", None
+
+        farmer_id = review['farmer_id']
+        r = float(rating)
+        if r < 1 or r > 5:
+            conn.close()
+            return False, "Rating must be between 1 and 5 stars", None
+
+        q_r = max(1.0, min(5.0, float(quality_rating if quality_rating is not None else review['quality_rating'] or r)))
+        f_r = max(1.0, min(5.0, float(freshness_rating if freshness_rating is not None else review['freshness_rating'] or r)))
+        c_r = max(1.0, min(5.0, float(communication_rating if communication_rating is not None else review['communication_rating'] or r)))
+        p_r = max(1.0, min(5.0, float(price_rating if price_rating is not None else review['price_rating'] or r)))
+        o_r = max(1.0, min(5.0, float(overall_rating if overall_rating is not None else r)))
+
+        now_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+        cursor.execute("""
+            UPDATE buyer_reviews
+            SET rating = ?,
+                comment = ?,
+                quality_rating = ?,
+                freshness_rating = ?,
+                communication_rating = ?,
+                price_rating = ?,
+                overall_rating = ?,
+                updated_at = ?
+            WHERE id = ?
+        """, (r, comment or '', q_r, f_r, c_r, p_r, o_r, now_str, review_id))
+
+        # Recalculate seller rating and total reviews
+        cursor.execute("SELECT COUNT(*), AVG(rating) FROM buyer_reviews WHERE farmer_id = ?", (farmer_id,))
+        count_row = cursor.fetchone()
+        tot_reviews = count_row[0] or 0
+        avg_rating = round(float(count_row[1] or 0.0), 2)
+
+        cursor.execute("""
+            UPDATE users
+            SET seller_rating = ?, total_reviews = ?
+            WHERE id = ?
+        """, (avg_rating, tot_reviews, farmer_id))
+        conn.commit()
+        conn.close()
+
+        return True, "Review updated successfully!", review_id
+    except Exception as e:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        return False, str(e), None
