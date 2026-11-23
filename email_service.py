@@ -592,7 +592,7 @@ def _deliver_in_app_notification(to_email: str, subject: str, content: str):
         if user_row:
             cursor.execute("""
                 INSERT INTO notifications (user_id, title, message, type, link, is_read, created_at)
-                VALUES (?, ?, ?, 'broadcast', '/dashboard', 0, ?)
+                VALUES (?, ?, ?, 'info', '/dashboard', 0, ?)
             """, (user_row['id'], subject[:100], clean_text, now_ts))
             conn.commit()
             conn.close()
@@ -608,6 +608,11 @@ def _deliver_in_app_notification(to_email: str, subject: str, content: str):
             conn.close()
             return True
     except Exception as e:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
         print(f"[_deliver_in_app_notification Error] {e}")
         return False
 

@@ -31,25 +31,6 @@
       </button>
     </div>
 
-    <!-- 1-Click Quick Demo Accounts Fill Bar -->
-    <div class="demo-accounts-strip">
-      <div class="demo-strip-header">
-        <span class="demo-strip-icon">⚡</span>
-        <span class="demo-strip-label">{{ '1-கிளிக் மாதிரி உள்நுழைவு:' if lang == 'ta' else '1-Click Demo Fill:' }}</span>
-      </div>
-      <div class="demo-strip-btns">
-        <button type="button" class="demo-quick-btn demo-quick-farmer" onclick="quickFillDemo('farmer', 'selvi.farms@gmail.com', 'farmer123')">
-          👨‍🌾 Selvi (Farmer)
-        </button>
-        <button type="button" class="demo-quick-btn demo-quick-buyer" onclick="quickFillDemo('buyer', 'saravana.hotel@gmail.com', 'buyer123')">
-          🛒 Saravana (Buyer)
-        </button>
-        <button type="button" class="demo-quick-btn demo-quick-admin" onclick="quickFillDemo('admin', 'Pp274142@gmail.com', 'praveen16')">
-          🛡️ Admin (Praveen)
-        </button>
-      </div>
-    </div>
-
     <!-- 1. FARMER LOGIN FORM -->
     <div class="auth-role-pane {% if active_role == 'farmer' or not active_role %}active{% endif %}" id="paneFarmer">
       <div class="role-badge role-badge-farmer">
@@ -197,26 +178,6 @@ function switchLoginRole(role) {
   // Update URL hash without reload
   if (history.replaceState) {
     history.replaceState(null, null, '#' + role);
-  }
-}
-
-function quickFillDemo(role, email, password) {
-  switchLoginRole(role);
-  if (role === 'farmer') {
-    const e = document.getElementById('farmerEmail');
-    const p = document.getElementById('farmerPassword');
-    if (e) e.value = email;
-    if (p) p.value = password;
-  } else if (role === 'buyer') {
-    const e = document.getElementById('buyerEmail');
-    const p = document.getElementById('buyerPassword');
-    if (e) e.value = email;
-    if (p) p.value = password;
-  } else if (role === 'admin') {
-    const e = document.getElementById('adminEmail');
-    const p = document.getElementById('adminPassword');
-    if (e) e.value = email;
-    if (p) p.value = password;
   }
 }
 
